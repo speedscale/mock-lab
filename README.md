@@ -14,13 +14,13 @@ One click — all six runtimes and the `proxymock` CLI are preinstalled.
 
 | Language | Run |
 | --- | --- |
-| Go | `cd go && go run .` |
-| Node.js | `cd node && node index.js` |
-| Python | `cd python && python3 app.py` |
-| Java | `cd java && java App.java` |
-| Ruby | `cd ruby && ruby app.rb` |
-| .NET | `cd dotnet && dotnet run` |
-| C++ | `cd cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app` |
+| [Go](go/README.md) | `cd go && go run .` |
+| [Node.js](node/README.md) | `cd node && node index.js` |
+| [Python](python/README.md) | `cd python && python3 app.py` |
+| [Java](java/README.md) | `cd java && java App.java` |
+| [Ruby](ruby/README.md) | `cd ruby && ruby app.rb` |
+| [.NET](dotnet/README.md) | `cd dotnet && dotnet run` |
+| [C++](cpp/README.md) | `cd cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app` |
 
 Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWNSTREAM_URL`
 (default `https://demo-api-dev.trafficreplay.com`).

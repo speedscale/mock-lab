@@ -1,7 +1,7 @@
 // proxymock CNCF demo app (Node.js). Exposes a small HTTP API on :8080 and fulfills
 // each request by calling the CNCF downstream API. Zero dependencies (built-in http +
-// global fetch). For proxymock recording, route fetch through a proxy dispatcher or
-// run behind proxymock per the Node language reference.
+// global fetch). For proxymock recording, run on Node 24+ (or 22.21+) with
+// NODE_USE_ENV_PROXY=1 and NODE_EXTRA_CA_CERTS set — see node/README.md.
 import http from "node:http";
 
 const DOWNSTREAM = process.env.DOWNSTREAM_URL || "https://demo-api-dev.trafficreplay.com";

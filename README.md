@@ -1,14 +1,16 @@
 # mock-lab
 
 Demo apps for the [proxymock](https://docs.speedscale.com/proxymock/) quickstart — the same
-small app in six languages. Each one calls a CNCF projects API as its downstream; proxymock
+small app in seven languages. Each one calls a CNCF projects API as its downstream; proxymock
 records that call, then mocks it so the app runs and tests with **no network**.
 
 ## Try it in GitHub Codespaces
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/speedscale/mock-lab)
 
-One click — all six runtimes and the `proxymock` CLI are preinstalled.
+One click — all seven runtimes and the `proxymock` CLI are preinstalled. Run
+`proxymock init --api-key <key>` once to activate it (free key at
+[app.speedscale.com/signup](https://app.speedscale.com/signup)).
 
 ## Pick your language
 
@@ -45,8 +47,10 @@ proxymock mock -- go run .                      # mock the downstream — no net
 proxymock replay --test-against http://localhost:8080
 ```
 
-Go, Python, .NET, and C++ (via libcurl) honor proxy env vars natively; Node and Java need
-the proxy config from the [language reference](https://docs.speedscale.com/proxymock/getting-started/language-reference/).
+Go, Python, Ruby, Java, .NET, and C++ all work with `proxymock record` out of the box — proxymock
+injects the proxy and TLS settings each runtime understands (for Java, via `JAVA_TOOL_OPTIONS`).
+**Node is the exception:** its `fetch` ignores proxy env vars until Node 24 (backported to 22.21),
+so set `NODE_USE_ENV_PROXY=1` and `NODE_EXTRA_CA_CERTS` first — see [node/README.md](node/README.md).
 
 ## The downstream API
 

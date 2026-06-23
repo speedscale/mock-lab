@@ -20,6 +20,7 @@ jobs:
           - { lang: java,   start: "java java/App.java" }
           - { lang: ruby,   start: "ruby ruby/app.rb" }
           - { lang: dotnet, start: "dotnet run --project dotnet/demo.csproj" }
+          - { lang: cpp,    start: "cd cpp && make run" }
     steps:
       - uses: actions/checkout@v4
 
@@ -49,6 +50,8 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "8.0"
+      - if: matrix.lang == 'cpp'
+        run: sudo apt-get update && sudo apt-get install -y build-essential libcurl4-openssl-dev
 
       - name: validate ${{ matrix.lang }} app against the reference downstream
         run: |

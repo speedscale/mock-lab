@@ -20,6 +20,7 @@ One click — all six runtimes and the `proxymock` CLI are preinstalled.
 | Java | `cd java && java App.java` |
 | Ruby | `cd ruby && ruby app.rb` |
 | .NET | `cd dotnet && dotnet run` |
+| C++ | `cd cpp && make run` |
 
 Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWNSTREAM_URL`
 (default `https://demo-api-dev.trafficreplay.com`).
@@ -44,8 +45,8 @@ proxymock mock -- go run .                      # mock the downstream — no net
 proxymock replay --test-against http://localhost:8080
 ```
 
-Go, Python, and .NET honor proxy env vars natively; Node and Java need the proxy config
-from the [language reference](https://docs.speedscale.com/proxymock/getting-started/language-reference/).
+Go, Python, .NET, and C++ (via libcurl) honor proxy env vars natively; Node and Java need
+the proxy config from the [language reference](https://docs.speedscale.com/proxymock/getting-started/language-reference/).
 
 ## The downstream API
 

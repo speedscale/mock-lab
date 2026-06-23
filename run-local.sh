@@ -23,10 +23,10 @@ trap cleanup EXIT
 trap 'cleanup; exit 0' INT TERM
 
 echo "Rendering static dataset -> ./static"
-go run ./server -export ./static >/dev/null
+(cd server && go run . -export ../static) >/dev/null
 
 echo "Building app"
-go build -o "${BIN_DIR}/app" .
+(cd go && go build -o "${BIN_DIR}/app" .)
 
 echo "Origin (CloudFront/S3 stand-in) : http://localhost:${ORIGIN_PORT}"
 ( cd static && exec python3 -m http.server "${ORIGIN_PORT}" ) >/tmp/proxymock-demo-origin.log 2>&1 &

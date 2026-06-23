@@ -3,7 +3,7 @@
 A tiny, multi-language demo for the [proxymock](https://docs.speedscale.com/proxymock/) quickstart.
 
 Each app exposes a small HTTP API and fulfills requests by calling a **CNCF projects API**
-downstream at `https://demo-api.trafficreplay.com`. proxymock records those downstream
+downstream at `https://demo-api-dev.trafficreplay.com`. proxymock records those downstream
 calls, then mocks them so the app runs and tests with **no network and no dependencies of
 its own** — the downstream is a static, Speedscale-owned endpoint that can't be
 rate-limited or archived.
@@ -20,7 +20,7 @@ rate-limited or archived.
 | .NET | `cd dotnet && dotnet run` |
 
 Every app listens on `:8080` (override `PORT`) and calls `DOWNSTREAM_URL`
-(default `https://demo-api.trafficreplay.com`).
+(default `https://demo-api-dev.trafficreplay.com`).
 
 ## Endpoints (identical across every language)
 

@@ -5,7 +5,7 @@ require "socket"
 require "net/http"
 require "json"
 
-DOWNSTREAM = ENV.fetch("DOWNSTREAM_URL", "https://demo-api.trafficreplay.com")
+DOWNSTREAM = ENV.fetch("DOWNSTREAM_URL", "https://demo-api-dev.trafficreplay.com")
 PORT = (ENV["PORT"] || "8080").to_i
 
 def fetch(path)

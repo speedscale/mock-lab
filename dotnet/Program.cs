@@ -3,7 +3,7 @@
 // so proxymock can record/mock/replay the downstream calls. Run with: dotnet run
 using System.Text.Json;
 
-var downstream = Environment.GetEnvironmentVariable("DOWNSTREAM_URL") ?? "https://demo-api.trafficreplay.com";
+var downstream = Environment.GetEnvironmentVariable("DOWNSTREAM_URL") ?? "https://demo-api-dev.trafficreplay.com";
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 var http = new HttpClient();
 

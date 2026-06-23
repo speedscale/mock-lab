@@ -15,7 +15,7 @@ import java.net.http.HttpResponse;
 
 public class App {
     static final String DOWNSTREAM =
-            System.getenv().getOrDefault("DOWNSTREAM_URL", "https://demo-api.trafficreplay.com");
+            System.getenv().getOrDefault("DOWNSTREAM_URL", "https://demo-api-dev.trafficreplay.com");
     static final HttpClient CLIENT = HttpClient.newHttpClient();
 
     static void send(HttpExchange ex, int code, String body) throws IOException {

@@ -4,7 +4,7 @@
 // run behind proxymock per the Node language reference.
 import http from "node:http";
 
-const DOWNSTREAM = process.env.DOWNSTREAM_URL || "https://demo-api.trafficreplay.com";
+const DOWNSTREAM = process.env.DOWNSTREAM_URL || "https://demo-api-dev.trafficreplay.com";
 const PORT = process.env.PORT || 8080;
 
 const sendJSON = (res, code, obj) => {

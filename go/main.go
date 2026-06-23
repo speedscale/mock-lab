@@ -5,16 +5,44 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
+	"sync"
 	"time"
 )
 
 var downstream string
+
+// In-memory auth + order state. The access_token and order_id are the two unique
+// IDs that "move around": a fresh token comes from POST /oauth/token and rides in
+// the Authorization header; a fresh order_id comes from POST /api/orders and rides
+// in the GET /api/orders/{id} path. On replay both are regenerated, so proxymock's
+// smart replace has to chain them from the responses into the later requests.
+var (
+	mu          sync.Mutex
+	validTokens = map[string]bool{}
+	orders      = map[string]order{}
+)
+
+type order struct {
+	OrderID string `json:"order_id"`
+	Project string `json:"project"`
+	Status  string `json:"status"`
+	Created string `json:"created"`
+}
+
+func randID(prefix string, n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return prefix + hex.EncodeToString(b)
+}
 
 func main() {
 	downstream = os.Getenv("DOWNSTREAM_URL")
@@ -38,6 +66,11 @@ func main() {
 		fetch(w, "/v1/categories")
 	})
 	mux.HandleFunc("GET /api/stats", statsHandler)
+
+	// OAuth handshake + order flow — the two moving IDs (token, order_id).
+	mux.HandleFunc("POST /oauth/token", tokenHandler)
+	mux.HandleFunc("POST /api/orders", createOrderHandler)
+	mux.HandleFunc("GET /api/orders/{id}", getOrderHandler)
 
 	log.Printf("Starting HTTP server on :%s (downstream=%s)", port, downstream)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
@@ -91,6 +124,83 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 		"total":       len(projects),
 		"by_maturity": byMaturity,
 	})
+}
+
+// tokenHandler issues a fresh bearer token (moving ID #1).
+func tokenHandler(w http.ResponseWriter, r *http.Request) {
+	token := randID("", 32)
+	mu.Lock()
+	validTokens[token] = true
+	mu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"access_token": token,
+		"token_type":   "Bearer",
+		"expires_in":   3600,
+	})
+}
+
+// authed reports whether the request carries a valid bearer token.
+func authed(r *http.Request) bool {
+	h := r.Header.Get("Authorization")
+	if !strings.HasPrefix(h, "Bearer ") {
+		return false
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	return validTokens[strings.TrimPrefix(h, "Bearer ")]
+}
+
+// createOrderHandler validates the requested project against the downstream, then
+// creates an order with a fresh order_id (moving ID #2). Requires a bearer token.
+func createOrderHandler(w http.ResponseWriter, r *http.Request) {
+	if !authed(r) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing or invalid bearer token"})
+		return
+	}
+	var req struct {
+		Project string `json:"project"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Project == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "project is required"})
+		return
+	}
+	// Validate the project exists by calling the downstream (outbound — proxymock-mockable).
+	resp, err := http.Get(downstream + "/v1/project/" + req.Project)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]any{"error": err.Error()})
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "unknown project", "project": req.Project})
+		return
+	}
+	o := order{
+		OrderID: randID("order-", 8),
+		Project: req.Project,
+		Status:  "created",
+		Created: time.Now().UTC().Format(time.RFC3339),
+	}
+	mu.Lock()
+	orders[o.OrderID] = o
+	mu.Unlock()
+	writeJSON(w, http.StatusCreated, o)
+}
+
+// getOrderHandler returns an order by ID. Requires a bearer token.
+func getOrderHandler(w http.ResponseWriter, r *http.Request) {
+	if !authed(r) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing or invalid bearer token"})
+		return
+	}
+	mu.Lock()
+	o, ok := orders[r.PathValue("id")]
+	mu.Unlock()
+	if !ok {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": "order not found", "order_id": r.PathValue("id")})
+		return
+	}
+	writeJSON(w, http.StatusOK, o)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

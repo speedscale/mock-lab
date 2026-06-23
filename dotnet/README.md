@@ -22,4 +22,8 @@ proxymock replay --test-against http://localhost:8080
 `proxymock record` exports the proxy and TLS settings, and `HttpClient` picks them up
 automatically — no extra configuration.
 
+## Auth flow (two moving IDs)
+
+This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. Drive the flow with `../lab/tests/run_auth_tests.sh` (add `--recording` to capture it through proxymock). On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see the [root README](../README.md#auth-handshake--the-two-moving-ids) and [`../lab/proxymock/`](../lab/proxymock/) for the ready-to-run recording + blueprint.
+
 Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../lab/openapi.yaml).

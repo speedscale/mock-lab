@@ -1,0 +1,47 @@
+{
+  "id": "11111111-2222-3333-4444-555555555555",
+  "name": "mock-lab smart replace (token + order_id)",
+  "description": "Chains the two moving IDs on replay: access_token from POST /oauth/token into the Authorization header, and order_id from POST /api/orders into the GET /api/orders/{id} path.",
+  "services": ["localhost"],
+  "iterationCount": 0,
+  "finalMatchRate": 0,
+  "tokenizeConfig": {
+    "name": "mock-lab smart replace (token + order_id)",
+    "id": "11111111-2222-3333-4444-555555555555",
+    "generator": [
+      {
+        "filters": {
+          "filters": [
+            { "include": true, "operator": "CONTAINS", "network_address": "localhost" },
+            { "include": true, "detectedLocation": "/oauth/token" },
+            { "include": true, "detectedCommand": "POST" }
+          ]
+        },
+        "extractor": { "type": "res_body" },
+        "transforms": [
+          { "type": "json_path", "config": { "path": "access_token" } },
+          { "type": "smart_replace_recorded", "config": { "overwrite": "true" } }
+        ],
+        "id": "a1111111-0000-0000-0000-000000000001"
+      },
+      {
+        "filters": {
+          "filters": [
+            { "include": true, "operator": "CONTAINS", "network_address": "localhost" },
+            { "include": true, "detectedLocation": "/api/orders" },
+            { "include": true, "detectedCommand": "POST" }
+          ]
+        },
+        "extractor": { "type": "res_body" },
+        "transforms": [
+          { "type": "json_path", "config": { "path": "order_id" } },
+          { "type": "smart_replace_recorded", "config": { "overwrite": "true" } }
+        ],
+        "id": "a2222222-0000-0000-0000-000000000002"
+      }
+    ],
+    "services": ["localhost"]
+  },
+  "active": true,
+  "source": "tuning"
+}

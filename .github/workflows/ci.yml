@@ -69,4 +69,7 @@ jobs:
           PORT=8080 ./lab/tests/run_http_tests.sh
           n=$(curl -s localhost:8080/api/projects | grep -c '"id"')
           test "$n" = "24" || { echo "expected 24 projects, got $n"; cat /tmp/app.log; exit 1; }
+
+          # 4. oauth handshake + order flow (the two moving IDs)
+          PORT=8080 ./lab/tests/run_auth_tests.sh
           echo "${{ matrix.lang }} app OK"

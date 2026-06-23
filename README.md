@@ -8,6 +8,12 @@ calls, then mocks them so the app runs and tests with **no network and no depend
 its own** — the downstream is a static, Speedscale-owned endpoint that can't be
 rate-limited or archived.
 
+## Try it in GitHub Codespaces
+
+[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/speedscale/mock-lab)
+
+One click — Go, Node, Python, Java, Ruby, .NET, and the `proxymock` CLI are all preinstalled.
+
 ## Pick your language
 
 | Language | Run |
@@ -63,7 +69,7 @@ Routes: `GET /v1/projects`, `GET /v1/project/{id}`, `GET /v1/categories`,
 > The data in `server/data/projects.json` is a frozen snapshot of the CNCF landscape for
 > demo purposes and may not reflect a project's current maturity or star count.
 
-## Run it all locally (no AWS)
+## Run it all locally (no cloud)
 
 `./run-local.sh` renders the dataset, serves it the way CloudFront/S3 will, runs the Go app
 against it, and smoke-tests — all on auto-picked free ports.

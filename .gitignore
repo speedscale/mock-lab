@@ -12,3 +12,4 @@ dotnet/obj/
 node_modules/
 /go/go
 /server/server
+cpp/app

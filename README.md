@@ -20,7 +20,7 @@ One click — all six runtimes and the `proxymock` CLI are preinstalled.
 | Java | `cd java && java App.java` |
 | Ruby | `cd ruby && ruby app.rb` |
 | .NET | `cd dotnet && dotnet run` |
-| C++ | `cd cpp && make run` |
+| C++ | `cd cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app` |
 
 Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWNSTREAM_URL`
 (default `https://demo-api-dev.trafficreplay.com`).

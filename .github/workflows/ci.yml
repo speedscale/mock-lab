@@ -20,7 +20,7 @@ jobs:
           - { lang: java,   start: "java java/App.java" }
           - { lang: ruby,   start: "ruby ruby/app.rb" }
           - { lang: dotnet, start: "dotnet run --project dotnet/demo.csproj" }
-          - { lang: cpp,    start: "cd cpp && make run" }
+          - { lang: cpp,    start: "cd cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app" }
     steps:
       - uses: actions/checkout@v4
 

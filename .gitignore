@@ -1,0 +1,12 @@
+# generated static export (rendered from server/data, synced to S3)
+/static/
+# local proxymock run output (committed snapshot lives under proxymock/)
+/proxymock/recorded-*
+/proxymock/results/
+# build artifacts
+/mock-lab
+*.test
+*.out
+dotnet/bin/
+dotnet/obj/
+node_modules/

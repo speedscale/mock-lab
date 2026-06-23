@@ -1,0 +1,10 @@
+{
+    "name": "proxymock-demo",
+    "image": "mcr.microsoft.com/devcontainers/go:1-1.23-bookworm",
+    "forwardPorts": [
+        8080
+    ],
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+    "workspaceFolder": "/workspace",
+    "postCreateCommand": "mkdir -p /home/vscode/.speedscale /home/vscode/.local/bin && curl -sL \"https://downloads.speedscale.com/proxymock/proxymock-linux-$(case $(uname -m) in x86_64) echo 'amd64';; arm | arm64 | aarch64) echo 'arm64';; esac)\" -o /home/vscode/.speedscale/proxymock && chmod +x /home/vscode/.speedscale/proxymock && ln -sf /home/vscode/.speedscale/proxymock /home/vscode/.local/bin/proxymock"
+}

@@ -1,0 +1,10 @@
+{
+  "name": "proxymock-cncf-demo-node",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "proxymock CNCF quickstart demo app (Node.js)",
+  "scripts": {
+    "start": "node index.js"
+  }
+}

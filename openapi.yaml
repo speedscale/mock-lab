@@ -1,0 +1,111 @@
+openapi: 3.0.3
+info:
+  title: CNCF Demo API
+  version: "1.0.0"
+  description: >
+    Read-only CNCF projects API used as the downstream dependency for the mock-lab
+    demo apps. Served as static JSON from S3 behind CloudFront — deterministic, a
+    frozen snapshot of the CNCF landscape for demo purposes.
+servers:
+  - url: https://demo-api.trafficreplay.com
+    description: Production (hosted)
+  - url: https://demo-api-dev.trafficreplay.com
+    description: Dev (currently live; the apps' default)
+paths:
+  /v1/projects:
+    get:
+      summary: List all CNCF projects
+      operationId: listProjects
+      responses:
+        "200":
+          description: All projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Project" }
+  /v1/project/{id}:
+    get:
+      summary: Get one project by id
+      operationId: getProject
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          example: cilium
+      responses:
+        "200":
+          description: One project
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Project" }
+        "404":
+          description: Project not found
+  /v1/categories:
+    get:
+      summary: List categories with project counts
+      operationId: listCategories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/CategoryCount" }
+  /v1/maturity/{level}:
+    get:
+      summary: List projects at a maturity level
+      operationId: listByMaturity
+      parameters:
+        - name: level
+          in: path
+          required: true
+          schema: { type: string, enum: [graduated, incubating, sandbox] }
+      responses:
+        "200":
+          description: Projects at that maturity level
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Project" }
+  /healthz:
+    get:
+      summary: Health check
+      operationId: healthz
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+components:
+  schemas:
+    Project:
+      type: object
+      required: [id, name, maturity, category]
+      properties:
+        id: { type: string, example: cilium }
+        name: { type: string, example: Cilium }
+        maturity:
+          type: string
+          enum: [Graduated, Incubating, Sandbox]
+        category: { type: string, example: Networking }
+        subcategory: { type: string, example: eBPF }
+        description: { type: string }
+        repo: { type: string, example: cilium/cilium }
+        stars: { type: integer, example: 20000 }
+        license: { type: string, example: Apache-2.0 }
+        accepted: { type: string, format: date, example: "2023-10-11" }
+        website: { type: string, format: uri, example: "https://cilium.io" }
+    CategoryCount:
+      type: object
+      required: [name, count]
+      properties:
+        name: { type: string, example: Networking }
+        count: { type: integer, example: 3 }

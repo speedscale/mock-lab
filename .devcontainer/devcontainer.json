@@ -10,5 +10,5 @@
         "ghcr.io/devcontainers/features/dotnet:2": { "version": "8.0" }
     },
     "forwardPorts": [8080, 8090],
-    "postCreateCommand": "sudo curl -sL \"https://downloads.speedscale.com/proxymock/proxymock-linux-$(dpkg --print-architecture)\" -o /usr/local/bin/proxymock && sudo chmod +x /usr/local/bin/proxymock"
+    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y build-essential libcurl4-openssl-dev && sudo curl -sL \"https://downloads.speedscale.com/proxymock/proxymock-linux-$(dpkg --print-architecture)\" -o /usr/local/bin/proxymock && sudo chmod +x /usr/local/bin/proxymock"
 }

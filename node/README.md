@@ -15,7 +15,7 @@ node index.js
 
 ```shell
 proxymock record -- node index.js                 # record the downstream calls
-../tests/run_http_tests.sh --recording            # in a second terminal, drive traffic
+../lab/tests/run_http_tests.sh --recording            # in a second terminal, drive traffic
 proxymock mock -- node index.js                    # serve the downstream from the recording
 proxymock replay --test-against http://localhost:8080
 ```
@@ -24,4 +24,4 @@ Node's HTTP stack does not read proxy env vars automatically. See the
 [language reference](https://docs.speedscale.com/proxymock/getting-started/language-reference/)
 for the proxy/TLS setup `proxymock record` needs with Node.
 
-Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../openapi.yaml).
+Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../lab/openapi.yaml).

@@ -15,7 +15,7 @@ ruby app.rb
 
 ```shell
 proxymock record -- ruby app.rb                   # record the downstream calls
-../tests/run_http_tests.sh --recording            # in a second terminal, drive traffic
+../lab/tests/run_http_tests.sh --recording            # in a second terminal, drive traffic
 proxymock mock -- ruby app.rb                      # serve the downstream from the recording
 proxymock replay --test-against http://localhost:8080
 ```
@@ -23,4 +23,4 @@ proxymock replay --test-against http://localhost:8080
 Ruby's `Net::HTTP` reads the `http_proxy`/`https_proxy` env vars by default, so `proxymock record`
 works with no extra configuration.
 
-Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../openapi.yaml).
+Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../lab/openapi.yaml).

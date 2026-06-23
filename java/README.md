@@ -15,7 +15,7 @@ java App.java
 
 ```shell
 proxymock record -- java App.java                 # record the downstream calls
-../tests/run_http_tests.sh --recording            # in a second terminal, drive traffic
+../lab/tests/run_http_tests.sh --recording            # in a second terminal, drive traffic
 proxymock mock -- java App.java                    # serve the downstream from the recording
 proxymock replay --test-against http://localhost:8080
 ```
@@ -24,4 +24,4 @@ The JVM needs `-D` proxy/TLS flags — it does not read proxy env vars automatic
 [language reference](https://docs.speedscale.com/proxymock/getting-started/language-reference/)
 for the exact flags `proxymock record` needs with Java.
 
-Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../openapi.yaml).
+Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../lab/openapi.yaml).

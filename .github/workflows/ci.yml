@@ -32,7 +32,7 @@ jobs:
       - if: matrix.lang == 'node'
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
       - if: matrix.lang == 'python'
         uses: actions/setup-python@v5
         with:

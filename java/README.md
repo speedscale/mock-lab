@@ -20,8 +20,8 @@ proxymock mock -- java App.java                    # serve the downstream from t
 proxymock replay --test-against http://localhost:8080
 ```
 
-The JVM needs `-D` proxy/TLS flags — it does not read proxy env vars automatically. See the
-[language reference](https://docs.speedscale.com/proxymock/getting-started/language-reference/)
-for the exact flags `proxymock record` needs with Java.
+No extra config needed: when `proxymock record` wraps the JVM it injects `JAVA_TOOL_OPTIONS`
+with the `-D` proxy flags and a CA truststore, so `java.net.http.HttpClient` routes through
+proxymock automatically.
 
 Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../lab/openapi.yaml).

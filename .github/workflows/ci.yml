@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { lang: go,     start: "go run main.go" }
+          - { lang: go,     start: "cd go && go run ." }
           - { lang: node,   start: "node node/index.js" }
           - { lang: python, start: "python3 python/app.py" }
           - { lang: java,   start: "java java/App.java" }
@@ -55,7 +55,7 @@ jobs:
           set -euo pipefail
 
           # 1. reference downstream (static CNCF API) on :8090
-          go run ./server >/tmp/server.log 2>&1 &
+          (cd server && go run .) >/tmp/server.log 2>&1 &
           for i in $(seq 1 30); do curl -sf localhost:8090/healthz >/dev/null && break; sleep 1; done
 
           # 2. the demo app, pointed at it

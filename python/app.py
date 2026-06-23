@@ -10,7 +10,7 @@ import os
 import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-DOWNSTREAM = os.environ.get("DOWNSTREAM_URL", "https://demo-api.trafficreplay.com")
+DOWNSTREAM = os.environ.get("DOWNSTREAM_URL", "https://demo-api-dev.trafficreplay.com")
 PORT = int(os.environ.get("PORT", "8080"))
 
 

@@ -1,5 +1,5 @@
-# generated static export (rendered from server/data, synced to S3)
-/static/
+# generated static export (rendered from lab/server/data, synced to S3)
+/lab/static/
 # local proxymock run output (committed snapshot lives under proxymock/)
 /proxymock/recorded-*
 /proxymock/results/
@@ -11,5 +11,5 @@ dotnet/bin/
 dotnet/obj/
 node_modules/
 /go/go
-/server/server
+/lab/server/server
 cpp/app

@@ -40,7 +40,7 @@ Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWN
 ```shell
 cd go                                          # pick any language dir (node/, python/, ...)
 proxymock record -- go run .                   # record the app calling the downstream
-./tests/run_http_tests.sh --recording          # (new terminal, repo root) drive some traffic
+./lab/tests/run_http_tests.sh --recording      # (new terminal, repo root) drive some traffic
 proxymock mock -- go run .                      # mock the downstream — no network needed
 proxymock replay --test-against http://localhost:8080
 ```
@@ -50,8 +50,8 @@ the proxy config from the [language reference](https://docs.speedscale.com/proxy
 
 ## The downstream API
 
-The apps query a hosted CNCF projects API (default `demo-api.trafficreplay.com`). You don't
-run or manage it — its contract is described in [`openapi.yaml`](openapi.yaml).
+The apps query a hosted CNCF projects API (default `demo-api-dev.trafficreplay.com`). You don't
+run or manage it — its contract is in [`lab/openapi.yaml`](lab/openapi.yaml).
 
-> `server/` is the reference implementation that generates the hosted dataset. It's here for
-> completeness only — you can ignore it for the quickstart.
+> Everything the lab needs for itself (the mock backend, the traffic driver, and the API spec)
+> lives in [`lab/`](lab/). You can ignore it for the quickstart.

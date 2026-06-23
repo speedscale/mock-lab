@@ -1,18 +1,27 @@
 # mock-lab
 
-A tiny, multi-language demo for the [proxymock](https://docs.speedscale.com/proxymock/) quickstart.
+Demo apps for the [proxymock](https://docs.speedscale.com/proxymock/) quickstart — the same
+small app in six languages. Each one calls a **CNCF projects API** as its downstream;
+proxymock records that call, then mocks it so the app runs and tests with **no network**.
 
-Each app exposes a small HTTP API and fulfills requests by calling a **CNCF projects API**
-downstream at `https://demo-api-dev.trafficreplay.com`. proxymock records those downstream
-calls, then mocks them so the app runs and tests with **no network and no dependencies of
-its own** — the downstream is a static, Speedscale-owned endpoint that can't be
-rate-limited or archived.
+## What's in this repo
+
+Two independent parts — **most people only need Part 1:**
+
+| Part | Directories | What it is |
+| --- | --- | --- |
+| **1. Demo apps** | `go/` `node/` `python/` `java/` `ruby/` `dotnet/` | **What you run.** The quickstart sample app, one per language. |
+| **2. Downstream API** | `server/` | Source of the **already-hosted** API at `demo-api.trafficreplay.com` that the apps call. Reference only — **you don't run this.** |
+
+---
+
+# Part 1 — the demo apps (run these)
 
 ## Try it in GitHub Codespaces
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/speedscale/mock-lab)
 
-One click — Go, Node, Python, Java, Ruby, .NET, and the `proxymock` CLI are all preinstalled.
+One click — all six runtimes and the `proxymock` CLI are preinstalled.
 
 ## Pick your language
 
@@ -25,8 +34,8 @@ One click — Go, Node, Python, Java, Ruby, .NET, and the `proxymock` CLI are al
 | Ruby | `cd ruby && ruby app.rb` |
 | .NET | `cd dotnet && dotnet run` |
 
-Every app listens on `:8080` (override `PORT`) and calls `DOWNSTREAM_URL`
-(default `https://demo-api-dev.trafficreplay.com`).
+Every app listens on `:8080` (override `PORT`) and calls the hosted downstream at
+`DOWNSTREAM_URL` (default `https://demo-api-dev.trafficreplay.com`).
 
 ## Endpoints (identical across every language)
 
@@ -48,15 +57,17 @@ proxymock mock -- go run .                      # mock the downstream — no net
 proxymock replay --test-against http://localhost:8080
 ```
 
-Use the run command for your language. Go, Python, and .NET honor proxy env vars
-natively; Node and Java need the proxy config from the
+Use the run command for your language. Go, Python, and .NET honor proxy env vars natively;
+Node and Java need the proxy config from the
 [language reference](https://docs.speedscale.com/proxymock/getting-started/language-reference/).
 
-## The downstream
+---
 
-`server/` is the reference implementation of `demo-api.trafficreplay.com`. The quickstart
-user never runs it — it documents the contract and generates the static dataset that is
-deployed to S3 behind CloudFront.
+# Part 2 — the downstream API (reference only)
+
+`server/` is the source for **`demo-api.trafficreplay.com`** — a static CNCF dataset served
+from S3 behind CloudFront. **The quickstart never runs this**; it lives here so you can see
+the contract and regenerate the dataset. Run it only if you want a fully local downstream:
 
 ```shell
 cd server && go run .                   # serve the CNCF API locally on :8090
@@ -69,7 +80,8 @@ Routes: `GET /v1/projects`, `GET /v1/project/{id}`, `GET /v1/categories`,
 > The data in `server/data/projects.json` is a frozen snapshot of the CNCF landscape for
 > demo purposes and may not reflect a project's current maturity or star count.
 
-## Run it all locally (no cloud)
+## Run fully offline (no cloud)
 
-`./run-local.sh` renders the dataset, serves it the way CloudFront/S3 will, runs the Go app
-against it, and smoke-tests — all on auto-picked free ports.
+Want Part 1 + Part 2 wired together with no internet? `./run-local.sh` renders the dataset,
+serves it the way CloudFront/S3 will, runs the Go app against it, and smoke-tests — all on
+auto-picked free ports.

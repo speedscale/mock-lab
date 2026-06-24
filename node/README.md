@@ -22,10 +22,11 @@ node index.js
 export NODE_USE_ENV_PROXY=1
 export NODE_EXTRA_CA_CERTS="$HOME/.speedscale/certs/tls.crt"
 
-proxymock record -- node index.js                 # record the downstream calls
-../lab/tests/run_http_tests.sh --recording        # in a second terminal, drive traffic
-proxymock mock -- node index.js                   # serve the downstream from the recording
-proxymock replay --test-against http://localhost:8080
+proxymock record -- node index.js                # 1. record the downstream calls
+../lab/tests/run_tests.sh --recording            # 2. second terminal: drive every endpoint
+proxymock web                                    # 3. browse the recorded traffic (:7788)
+proxymock mock -- node index.js                   # 4. serve the downstream from the recording
+proxymock replay --test-against http://localhost:8080   # 5. replay (or use Replay in proxymock web)
 ```
 
 Unlike the other languages, Node's `fetch` does not honor `http_proxy`/`https_proxy` by itself.
@@ -36,6 +37,6 @@ older Node, route `fetch` through a proxy dispatcher per the
 
 ## Auth flow (two moving IDs)
 
-This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. Drive the flow with `../lab/tests/run_auth_tests.sh` (add `--recording` to capture it through proxymock). On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see the [root README](../README.md#auth-handshake--the-two-moving-ids) and [`../lab/proxymock/`](../lab/proxymock/) for the ready-to-run recording + blueprint.
+This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. The quickstart's `../lab/tests/run_tests.sh` drives this flow too. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see the [root README](../README.md#auth-handshake--the-two-moving-ids) and [`../lab/proxymock/`](../lab/proxymock/) for the ready-to-run recording + blueprint.
 
 Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../lab/openapi.yaml).

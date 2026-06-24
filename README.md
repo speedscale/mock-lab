@@ -44,6 +44,11 @@ Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWN
 
 ## proxymock quickstart
 
+First time on a machine, [install proxymock](https://docs.speedscale.com/proxymock/) and activate it
+once — `proxymock init --api-key <key>` (free key at
+[app.speedscale.com/signup](https://app.speedscale.com/signup)). In a Codespace the CLI is already
+installed, so you only need the `init`.
+
 ```shell
 cd go                                          # pick any language dir (node/, python/, ...)
 proxymock record -- go run .                   # record the app calling the downstream

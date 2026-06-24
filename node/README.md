@@ -14,6 +14,8 @@ node index.js
 
 ## proxymock: record, mock, replay
 
+> First time only: install proxymock and run `proxymock init --api-key <key>` once (free key at [app.speedscale.com/signup](https://app.speedscale.com/signup)). In a Codespace the CLI is preinstalled.
+
 ```shell
 # Node's fetch ignores proxy env vars on its own. Turn on the built-in proxy support and
 # trust proxymock's TLS CA — needed for both record and mock (not for replay):

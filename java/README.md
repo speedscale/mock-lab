@@ -13,6 +13,8 @@ java App.java
 
 ## proxymock: record, mock, replay
 
+> First time only: install proxymock and run `proxymock init --api-key <key>` once (free key at [app.speedscale.com/signup](https://app.speedscale.com/signup)). In a Codespace the CLI is preinstalled.
+
 ```shell
 proxymock record -- java App.java                 # record the downstream calls
 ../lab/tests/run_http_tests.sh --recording            # in a second terminal, drive traffic

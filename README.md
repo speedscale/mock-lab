@@ -51,11 +51,16 @@ installed, so you only need the `init`.
 
 ```shell
 cd go                                          # pick any language dir (node/, python/, ...)
-proxymock record -- go run .                   # record the app calling the downstream
-./lab/tests/run_http_tests.sh --recording      # (new terminal, repo root) drive some traffic
-proxymock mock -- go run .                      # mock the downstream — no network needed
-proxymock replay --test-against http://localhost:8080
+proxymock record -- go run .                   # 1. record the app calling the downstream
+./lab/tests/run_tests.sh --recording           # 2. new terminal (repo root): drive every endpoint
+proxymock web                                   # 3. browse the recorded traffic in your browser (:7788)
+proxymock mock -- go run .                      # 4. mock the downstream — no network needed
+proxymock replay --test-against http://localhost:8080   # 5. replay it back at the app
 ```
+
+One script drives the whole demo — the 5 read endpoints plus the OAuth + order flow — pausing ~1s
+between calls so you can watch each one land in `proxymock web` (set `DELAY=0` to skip the pause).
+Step 5 can also be run **from the proxymock web UI** instead of the `proxymock replay` command.
 
 Go, Python, Ruby, Java, .NET, and C++ all work with `proxymock record` out of the box — proxymock
 injects the proxy and TLS settings each runtime understands (for Java, via `JAVA_TOOL_OPTIONS`).
@@ -83,8 +88,8 @@ proxymock replay --in ../lab/proxymock/recording --test-against http://localhost
 ```
 
 Replay passes 0% failed — the blueprint (`res_body → json_path → smart_replace_recorded` on
-`access_token` and `order_id`) re-chains both IDs. To record your own and watch it happen:
-`proxymock record -- go run .`, then `./lab/tests/run_auth_tests.sh --recording`.
+`access_token` and `order_id`) re-chains both IDs. To record your own and watch it happen, use the
+quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow too).
 
 ## The downstream API
 

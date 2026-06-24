@@ -9,7 +9,11 @@ support the demo apps and CI:
   deployed to S3 behind CloudFront.
   - `cd server && go run .` — serve the API locally on `:8090`
   - `cd server && go run . -export ../static` — render the static file tree for S3
-- **`tests/run_http_tests.sh`** — drives a running demo app's inbound endpoints. In the
-  proxymock flow the recorded inbound traffic becomes the replay test suite; it's also the CI
-  smoke test. Run it from the repo root: `./lab/tests/run_http_tests.sh`.
+- **`tests/run_tests.sh`** — drives a running demo app's whole API (the 5 read endpoints plus
+  the OAuth + order flow). In the proxymock flow this recorded traffic becomes the replay test
+  suite; it's also the CI smoke test (which asserts the data). Run it from the repo root:
+  `./lab/tests/run_tests.sh` (`--recording` to hit proxymock's inbound proxy, `DELAY=0` to skip
+  the ~1s pause between calls).
+- **`proxymock/`** — a committed recording + smart-replace blueprint, so `proxymock mock`/`replay`
+  work offline against any language (`proxymock replay --in lab/proxymock/recording …`).
 - **`openapi.yaml`** — the contract for the downstream API.

@@ -9,6 +9,6 @@
         "ghcr.io/devcontainers/features/ruby:1": { "version": "3.2" },
         "ghcr.io/devcontainers/features/dotnet:2": { "version": "8.0" }
     },
-    "forwardPorts": [8080, 8090],
+    "forwardPorts": [8080, 8090, 7788],
     "postCreateCommand": "sudo apt-get update && sudo apt-get install -y build-essential libcurl4-openssl-dev && sudo curl -sL \"https://downloads.speedscale.com/proxymock/proxymock-linux-$(dpkg --print-architecture)\" -o /usr/local/bin/proxymock && sudo chmod +x /usr/local/bin/proxymock"
 }

@@ -1,6 +1,8 @@
 // proxymock CNCF demo app (.NET). Exposes a small HTTP API on :8080 and fulfills each
 // request by calling the CNCF downstream API. HttpClient honors HTTP(S)_PROXY env vars,
 // so proxymock can record/mock/replay the downstream calls. Run with: dotnet run
+using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 var downstream = Environment.GetEnvironmentVariable("DOWNSTREAM_URL") ?? "https://demo-api-dev.trafficreplay.com";
@@ -32,6 +34,70 @@ app.MapGet("/api/stats", async () =>
         byMaturity[m] = byMaturity.GetValueOrDefault(m) + 1;
     }
     return Results.Json(new { total = projects.Count, by_maturity = byMaturity });
+});
+
+// --- OAuth + orders (in-memory, fresh tokens/ids per call by design) ---
+var tokens = new ConcurrentDictionary<string, byte>();
+var orders = new ConcurrentDictionary<string, object>();
+
+string Hex(int bytes) => Convert.ToHexString(RandomNumberGenerator.GetBytes(bytes)).ToLowerInvariant();
+
+bool HasValidToken(HttpRequest req)
+{
+    var auth = req.Headers.Authorization.ToString();
+    const string prefix = "Bearer ";
+    if (!auth.StartsWith(prefix, StringComparison.Ordinal)) return false;
+    var tok = auth.Substring(prefix.Length);
+    return tok.Length > 0 && tokens.ContainsKey(tok);
+}
+
+app.MapPost("/oauth/token", () =>
+{
+    var token = Hex(32);
+    tokens[token] = 1;
+    return Results.Json(new { access_token = token, token_type = "Bearer", expires_in = 3600 });
+});
+
+app.MapPost("/api/orders", async (HttpRequest req) =>
+{
+    if (!HasValidToken(req))
+        return Results.Json(new { error = "missing or invalid bearer token" }, statusCode: 401);
+
+    string? project = null;
+    try
+    {
+        // Read the raw body and parse it ourselves so we don't depend on the
+        // Content-Type header (matches the other languages' lenient parsing).
+        using var reader = new StreamReader(req.Body);
+        var raw = await reader.ReadToEndAsync();
+        using var doc = JsonDocument.Parse(raw);
+        if (doc.RootElement.ValueKind == JsonValueKind.Object
+            && doc.RootElement.TryGetProperty("project", out var p)
+            && p.ValueKind == JsonValueKind.String)
+            project = p.GetString();
+    }
+    catch { /* malformed/empty body -> treated as missing project */ }
+
+    if (string.IsNullOrEmpty(project))
+        return Results.Json(new { error = "project is required" }, statusCode: 400);
+
+    var check = await http.GetAsync(downstream + "/v1/project/" + project);
+    if ((int)check.StatusCode != 200)
+        return Results.Json(new { error = "unknown project", project }, statusCode: 404);
+
+    var orderId = "order-" + Hex(8);
+    var order = new { order_id = orderId, project, status = "created", created = DateTime.UtcNow.ToString("o") };
+    orders[orderId] = order;
+    return Results.Json(order, statusCode: 201);
+});
+
+app.MapGet("/api/orders/{id}", (string id, HttpRequest req) =>
+{
+    if (!HasValidToken(req))
+        return Results.Json(new { error = "missing or invalid bearer token" }, statusCode: 401);
+    if (!orders.TryGetValue(id, out var order))
+        return Results.Json(new { error = "order not found", order_id = id }, statusCode: 404);
+    return Results.Json(order);
 });
 
 Console.WriteLine($"dotnet demo on :{port} (downstream={downstream})");

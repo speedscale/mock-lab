@@ -1,8 +1,18 @@
 # generated static export (rendered from lab/server/data, synced to S3)
 /lab/static/
-# local proxymock run output (committed snapshot lives under proxymock/)
-/proxymock/recorded-*
-/proxymock/results/
+# scratch proxymock recordings from `proxymock record` in a language dir
+/go/proxymock/
+/node/proxymock/
+/python/proxymock/
+/java/proxymock/
+/ruby/proxymock/
+/dotnet/proxymock/
+/cpp/proxymock/
+# scratch proxymock writes into the committed shared workspace (lab/proxymock/)
+/lab/proxymock/results/
+/lab/proxymock/recording/.replay/
+# python bytecode
+__pycache__/
 # build artifacts
 /mock-lab
 *.test

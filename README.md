@@ -36,6 +36,11 @@ Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWN
 | `GET /api/projects/{id}` | `/v1/project/{id}` | one project |
 | `GET /api/categories` | `/v1/categories` | categories with counts |
 | `GET /api/stats` | `/v1/projects` | counts by maturity |
+| `POST /oauth/token` | – | a fresh `access_token` |
+| `POST /api/orders` ¹ | `/v1/project/{id}` | creates an order with a fresh `order_id` |
+| `GET /api/orders/{order_id}` ¹ | – | the order |
+
+¹ requires `Authorization: Bearer <access_token>`.
 
 ## proxymock quickstart
 
@@ -51,6 +56,30 @@ Go, Python, Ruby, Java, .NET, and C++ all work with `proxymock record` out of th
 injects the proxy and TLS settings each runtime understands (for Java, via `JAVA_TOOL_OPTIONS`).
 **Node is the exception:** its `fetch` ignores proxy env vars until Node 24 (backported to 22.21),
 so set `NODE_USE_ENV_PROXY=1` and `NODE_EXTRA_CA_CERTS` first — see [node/README.md](node/README.md).
+
+## Auth handshake + the two moving IDs
+
+Each app also exposes a small OAuth-style flow, built to show how proxymock handles values that
+change between record and replay. `POST /oauth/token` returns a fresh `access_token`;
+`POST /api/orders` (Bearer-protected, validates the project against the downstream) returns a
+fresh `order_id`; `GET /api/orders/{order_id}` (Bearer-protected) reads it back. Those two IDs
+are **regenerated on every call**, so on replay the recorded token/order_id are stale and the
+protected calls would 401/404 — until *smart replace* chains them.
+
+A committed recording **and** smart-replace blueprint ship in [`lab/proxymock/`](lab/proxymock/),
+so you can mock + replay the whole demo (basic + auth endpoints) **offline against any language**,
+with no recording step:
+
+```shell
+cd go                                                          # any language dir
+proxymock mock --in ../lab/proxymock/recording -- go run .     # downstream served from the recording
+# in another terminal:
+proxymock replay --in ../lab/proxymock/recording --test-against http://localhost:8080
+```
+
+Replay passes 0% failed — the blueprint (`res_body → json_path → smart_replace_recorded` on
+`access_token` and `order_id`) re-chains both IDs. To record your own and watch it happen:
+`proxymock record -- go run .`, then `./lab/tests/run_auth_tests.sh --recording`.
 
 ## The downstream API
 

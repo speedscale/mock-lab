@@ -32,4 +32,8 @@ Node 24 (backported to 22.21) adds `NODE_USE_ENV_PROXY`, which routes `fetch` th
 older Node, route `fetch` through a proxy dispatcher per the
 [language reference](https://docs.speedscale.com/proxymock/getting-started/language-reference/).
 
+## Auth flow (two moving IDs)
+
+This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. Drive the flow with `../lab/tests/run_auth_tests.sh` (add `--recording` to capture it through proxymock). On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see the [root README](../README.md#auth-handshake--the-two-moving-ids) and [`../lab/proxymock/`](../lab/proxymock/) for the ready-to-run recording + blueprint.
+
 Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../lab/openapi.yaml).

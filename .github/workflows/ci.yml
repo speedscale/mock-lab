@@ -65,11 +65,7 @@ jobs:
           DOWNSTREAM_URL=http://localhost:8090 PORT=8080 ${{ matrix.start }} >/tmp/app.log 2>&1 &
           for i in $(seq 1 60); do curl -sf localhost:8080/ >/dev/null && break; sleep 1; done
 
-          # 3. smoke test + assert data flows through
-          PORT=8080 ./lab/tests/run_http_tests.sh
-          n=$(curl -s localhost:8080/api/projects | grep -c '"id"')
-          test "$n" = "24" || { echo "expected 24 projects, got $n"; cat /tmp/app.log; exit 1; }
-
-          # 4. oauth handshake + order flow (the two moving IDs)
-          PORT=8080 ./lab/tests/run_auth_tests.sh
+          # 3. drive the whole API (read endpoints + oauth/order flow); the script
+          #    asserts 24 projects and that the auth flow returns a token + order.
+          DELAY=0 PORT=8080 ./lab/tests/run_tests.sh
           echo "${{ matrix.lang }} app OK"

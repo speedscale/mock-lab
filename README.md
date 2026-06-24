@@ -81,6 +81,32 @@ Replay passes 0% failed — the blueprint (`res_body → json_path → smart_rep
 `access_token` and `order_id`) re-chains both IDs. To record your own and watch it happen:
 `proxymock record -- go run .`, then `./lab/tests/run_auth_tests.sh --recording`.
 
+## Traffic replay tuning
+
+Traffic replay is useful because it keeps the story honest: the app succeeds or fails against
+requests it already saw. In this lab, the story starts with the Go demo app calling the CNCF API
+and running the auth/order flow. proxymock records that traffic as RRPairs. Then the mock set gets
+stale — several downstream recordings are missing — and replay exposes the gap as `MISS` results.
+Tuning means restoring or adjusting the mock set until the same replay passes cleanly.
+
+Use [`skills/proxymock-replay-tuning/`](skills/proxymock-replay-tuning/SKILL.md) when a local
+HTTP/HTTPS mock has replay misses and you need a repeatable match-rate report:
+
+```shell
+./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh \
+  --mock-in <candidate-mock-dir> \
+  --replay-in <replay-dir>
+```
+
+To verify the tuning workflow itself, run:
+
+```shell
+./skills/proxymock-replay-tuning/scripts/prove-proxymock-replay-tuning.sh
+```
+
+The proof tells the whole replay story: record real app traffic, create a stale mock baseline,
+measure the misses, replay against the tuned mock set, and verify the hit rate improves.
+
 ## The downstream API
 
 The apps query a hosted CNCF projects API (default `demo-api-dev.trafficreplay.com`). You don't

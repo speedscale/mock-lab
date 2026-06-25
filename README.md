@@ -108,6 +108,42 @@ HTTP/HTTPS mock has replay misses and you need a repeatable match-rate report:
   --replay-in <replay-dir>
 ```
 
+To run the workflow from a fresh checkout:
+
+```shell
+git clone https://github.com/speedscale/mock-lab.git
+cd mock-lab
+mkdir -p replay-work
+```
+
+Take a local recording. This example uses the Go app, but the same pattern works from any
+language directory in this repo:
+
+```shell
+cd go
+proxymock record --out ../replay-work/recording -- go run .
+```
+
+In another terminal from the repo root, drive the demo traffic:
+
+```shell
+./lab/tests/run_tests.sh --recording
+```
+
+Then start your AI agent from the repo root and ask it to use the tuning skill:
+
+```text
+Use the proxymock-replay-tuning skill to tune this replay.
+Mock input: lab/proxymock/recording
+Replay input: replay-work/recording
+Run the tuning script, summarize HIT/MISS/PASSTHROUGH, and recommend what transforms or recordings need to change.
+```
+
+Use `Mock input` for the mock or recording you want to tune. The agent should run the tuning
+script, read `summary.json`, inspect misses in `mock-output/`, and recommend concrete changes to
+recordings, signatures, filters, or transforms. Rerun the same skill after each tuning change until
+the match rate is acceptable.
+
 To verify the tuning workflow itself, run:
 
 ```shell

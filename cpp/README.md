@@ -2,7 +2,7 @@
 
 The C++ version of the [mock-lab](../README.md) proxymock demo. It serves an HTTP API on
 `:8080` (POSIX sockets) and fulfills each request by calling the CNCF projects API downstream
-via libcurl (`DOWNSTREAM_URL`, default `https://demo-api-dev.trafficreplay.com`; set `PORT` to change the port).
+via libcurl (`DOWNSTREAM_URL`, default `https://demo-api.trafficreplay.com`; set `PORT` to change the port).
 
 Needs a C++17 compiler and **libcurl** (`libcurl4-openssl-dev` on Debian/Ubuntu; preinstalled in the devcontainer).
 

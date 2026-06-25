@@ -8,9 +8,9 @@ info:
     frozen snapshot of the CNCF landscape for demo purposes.
 servers:
   - url: https://demo-api.trafficreplay.com
-    description: Production (hosted)
+    description: Production (the apps' default)
   - url: https://demo-api-dev.trafficreplay.com
-    description: Dev (currently live; the apps' default)
+    description: Dev
 paths:
   /v1/projects:
     get:

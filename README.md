@@ -25,7 +25,7 @@ One click — all seven runtimes and the `proxymock` CLI are preinstalled. Run
 | [C++](cpp/README.md) | `cd cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app` |
 
 Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWNSTREAM_URL`
-(default `https://demo-api-dev.trafficreplay.com`).
+(default `https://demo-api.trafficreplay.com`).
 
 ## Endpoints (identical across every language)
 
@@ -119,7 +119,7 @@ measure the misses, replay against the tuned mock set, and verify the hit rate i
 
 ## The downstream API
 
-The apps query a hosted CNCF projects API (default `demo-api-dev.trafficreplay.com`). You don't
+The apps query a hosted CNCF projects API (default `demo-api.trafficreplay.com`). You don't
 run or manage it — its contract is in [`lab/openapi.yaml`](lab/openapi.yaml).
 
 > Everything the lab needs for itself (the mock backend, the traffic driver, and the API spec)

@@ -56,7 +56,7 @@ static std::string utc_rfc3339() {
 
 static std::string downstream() {
   const char* d = std::getenv("DOWNSTREAM_URL");
-  return d ? d : "https://demo-api-dev.trafficreplay.com";
+  return d ? d : "https://demo-api.trafficreplay.com";
 }
 
 static int listen_port() {

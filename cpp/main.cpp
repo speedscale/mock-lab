@@ -1,6 +1,7 @@
 // proxymock CNCF demo app (C++). Exposes a small HTTP API on :8080 and fulfills each
 // request by calling the CNCF downstream API. libcurl is used for the downstream call;
-// it honors HTTP(S)_PROXY env vars, so proxymock can record/mock/replay with no change.
+// it honors HTTP(S)_PROXY env vars for routing, and the app sets CURLOPT_CAINFO from
+// $SSL_CERT_FILE (see http_get) so proxymock's TLS interception is trusted on Linux.
 // A minimal POSIX-socket server handles the inbound side. Build/run: make run
 #include <cctype>
 #include <cstdio>
@@ -78,6 +79,13 @@ static std::pair<long, std::string> http_get(const std::string& url) {
   curl_easy_setopt(c, CURLOPT_WRITEDATA, &body);
   curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
   curl_easy_setopt(c, CURLOPT_TIMEOUT, 10L);
+  // Honor SSL_CERT_FILE so proxymock's TLS interception is trusted. libcurl (unlike
+  // the curl CLI) does not read this env var on its own — it uses a compiled-in CA
+  // bundle — so we must point CAINFO at it explicitly. Without this, the downstream
+  // HTTPS call through proxymock fails with CURLE_PEER_FAILED_VERIFICATION.
+  if (const char* ca = std::getenv("SSL_CERT_FILE"); ca && *ca) {
+    curl_easy_setopt(c, CURLOPT_CAINFO, ca);
+  }
   CURLcode rc = curl_easy_perform(c);
   if (rc == CURLE_OK) {
     curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &code);

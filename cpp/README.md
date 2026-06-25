@@ -26,8 +26,10 @@ proxymock mock -- ./app                           # 4. serve the downstream from
 proxymock replay --test-against http://localhost:8080   # 5. replay (or use Replay in proxymock web)
 ```
 
-`proxymock record` exports the proxy and TLS settings, and libcurl picks them up
-automatically — no extra configuration.
+`proxymock record` exports the proxy and TLS settings. libcurl honors the `*_proxy` env
+vars on its own, but — unlike the `curl` CLI — the library does **not** read `SSL_CERT_FILE`
+(it uses a compiled-in CA bundle), so the app sets `CURLOPT_CAINFO` from `$SSL_CERT_FILE`
+to trust proxymock's TLS. Without that, the downstream call fails verification on Linux.
 
 ## Auth flow (two moving IDs)
 

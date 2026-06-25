@@ -25,7 +25,7 @@ import java.util.regex.Pattern;
 
 public class App {
     static final String DOWNSTREAM =
-            System.getenv().getOrDefault("DOWNSTREAM_URL", "https://demo-api-dev.trafficreplay.com");
+            System.getenv().getOrDefault("DOWNSTREAM_URL", "https://demo-api.trafficreplay.com");
     static final HttpClient CLIENT = HttpClient.newHttpClient();
 
     // In-memory OAuth/order state. No external store; resets when the process exits.

@@ -2,7 +2,7 @@
 
 The Go version of the [mock-lab](../README.md) proxymock demo. It serves an HTTP API on
 `:8080` and fulfills each request by calling the CNCF projects API downstream
-(`DOWNSTREAM_URL`, default `https://demo-api-dev.trafficreplay.com`; set `PORT` to change the port).
+(`DOWNSTREAM_URL`, default `https://demo-api.trafficreplay.com`; set `PORT` to change the port).
 
 ## Run
 

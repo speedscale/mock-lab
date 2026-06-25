@@ -12,7 +12,7 @@ import urllib.request
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-DOWNSTREAM = os.environ.get("DOWNSTREAM_URL", "https://demo-api-dev.trafficreplay.com")
+DOWNSTREAM = os.environ.get("DOWNSTREAM_URL", "https://demo-api.trafficreplay.com")
 PORT = int(os.environ.get("PORT", "8080"))
 
 # In-memory state for the OAuth/orders endpoints (moving IDs are generated per call).

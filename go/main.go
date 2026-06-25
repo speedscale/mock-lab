@@ -1,6 +1,6 @@
 // Command proxymock-demo is the quickstart sample app. It exposes a small HTTP API
 // on :8080 and fulfills each request by calling a downstream CNCF API. In the
-// quickstart that downstream is https://demo-api-dev.trafficreplay.com; proxymock
+// quickstart that downstream is https://demo-api.trafficreplay.com; proxymock
 // records those calls, then mocks them so the app runs with no network at all.
 package main
 
@@ -47,7 +47,7 @@ func randID(prefix string, n int) string {
 func main() {
 	downstream = os.Getenv("DOWNSTREAM_URL")
 	if downstream == "" {
-		downstream = "https://demo-api-dev.trafficreplay.com"
+		downstream = "https://demo-api.trafficreplay.com"
 	}
 	port := os.Getenv("PORT")
 	if port == "" {

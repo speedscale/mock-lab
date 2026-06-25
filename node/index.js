@@ -5,7 +5,7 @@
 import http from "node:http";
 import crypto from "node:crypto";
 
-const DOWNSTREAM = process.env.DOWNSTREAM_URL || "https://demo-api-dev.trafficreplay.com";
+const DOWNSTREAM = process.env.DOWNSTREAM_URL || "https://demo-api.trafficreplay.com";
 const PORT = process.env.PORT || 8080;
 
 // In-memory auth + order state. access_token and order_id are the two unique IDs

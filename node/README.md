@@ -2,7 +2,7 @@
 
 The Node.js version of the [mock-lab](../README.md) proxymock demo. It serves an HTTP API on
 `:8080` and fulfills each request by calling the CNCF projects API downstream
-(`DOWNSTREAM_URL`, default `https://demo-api-dev.trafficreplay.com`; set `PORT` to change the port).
+(`DOWNSTREAM_URL`, default `https://demo-api.trafficreplay.com`; set `PORT` to change the port).
 Zero dependencies — built-in `http` + global `fetch`. Needs **Node 24+** (or 22.21+) for the
 built-in proxy support proxymock relies on; the devcontainer ships Node 24.
 

@@ -153,6 +153,32 @@ To verify the tuning workflow itself, run:
 The proof tells the whole replay story: record real app traffic, create a stale mock baseline,
 measure the misses, replay against the tuned mock set, and verify the hit rate improves.
 
+## More proxymock skills
+
+The same recordings power three more agent skills in [`skills/`](skills/). Each ships a script and
+a `prove-*.sh`, runs against the committed `lab/proxymock/recording`, and needs no Speedscale Cloud
+account.
+
+| Skill | What it does | Wraps |
+| --- | --- | --- |
+| [`proxymock-load-test`](skills/proxymock-load-test/SKILL.md) | Replay recorded traffic at a target with parallel virtual users; report latency percentiles, throughput, and match rate, with `--fail-if` SLO gates | `proxymock replay --vus --for --fail-if` |
+| [`proxymock-compare-results`](skills/proxymock-compare-results/SKILL.md) | Deep before/after comparison of two replay/recording sets — what regressed, improved, or persisted across performance/reliability/security; writes JSON, HTML, and an LLM digest | `proxymock report --baseline` + `proxymock drift` |
+| [`proxymock-summarize-recording`](skills/proxymock-summarize-recording/SKILL.md) | Summarize a recording: hosts, inbound/outbound endpoints, methods, status mix, volume, plus the report digest | `proxymock report --format prompt` |
+
+```shell
+# quick load test against the mocked app (run `cd go && proxymock mock --in ../lab/proxymock/recording -- go run .` first)
+./skills/proxymock-load-test/scripts/proxymock-load-test.sh \
+  --in lab/proxymock/recording/localhost --test-against http://localhost:8080 --vus 8 --for 20s
+
+# deep comparison of two replay outputs
+./skills/proxymock-compare-results/scripts/proxymock-compare-results.sh \
+  --in ./after --baseline ./before --drift --fail-on-regression
+
+# summarize what a recording contains
+./skills/proxymock-summarize-recording/scripts/proxymock-summarize-recording.sh \
+  --in lab/proxymock/recording --out recording-brief.md
+```
+
 ## The downstream API
 
 The apps query a hosted CNCF projects API (default `demo-api.trafficreplay.com`). You don't

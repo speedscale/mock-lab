@@ -11,6 +11,8 @@
 # scratch proxymock writes into the committed shared workspace (lab/proxymock/)
 /lab/proxymock/results/
 /lab/proxymock/recording/.replay/
+# scratch output from the replay-tuning demo/quickstart
+/replay-work/
 # python bytecode
 __pycache__/
 # build artifacts

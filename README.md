@@ -153,6 +153,17 @@ To verify the tuning workflow itself, run:
 The proof tells the whole replay story: record real app traffic, create a stale mock baseline,
 measure the misses, replay against the tuned mock set, and verify the hit rate improves.
 
+To record a narrated screen-capture of that same story (paced banners, live traffic in
+`proxymock web`), run:
+
+```shell
+./skills/proxymock-replay-tuning/scripts/demo-proxymock-replay-tuning.sh
+```
+
+It records the Go app against a local copy of the CNCF API, drives the demo traffic, breaks the
+mock set, then shows the hit rate go from MISSes to 100%. Tune the pacing with `BEAT` (seconds per
+caption) and `DELAY` (seconds between calls); open `http://localhost:7788` alongside for the visual.
+
 ## The downstream API
 
 The apps query a hosted CNCF projects API (default `demo-api.trafficreplay.com`). You don't

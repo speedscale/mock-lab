@@ -271,18 +271,17 @@ if removed < 5:
 PY
 )"
 
+# _TUNE_MOCK_DIR / _TUNE_REPLAY_DIR are the tune script's internal hook for
+# serving one mock set while replaying a different (full) recording. This is the
+# only place mock and replay differ; users tune a single recording with --in.
 echo "measuring stale mock baseline"
-"$tune_script" \
-  --mock-in "$stale_mock" \
-  --replay-in "$replay_traffic" \
+_TUNE_MOCK_DIR="$stale_mock" _TUNE_REPLAY_DIR="$replay_traffic" "$tune_script" \
   --work-dir "$before_dir" \
   --proxy-port "$(pick_port)" \
   --health-port "$(pick_port)" >/dev/null
 
 echo "measuring tuned mock set"
-"$tune_script" \
-  --mock-in "$tuned_mock" \
-  --replay-in "$replay_traffic" \
+_TUNE_MOCK_DIR="$tuned_mock" _TUNE_REPLAY_DIR="$replay_traffic" "$tune_script" \
   --work-dir "$after_dir" \
   --proxy-port "$(pick_port)" \
   --health-port "$(pick_port)" \

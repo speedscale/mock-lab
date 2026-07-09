@@ -1,7 +1,7 @@
 ---
 name: proxymock-replay-tuning
 description: Run and tune a local HTTP/HTTPS proxymock replay by routing replay RRPair requests through proxymock mock, measuring HIT/MISS/PASSTHROUGH outcomes, and identifying mock signatures or transforms to adjust. Use when users ask to tune a replay locally, compare proxymock recordings, improve mock match rate, or diagnose replay misses with proxymock files.
-argument-hint: --mock-in <dir> --replay-in <dir>
+argument-hint: --in <dir>
 ---
 
 # proxymock Traffic Replay Tuning
@@ -14,40 +14,39 @@ This workflow uses local files and the `proxymock` CLI. It does not require Spee
 
 ## Inputs
 
-- `--mock-in`: candidate mock/recording directory to tune.
-- `--replay-in`: HTTP/HTTPS replay request directory to run against the mock.
-- Optional `--work-dir`: where logs, observed RRPairs, and `summary.json` should be written.
+- `--in`: a recording to tune. It serves as both the mock set and the replay
+  set. Outbound (direction `OUT`) pairs are replayed against the mock; inbound
+  (direction `IN`) pairs are skipped automatically, so a whole recording is safe
+  to pass directly.
+- Optional `--work-dir`: where logs, observed RRPairs, and `summary.json` are written.
 
-Use the bundled script first:
+Use the bundled script:
 
 ```bash
-./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh \
-  --mock-in <candidate-mock-dir> \
-  --replay-in <replay-dir>
+./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh --in <recording-dir>
 ```
 
 If this skill has been copied outside `mock-lab`, replace `./skills/proxymock-replay-tuning` with the copied skill directory.
 
-For custom ports or protocol maps:
+For custom ports and protocol maps:
 
 ```bash
 ./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh \
-  --mock-in <candidate-mock-dir> \
-  --replay-in <replay-dir> \
+  --in <recording-dir> \
   --proxy-port 4140 \
   --mock-arg '--map=15432=postgres://localhost:5432'
 ```
 
 ## Traffic Replay Story
 
-1. Start with real recorded traffic. `--replay-in` is the request set that represents what the app already saw.
-2. Run that traffic against the candidate mock set. The script starts `proxymock mock` in fail-closed mode, sends replay HTTP RRPair requests through that proxy, stops the mock, then writes:
+1. Start with real recorded traffic. The outbound pairs in the recording are the app's downstream calls — the request set replayed against the mock.
+2. Run that traffic against the candidate mock set. The script starts `proxymock mock` in fail-closed mode, sends the outbound RRPair requests through that proxy, stops the mock, then writes:
    - `summary.json`
    - `mock.log`
    - `replay.log`
    - `mock-output/`
 3. Read `summary.json` first. Treat `HIT` as traffic covered by the mock set. Treat `MISS` and `PASSTHROUGH` as the parts of the replay story the mock set cannot yet explain.
-4. Inspect miss files in `mock-output/` and compare their request signatures with the closest matching files in `--mock-in`.
+4. Inspect miss files in `mock-output/` and compare their request signatures with the closest matching files in the mock set.
 5. **Ask proxymock what to change** (see below) — turn the observed traffic into a prioritized recommendation instead of eyeballing every miss.
 6. Tune by adding missing recordings, editing mock RRPair signatures, adjusting request filters, or updating `.metadata/snapshot.json` transforms, then rerun the same replay.
 
@@ -64,7 +63,7 @@ proxymock report --in <work-dir>/mock-output --format prompt --out <work-dir>/re
 # drift emits a prefilled TransformChain per field that varies between the
 # mock set and the observed replay — drop it into the responder signature
 # (to wildcard-ignore) or a generator transform (to stabilize the mock).
-proxymock drift --source <mock-in> --source <work-dir>/mock-output \
+proxymock drift --source <recording> --source <work-dir>/mock-output \
   --sensitivity normal --out <work-dir>/drift.json
 ```
 

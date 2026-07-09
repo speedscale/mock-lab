@@ -103,46 +103,43 @@ Use [`skills/proxymock-replay-tuning/`](skills/proxymock-replay-tuning/SKILL.md)
 HTTP/HTTPS mock has replay misses and you need a repeatable match-rate report:
 
 ```shell
-./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh \
-  --mock-in <candidate-mock-dir> \
-  --replay-in <replay-dir>
+./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh --in <recording-dir>
 ```
 
-To run the workflow from a fresh checkout:
+`--in` points at a recording; the script replays its outbound pairs against the mock and skips the
+inbound ones. The committed recording works out of the box:
+
+```shell
+./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh --in lab/proxymock/recording
+```
+
+To tune your own traffic from a fresh checkout, take a local recording. This example uses the Go
+app, but the same pattern works from any language directory in this repo:
 
 ```shell
 git clone https://github.com/speedscale/mock-lab.git
-cd mock-lab
-mkdir -p replay-work
-```
-
-Take a local recording. This example uses the Go app, but the same pattern works from any
-language directory in this repo:
-
-```shell
-cd go
+cd mock-lab/go
 proxymock record --out ../replay-work/recording -- go run .
 ```
 
-In another terminal from the repo root, drive the demo traffic:
+In another terminal from the repo root, drive the demo traffic, then tune the recording:
 
 ```shell
 ./lab/tests/run_tests.sh --recording
+./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh --in replay-work/recording
 ```
 
-Then start your AI agent from the repo root and ask it to use the tuning skill:
+Or hand it to an AI agent from the repo root:
 
 ```text
 Use the proxymock-replay-tuning skill to tune this replay.
-Mock input: lab/proxymock/recording
-Replay input: replay-work/recording
+Recording: replay-work/recording
 Run the tuning script, summarize HIT/MISS/PASSTHROUGH, and recommend what transforms or recordings need to change.
 ```
 
-Use `Mock input` for the mock or recording you want to tune. The agent should run the tuning
-script, read `summary.json`, inspect misses in `mock-output/`, and recommend concrete changes to
-recordings, signatures, filters, or transforms. Rerun the same skill after each tuning change until
-the match rate is acceptable.
+The agent should run the tuning script, read `summary.json`, inspect misses in `mock-output/`, and
+recommend concrete changes to recordings, signatures, filters, or transforms. Rerun the same skill
+after each tuning change until the match rate is acceptable.
 
 To verify the tuning workflow itself, run:
 

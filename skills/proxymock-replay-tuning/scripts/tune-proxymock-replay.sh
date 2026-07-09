@@ -4,11 +4,13 @@ set -euo pipefail
 usage() {
   cat <<'USAGE'
 Usage:
-  tune-proxymock-replay.sh --mock-in DIR --replay-in DIR [options]
+  tune-proxymock-replay.sh --in DIR [options]
 
 Required:
-  --mock-in DIR           Candidate mock/recording directory to tune
-  --replay-in DIR         Replay request directory
+  --in DIR                Recording to tune. Serves as both the mock set and the
+                          replay set: outbound (direction OUT) pairs are replayed
+                          against the mock; inbound (direction IN) pairs are
+                          skipped automatically.
 
 Options:
   --work-dir DIR          Directory for logs, observed RRPairs, and summary.json
@@ -20,9 +22,9 @@ Options:
   -h, --help              Show this help
 
 Examples:
-  tune-proxymock-replay.sh --mock-in ./snapshot --replay-in ./replay
-  tune-proxymock-replay.sh --mock-in ./snapshot --replay-in ./replay --fail-under 95
-  tune-proxymock-replay.sh --mock-in ./snapshot --replay-in ./replay \
+  tune-proxymock-replay.sh --in ./recording
+  tune-proxymock-replay.sh --in ./recording --fail-under 95
+  tune-proxymock-replay.sh --in ./recording \
     --mock-arg '--map=15432=postgres://localhost:5432'
 USAGE
 }
@@ -90,8 +92,12 @@ wait_ready() {
   return 1
 }
 
-mock_in=""
-replay_in=""
+in_dir=""
+# Internal hook for prove-proxymock-replay-tuning.sh only: it must serve a stale
+# mock set while replaying the full recording, which is the only case where mock
+# and replay differ. Not a user-facing option; the CLI is --in.
+mock_in="${_TUNE_MOCK_DIR:-}"
+replay_in="${_TUNE_REPLAY_DIR:-}"
 work_dir=""
 proxymock_bin="${PROXYMOCK:-proxymock}"
 proxy_port="4140"
@@ -101,14 +107,9 @@ mock_args=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --mock-in)
-      [[ $# -ge 2 ]] || die "--mock-in requires a value"
-      mock_in="$2"
-      shift 2
-      ;;
-    --replay-in)
-      [[ $# -ge 2 ]] || die "--replay-in requires a value"
-      replay_in="$2"
+    --in)
+      [[ $# -ge 2 ]] || die "--in requires a value"
+      in_dir="$2"
       shift 2
       ;;
     --work-dir)
@@ -154,10 +155,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ -n "$mock_in" ]] || die "--mock-in is required"
-[[ -n "$replay_in" ]] || die "--replay-in is required"
-[[ -d "$mock_in" ]] || die "--mock-in is not a directory: $mock_in"
-[[ -d "$replay_in" ]] || die "--replay-in is not a directory: $replay_in"
+# --in seeds both the mock set and the replay set.
+mock_in="${mock_in:-$in_dir}"
+replay_in="${replay_in:-$in_dir}"
+[[ -n "$mock_in" && -n "$replay_in" ]] || die "--in is required"
+[[ -d "$mock_in" ]] || die "not a directory: $mock_in"
+[[ -d "$replay_in" ]] || die "not a directory: $replay_in"
 
 need_cmd python3
 need_cmd curl
@@ -190,8 +193,8 @@ mkdir -p "$mock_out"
 
 mock_input_total="$(count_rrpairs "$mock_in")"
 replay_input_total="$(count_rrpairs "$replay_in")"
-[[ "$mock_input_total" -gt 0 ]] || die "no RRPair .md or .json files found in --mock-in"
-[[ "$replay_input_total" -gt 0 ]] || die "no RRPair .md or .json files found in --replay-in"
+[[ "$mock_input_total" -gt 0 ]] || die "no RRPair .md or .json files found in the mock set: $mock_in"
+[[ "$replay_input_total" -gt 0 ]] || die "no RRPair .md or .json files found in the replay set: $replay_in"
 
 mock_pid=""
 cleanup() {
@@ -224,6 +227,7 @@ import base64
 import json
 import pathlib
 import re
+import ssl
 import sys
 import time
 import urllib.error
@@ -242,8 +246,18 @@ skipped = 0
 # a proxy is explicitly configured. Replay tuning must preserve recorded hosts
 # and always send through proxymock.
 urllib.request.proxy_bypass = lambda host: False
+
+# HTTPS pairs are replayed through the local proxymock mock, which terminates TLS
+# with its own MITM cert. This client has no reason to trust that CA, so skip
+# verification: the tuner only measures signature matches, and the connection
+# never leaves the loopback proxy.
+tls_ctx = ssl.create_default_context()
+tls_ctx.check_hostname = False
+tls_ctx.verify_mode = ssl.CERT_NONE
+
 opener = urllib.request.build_opener(
-    urllib.request.ProxyHandler({"http": proxy, "https": proxy})
+    urllib.request.ProxyHandler({"http": proxy, "https": proxy}),
+    urllib.request.HTTPSHandler(context=tls_ctx),
 )
 
 def decode_value(v):
@@ -319,6 +333,13 @@ with log_path.open("w") as log:
             continue
         try:
             rr = load_rr(path)
+            # Inbound pairs are requests the app received, not calls it made;
+            # replaying them would fire at the mock proxy with no app behind it.
+            # Only outbound (direction OUT) pairs belong in a replay.
+            if str(rr.get("direction", "")).upper() == "IN":
+                skipped += 1
+                print(json.dumps({"file": str(path), "status": "skipped", "reason": "inbound pair"}), file=log)
+                continue
             req = rr.get("http", {}).get("req", {})
             method = req.get("method") or rr.get("command") or "GET"
             url = request_url(rr)

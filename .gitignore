@@ -23,3 +23,5 @@ node_modules/
 /go/go
 /lab/server/server
 cpp/app
+
+.claude/worktrees

@@ -114,6 +114,11 @@ func main() {
 	mux.HandleFunc("GET /v1/categories", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, categories())
 	})
+	// Telemetry sink for the demo apps' opt-in beacon (EMIT_TELEMETRY=1).
+	// Acknowledges and discards; deterministic body so recordings stay valid.
+	mux.HandleFunc("POST /v1/track/{id}", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"tracked": true})
+	})
 
 	log.Printf("CNCF reference API listening on :%s (%d projects)", port, len(projects))
 	log.Fatal(http.ListenAndServe(":"+port, mux))

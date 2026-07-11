@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -19,6 +20,37 @@ import (
 )
 
 var downstream string
+
+// emitTelemetry is the opt-in telemetry beacon (EMIT_TELEMETRY=1): every
+// downstream-backed API request additionally POSTs a tracking event with a
+// fresh event id in the URL path and a timestamp in the body. Both values
+// change on every call, so replaying a recording produces mock misses on
+// /v1/track/{event_id} — the raw material for the mock match-rate tuning
+// demo. Off by default so the quickstart's recordings and the committed lab
+// traffic are unchanged. Fire-and-forget: failures (e.g. a downstream without
+// the /v1/track route) are ignored and never affect the caller's response.
+var emitTelemetry = os.Getenv("EMIT_TELEMETRY") != ""
+
+func trackEvent(path string) {
+	if !emitTelemetry {
+		return
+	}
+	// UUID-shaped event id so tooling classifies the rotating segment.
+	h := randID("", 16)
+	eventID := fmt.Sprintf("%s-%s-%s-%s-%s", h[0:8], h[8:12], h[12:16], h[16:20], h[20:32])
+
+	body, _ := json.Marshal(map[string]string{
+		"event": "api_request",
+		"path":  path,
+		"ts":    time.Now().UTC().Format(time.RFC3339),
+	})
+	resp, err := http.Post(downstream+"/v1/track/"+eventID, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+}
 
 // In-memory auth + order state. The access_token and order_id are the two unique
 // IDs that "move around": a fresh token comes from POST /oauth/token and rides in
@@ -57,15 +89,21 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /", rootHandler)
 	mux.HandleFunc("GET /api/projects", func(w http.ResponseWriter, r *http.Request) {
+		trackEvent(r.URL.Path)
 		fetch(w, "/v1/projects")
 	})
 	mux.HandleFunc("GET /api/projects/{id}", func(w http.ResponseWriter, r *http.Request) {
+		trackEvent(r.URL.Path)
 		fetch(w, "/v1/project/"+r.PathValue("id"))
 	})
 	mux.HandleFunc("GET /api/categories", func(w http.ResponseWriter, r *http.Request) {
+		trackEvent(r.URL.Path)
 		fetch(w, "/v1/categories")
 	})
-	mux.HandleFunc("GET /api/stats", statsHandler)
+	mux.HandleFunc("GET /api/stats", func(w http.ResponseWriter, r *http.Request) {
+		trackEvent(r.URL.Path)
+		statsHandler(w, r)
+	})
 
 	// OAuth handshake + order flow — the two moving IDs (token, order_id).
 	mux.HandleFunc("POST /oauth/token", tokenHandler)

@@ -10,6 +10,13 @@ The Go version of the [mock-lab](../README.md) proxymock demo. It serves an HTTP
 go run .
 ```
 
+Set `EMIT_TELEMETRY=1` to enable the opt-in telemetry beacon: every downstream-backed API
+request additionally fires `POST /v1/track/{event_id}` with a fresh UUID in the path and a
+timestamp in the body. Both rotate on every call, so replaying a recording produces mock
+misses — the raw material for the [mock match-rate tuning
+guide](https://docs.speedscale.com/proxymock/guides/mock-match-rate/). Off by default; the
+beacon is fire-and-forget and never affects API responses.
+
 ## proxymock: record, mock, replay
 
 > First time only: install proxymock and run `proxymock init --api-key <key>` once (free key at [app.speedscale.com/signup](https://app.speedscale.com/signup)). In a Codespace the CLI is preinstalled.

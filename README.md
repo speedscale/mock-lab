@@ -91,6 +91,16 @@ Replay passes 0% failed — the blueprint (`res_body → json_path → smart_rep
 `access_token` and `order_id`) re-chains both IDs. To record your own and watch it happen, use the
 quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow too).
 
+## Mock match-rate tuning (MCP)
+
+The Go app has an opt-in telemetry beacon (`EMIT_TELEMETRY=1`) that fires
+`POST /v1/track/{event_id}` downstream with a fresh UUID and timestamp on every API request —
+values that rotate on every run, so a replay produces mock misses by construction. The
+[mock match-rate tuning guide](https://docs.speedscale.com/proxymock/guides/mock-match-rate/)
+uses it to demonstrate the `improve-mock-match-rate` skill and the proxymock MCP tuning tools
+(`analyze_mock_matches`, `accept_mock_recommendation`, `similar_candidates`): record with the
+beacon on, mock + replay, then let an AI agent tune the blueprint until the match rate is 100%.
+
 ## Traffic replay tuning
 
 Traffic replay is useful because it keeps the story honest: the app succeeds or fails against

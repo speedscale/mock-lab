@@ -50,6 +50,66 @@ func trackEvent(path string) {
 	}
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
+
+	trackTimed(path)
+}
+
+// trackTimed is the time-anchored companion to the UUID beacon: it fires a second
+// tracking call whose rotating ids all carry an embedded timestamp — a ULID in
+// the path segment, and a bare unix epoch plus a Snowflake as query params. All
+// three change on every call, so replaying a recording misses on them too. They
+// exercise the patterns the mock match-rate tuner learns to mask beyond rotating
+// UUIDs: a base32 id segment the plain id heuristic overlooks, and integer values
+// (epoch, Snowflake) that are only distinguishable from ordinary numbers because
+// their decoded time lands in the recording's own capture window. Same
+// EMIT_TELEMETRY gate, same fire-and-forget contract.
+func trackTimed(path string) {
+	now := time.Now()
+	body, _ := json.Marshal(map[string]string{
+		"event": "api_request_timed",
+		"path":  path,
+	})
+	url := fmt.Sprintf("%s/v1/track/%s?ts=%d&sid=%d", downstream, newULID(now), now.Unix(), newSnowflake(now))
+	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+}
+
+// crockford is the ULID / Crockford base32 alphabet (no I, L, O, U).
+const crockford = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+// newULID builds a 26-char ULID: the first 10 chars encode now's 48-bit
+// millisecond timestamp (Crockford base32, most-significant first) and the rest
+// are random — the standard ULID layout, so the id sorts by time and decodes back
+// to now.
+func newULID(now time.Time) string {
+	ms := now.UnixMilli()
+	var out [26]byte
+	for i := 9; i >= 0; i-- {
+		out[i] = crockford[ms&0x1f]
+		ms >>= 5
+	}
+	var r [16]byte
+	_, _ = rand.Read(r[:])
+	for i := 10; i < 26; i++ {
+		out[i] = crockford[int(r[i-10])&0x1f]
+	}
+	return string(out[:])
+}
+
+// discordEpochMillis is the Discord Snowflake epoch (2015-01-01); a Snowflake
+// packs milliseconds-since-epoch in its high 42 bits, so newSnowflake decodes
+// back to now.
+const discordEpochMillis = 1420070400000
+
+func newSnowflake(now time.Time) uint64 {
+	var r [2]byte
+	_, _ = rand.Read(r[:])
+	seq := uint64(r[0])<<8 | uint64(r[1])
+	return uint64(now.UnixMilli()-discordEpochMillis)<<22 | (seq & 0x3fffff)
 }
 
 // In-memory auth + order state. The access_token and order_id are the two unique

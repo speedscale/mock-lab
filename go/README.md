@@ -12,10 +12,15 @@ go run .
 
 Set `EMIT_TELEMETRY=1` to enable the opt-in telemetry beacon: every downstream-backed API
 request additionally fires `POST /v1/track/{event_id}` with a fresh UUID in the path and a
-timestamp in the body. Both rotate on every call, so replaying a recording produces mock
-misses — the raw material for the [mock match-rate tuning
-guide](https://docs.speedscale.com/proxymock/guides/mock-match-rate/). Off by default; the
-beacon is fire-and-forget and never affects API responses.
+timestamp in the body. It also fires a time-anchored companion call,
+`POST /v1/track/{ulid}?ts={epoch}&sid={snowflake}`, whose rotating ids each embed a
+timestamp — a ULID path segment, a bare unix epoch, and a Snowflake. All of these rotate on
+every call, so replaying a recording produces mock misses — the raw material for the [mock
+match-rate tuning guide](https://docs.speedscale.com/proxymock/guides/mock-match-rate/). The
+time-anchored values exercise the tuner's pattern discovery beyond rotating UUIDs: a base32
+id the plain id heuristic overlooks, and integer values (epoch, Snowflake) it recognizes as
+volatile because their decoded time lands in the recording's capture window. Off by default;
+the beacon is fire-and-forget and never affects API responses.
 
 ## proxymock: record, mock, replay
 

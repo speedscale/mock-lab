@@ -7,12 +7,15 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/base32"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -52,6 +55,8 @@ func trackEvent(path string) {
 	_ = resp.Body.Close()
 
 	trackTimed(path)
+	trackGraphQL(path)
+	trackCursor()
 }
 
 // trackTimed is the time-anchored companion to the UUID beacon: it fires a second
@@ -69,8 +74,14 @@ func trackTimed(path string) {
 		"event": "api_request_timed",
 		"path":  path,
 	})
-	url := fmt.Sprintf("%s/v1/track/%s?ts=%d&sid=%d", downstream, newULID(now), now.Unix(), newSnowflake(now))
-	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+	// One call carrying every time-anchored id format the match-rate tuner learns
+	// to recognize: a ULID path segment, plus a bare epoch, Snowflake, Mongo
+	// ObjectId, UUIDv7, xid, and KSUID as query params. All embed *this run's* time
+	// and all rotate, so on replay each is a distinct miss the tuner can classify.
+	u := fmt.Sprintf("%s/v1/track/%s?ts=%d&sid=%d&oid=%s&u7=%s&xid=%s&ksuid=%s",
+		downstream, newULID(now), now.Unix(), newSnowflake(now),
+		newObjectID(now), newUUIDv7(now), newXID(now), newKSUID(now))
+	resp, err := http.Post(u, "application/json", bytes.NewReader(body))
 	if err != nil {
 		return
 	}
@@ -110,6 +121,107 @@ func newSnowflake(now time.Time) uint64 {
 	_, _ = rand.Read(r[:])
 	seq := uint64(r[0])<<8 | uint64(r[1])
 	return uint64(now.UnixMilli()-discordEpochMillis)<<22 | (seq & 0x3fffff)
+}
+
+// newObjectID builds a 24-hex Mongo ObjectId: 4 bytes unix seconds + 8 random.
+func newObjectID(now time.Time) string {
+	var r [8]byte
+	_, _ = rand.Read(r[:])
+	return fmt.Sprintf("%08x%s", uint32(now.Unix()), hex.EncodeToString(r[:]))
+}
+
+// newUUIDv7 builds a UUIDv7: first 48 bits are unix millis, version nibble 7.
+func newUUIDv7(now time.Time) string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	ms := uint64(now.UnixMilli())
+	b[0], b[1], b[2] = byte(ms>>40), byte(ms>>32), byte(ms>>24)
+	b[3], b[4], b[5] = byte(ms>>16), byte(ms>>8), byte(ms)
+	b[6] = 0x70 | (b[6] & 0x0f) // version 7
+	b[8] = 0x80 | (b[8] & 0x3f) // variant
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// xidEnc is xid's lowercase base32-hex alphabet, no padding.
+var xidEnc = base32.NewEncoding("0123456789abcdefghijklmnopqrstuv").WithPadding(base32.NoPadding)
+
+// newXID builds a 20-char xid: 4 bytes unix seconds + 8 random, base32hex.
+func newXID(now time.Time) string {
+	var b [12]byte
+	secs := uint32(now.Unix())
+	b[0], b[1], b[2], b[3] = byte(secs>>24), byte(secs>>16), byte(secs>>8), byte(secs)
+	_, _ = rand.Read(b[4:])
+	return xidEnc.EncodeToString(b[:])
+}
+
+// base62Alphabet is KSUID's encoding alphabet.
+const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+// ksuidEpoch is KSUID's epoch offset (2014-05-13), subtracted from unix seconds.
+const ksuidEpoch = 1400000000
+
+// newKSUID builds a 27-char base62 KSUID: 4 bytes (unix seconds − ksuidEpoch) + 16
+// random, base62-encoded.
+func newKSUID(now time.Time) string {
+	var raw [20]byte
+	ts := uint32(now.Unix() - ksuidEpoch)
+	raw[0], raw[1], raw[2], raw[3] = byte(ts>>24), byte(ts>>16), byte(ts>>8), byte(ts)
+	_, _ = rand.Read(raw[4:])
+	n := new(big.Int).SetBytes(raw[:])
+	base, rem := big.NewInt(62), new(big.Int)
+	out := make([]byte, 27)
+	for i := 26; i >= 0; i-- {
+		n.DivMod(n, base, rem)
+		out[i] = base62Alphabet[rem.Int64()]
+	}
+	return string(out)
+}
+
+// trackGraphQL fires an outbound GraphQL call whose per-request variable rotates
+// while the operation identity (operationName + query) stays fixed. On replay the
+// variable drifts and misses, but the tuner recognizes the GraphQL body and
+// recommends masking only the variable — never the query/operationName, which
+// discriminate the operation (every GraphQL call shares one URL).
+func trackGraphQL(path string) {
+	body, _ := json.Marshal(map[string]any{
+		"operationName": "TrackEvent",
+		"query":         "query TrackEvent($id: ID!, $path: String!) { event(id: $id, path: $path) { ok } }",
+		"variables":     map[string]string{"id": newULID(time.Now()), "path": path},
+	})
+	resp, err := http.Post(downstream+"/graphql", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+}
+
+// trackCursor chains a paginated read: fetch the first page, then request the next
+// page using the cursor the *response* handed back. The cursor rotates every run,
+// so on replay the second request misses — and because the value flows
+// response→request, it is a correlation (bind the cursor), not noise to mask. This
+// is the edge the value-provenance index detects; it needs a downstream that
+// issues a nextCursor (the lab reference server's /v1/feed), so it is a no-op
+// against a downstream that lacks the route.
+func trackCursor() {
+	resp, err := http.Get(downstream + "/v1/feed")
+	if err != nil {
+		return
+	}
+	var page struct {
+		NextCursor string `json:"nextCursor"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&page)
+	_ = resp.Body.Close()
+	if page.NextCursor == "" {
+		return
+	}
+	resp2, err := http.Get(downstream + "/v1/feed?cursor=" + url.QueryEscape(page.NextCursor))
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp2.Body)
+	_ = resp2.Body.Close()
 }
 
 // In-memory auth + order state. The access_token and order_id are the two unique

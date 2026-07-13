@@ -5,7 +5,9 @@
 package main
 
 import (
+	"crypto/rand"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"log"
@@ -118,6 +120,20 @@ func main() {
 	// Acknowledges and discards; deterministic body so recordings stay valid.
 	mux.HandleFunc("POST /v1/track/{id}", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"tracked": true})
+	})
+	// Cursor feed for the correlation/provenance demo: each call hands back a fresh
+	// opaque nextCursor, so a client that pages with it produces a rotating
+	// response→request value — a correlation to bind, not noise to mask. Accepts
+	// ?cursor= and ignores it (the payload is a stub; only the rotating cursor
+	// matters). Only the opt-in beacon hits this, so committed recordings are
+	// unaffected.
+	mux.HandleFunc("GET /v1/feed", func(w http.ResponseWriter, r *http.Request) {
+		var c [16]byte
+		_, _ = rand.Read(c[:])
+		writeJSON(w, map[string]any{
+			"items":      []string{"cncf-1", "cncf-2", "cncf-3"},
+			"nextCursor": hex.EncodeToString(c[:]),
+		})
 	})
 
 	log.Printf("CNCF reference API listening on :%s (%d projects)", port, len(projects))

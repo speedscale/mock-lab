@@ -93,11 +93,13 @@ quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow to
 
 ## Mock match-rate tuning (MCP)
 
-The Go app has an opt-in telemetry beacon (`EMIT_TELEMETRY=1`) that fires
-`POST /v1/track/{event_id}` downstream with a fresh UUID and timestamp on every API request,
-plus a time-anchored companion call carrying a rotating ULID, unix epoch, and Snowflake —
-values that rotate on every run, so a replay produces mock misses by construction (and
-exercises pattern discovery beyond rotating UUIDs). The
+The Go app has an opt-in telemetry beacon (`EMIT_TELEMETRY=1`) whose outbound calls each
+rotate on every run, so a replay produces mock misses by construction and exercises the
+tuner's pattern discovery: rotating UUIDs, a full set of **time-anchored ids** (ULID, epoch,
+Snowflake, Mongo ObjectId, UUIDv7, xid, KSUID), a **GraphQL** operation (variable masked,
+`query`/`operationName` protected), and a **cursor pagination** flow whose value flows
+response→request (a correlation to bind, surfaced by `POST /api/mocks/provenance`). See
+[`go/README.md`](go/README.md#run) for the per-call breakdown. The
 [mock match-rate tuning guide](https://docs.speedscale.com/proxymock/guides/mock-match-rate/)
 uses it to demonstrate the `improve-mock-match-rate` skill and the proxymock MCP tuning tools
 (`analyze_mock_matches`, `accept_mock_recommendation`, `similar_candidates`): record with the

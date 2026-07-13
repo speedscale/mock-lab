@@ -59,6 +59,48 @@ func trackEvent(path string) {
 	trackCursor()
 	trackPoll()
 	trackCreateUse()
+	trackAuth()
+}
+
+// trackAuth exercises an auth/session flow: POST mints a fresh access token and a
+// rotated session cookie, then the client replays both on GET /v1/me — the bearer
+// in Authorization, the session in Cookie. Both rotate every run, but they ride in
+// HEADERS, outside the mock signature, so they never cause a mock miss. The tuner
+// surfaces them as credentials to correlate for a validating replay rather than a
+// mask. Needs the lab reference server's auth routes; a no-op elsewhere.
+func trackAuth() {
+	resp, err := http.Post(downstream+"/v1/auth/token", "application/json", bytes.NewReader([]byte(`{"grant_type":"client_credentials"}`)))
+	if err != nil {
+		return
+	}
+	var tok struct {
+		AccessToken string `json:"access_token"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&tok)
+	cookie := ""
+	for _, c := range resp.Cookies() {
+		if c.Name == "SESSIONID" {
+			cookie = c.Name + "=" + c.Value
+		}
+	}
+	_ = resp.Body.Close()
+	if tok.AccessToken == "" {
+		return
+	}
+	req, err := http.NewRequest(http.MethodGet, downstream+"/v1/me", nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
+	if cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
+	resp2, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp2.Body)
+	_ = resp2.Body.Close()
 }
 
 // trackCreateUse chains a resource lifecycle: POST mints a new order id, then the

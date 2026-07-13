@@ -187,6 +187,18 @@ func main() {
 	mux.HandleFunc("GET /v1/orders/{id}", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"id": r.PathValue("id"), "status": "open", "items": []string{"cncf-1", "cncf-2"}})
 	})
+	// Auth/session demo (S-12418): mint a fresh access token AND a rotated session
+	// cookie, then the client replays both in headers on GET /v1/me. Tokens rotate
+	// every run, but they ride in headers — outside the mock signature — so they
+	// never cause a mock miss; the tuner surfaces them as credentials to correlate
+	// for a validating replay, not as a mask. Only the opt-in beacon hits these.
+	mux.HandleFunc("POST /v1/auth/token", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Set-Cookie", "SESSIONID="+newOrderID()+"; Path=/; HttpOnly")
+		writeJSON(w, map[string]any{"access_token": newOrderID(), "token_type": "Bearer", "expires_in": 3600})
+	})
+	mux.HandleFunc("GET /v1/me", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"user": "cncf-bot", "plan": "oss"})
+	})
 
 	log.Printf("CNCF reference API listening on :%s (%d projects)", port, len(projects))
 	log.Fatal(http.ListenAndServe(":"+port, mux))

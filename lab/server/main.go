@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 )
 
 //go:embed data/projects.json
@@ -150,7 +151,26 @@ func main() {
 		s := jobStates[jobN%len(jobStates)]
 		jobN++
 		jobMu.Unlock()
-		writeJSON(w, map[string]any{"job": "cncf-report", "status": s})
+		// status is the substantive field (a few values over many polls → low
+		// volatility → keeps the endpoint stateful); checkedAt rotates every call
+		// (unique → high volatility → the differential probe flags it as noise the
+		// mock can ignore, separated from the real state change).
+		writeJSON(w, map[string]any{
+			"job":       "cncf-report",
+			"status":    s,
+			"checkedAt": time.Now().UTC().Format(time.RFC3339Nano),
+		})
+	})
+	// Purely-noisy endpoint for the differential-probe demo: the SAME request is
+	// answered with a body that differs ONLY in a rotating timestamp. A whole-body
+	// comparison would wrongly call this stateful; the field-level probe discounts
+	// the volatile `now` leaf and leaves the endpoint correctly unflagged, listing
+	// `now` as an observed-volatile response field instead.
+	mux.HandleFunc("GET /v1/time", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{
+			"region": "lab",
+			"now":    time.Now().UTC().Format(time.RFC3339Nano),
+		})
 	})
 
 	log.Printf("CNCF reference API listening on :%s (%d projects)", port, len(projects))

@@ -69,8 +69,11 @@ func trackEvent(path string) {
 // remedy is a sequenced mock. Needs the lab reference server's /v1/job/status,
 // so it is a no-op against a downstream that lacks the route.
 func trackPoll() {
-	for i := 0; i < 3; i++ {
-		resp, err := http.Get(downstream + "/v1/job/status")
+	// The job poll goes pending→running→done — a real state change (flagged
+	// stateful). /v1/time changes only in a rotating timestamp — pure response
+	// noise the differential probe discounts (not flagged, listed as volatile).
+	for _, path := range []string{"/v1/job/status", "/v1/job/status", "/v1/job/status", "/v1/time", "/v1/time"} {
+		resp, err := http.Get(downstream + path)
 		if err != nil {
 			return
 		}

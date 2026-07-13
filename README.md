@@ -97,8 +97,14 @@ The Go app has an opt-in telemetry beacon (`EMIT_TELEMETRY=1`) whose outbound ca
 rotate on every run, so a replay produces mock misses by construction and exercises the
 tuner's pattern discovery: rotating UUIDs, a full set of **time-anchored ids** (ULID, epoch,
 Snowflake, Mongo ObjectId, UUIDv7, xid, KSUID), a **GraphQL** operation (variable masked,
-`query`/`operationName` protected), and a **cursor pagination** flow whose value flows
-response→request (a correlation to bind, surfaced by `POST /api/mocks/provenance`). See
+`query`/`operationName` protected), a **cursor pagination** flow whose value flows
+response→request (a correlation to bind, surfaced by `POST /api/mocks/provenance`), a
+**stateful poll** (same request, cycling response → needs a sequenced mock) with a companion
+**noise-only** endpoint (differs solely in a rotating timestamp), a **create→use** id
+(`POST /v1/orders` → `GET /v1/orders/{id}` — bound, never wildcarded), and an **auth/session**
+flow (token + session cookie replayed in headers → surfaced as credentials to correlate). The
+cursor, poll, create→use, and auth flows need the lab reference server as downstream
+(`DOWNSTREAM_URL=http://localhost:8090` against `../lab/server`). See
 [`go/README.md`](go/README.md#run) for the per-call breakdown. The
 [mock match-rate tuning guide](https://docs.speedscale.com/proxymock/guides/mock-match-rate/)
 uses it to demonstrate the `improve-mock-match-rate` skill and the proxymock MCP tuning tools

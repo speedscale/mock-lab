@@ -172,9 +172,33 @@ func main() {
 			"now":    time.Now().UTC().Format(time.RFC3339Nano),
 		})
 	})
+	// Create→use demo: POST mints a fresh order id (returned in the Location header
+	// and the body) and the client then GETs /v1/orders/{that id}. The id rotates
+	// every run, so the GET is a mock miss — but it's a CREATED id, not free noise:
+	// the tuner must NOT wildcard /v1/orders/* (that would match ids never issued),
+	// it recognizes the create→use chain instead. Only the opt-in beacon hits these.
+	mux.HandleFunc("POST /v1/orders", func(w http.ResponseWriter, r *http.Request) {
+		id := newOrderID()
+		w.Header().Set("Location", "/v1/orders/"+id)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "created"})
+	})
+	mux.HandleFunc("GET /v1/orders/{id}", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"id": r.PathValue("id"), "status": "open", "items": []string{"cncf-1", "cncf-2"}})
+	})
 
 	log.Printf("CNCF reference API listening on :%s (%d projects)", port, len(projects))
 	log.Fatal(http.ListenAndServe(":"+port, mux))
+}
+
+// newOrderID mints a fresh UUID-shaped order id, so tooling reads the path segment
+// as a rotating id (not a literal) — the create→use demo needs it to rotate.
+func newOrderID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	h := hex.EncodeToString(b[:])
+	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32]
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

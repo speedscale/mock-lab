@@ -58,6 +58,34 @@ func trackEvent(path string) {
 	trackGraphQL(path)
 	trackCursor()
 	trackPoll()
+	trackCreateUse()
+}
+
+// trackCreateUse chains a resource lifecycle: POST mints a new order id, then the
+// client GETs that order by the id the *response* just handed back. The id rotates
+// every run, so on replay the GET misses — but it is a CREATED id (issued by a 2xx
+// POST), not free noise, so the tuner must bind it, not wildcard /v1/orders/* (which
+// would match ids the mock never issued). This is the create→use provenance edge.
+// Needs the lab reference server's /v1/orders routes; a no-op elsewhere.
+func trackCreateUse() {
+	resp, err := http.Post(downstream+"/v1/orders", "application/json", bytes.NewReader([]byte(`{"item":"cncf-report"}`)))
+	if err != nil {
+		return
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&created)
+	_ = resp.Body.Close()
+	if created.ID == "" {
+		return
+	}
+	resp2, err := http.Get(downstream + "/v1/orders/" + created.ID)
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp2.Body)
+	_ = resp2.Body.Close()
 }
 
 // trackPoll polls a job-status endpoint whose answer changes each call

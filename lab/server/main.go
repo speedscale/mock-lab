@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 )
 
 //go:embed data/projects.json
@@ -134,6 +135,22 @@ func main() {
 			"items":      []string{"cncf-1", "cncf-2", "cncf-3"},
 			"nextCursor": hex.EncodeToString(c[:]),
 		})
+	})
+	// Stateful job poll for the sequenced-mock demo: the SAME request (fixed URL,
+	// no query, no body) is answered with a different status each call, cycling
+	// pending→running→done. A mock keys on the request signature, so it can only
+	// replay one of these — the tuner flags /v1/job/status as a stateful endpoint
+	// that needs a sequenced mock, not a masking fix. Only the opt-in beacon hits
+	// it, so committed recordings are unaffected.
+	var jobMu sync.Mutex
+	jobStates := []string{"pending", "running", "done"}
+	jobN := 0
+	mux.HandleFunc("GET /v1/job/status", func(w http.ResponseWriter, r *http.Request) {
+		jobMu.Lock()
+		s := jobStates[jobN%len(jobStates)]
+		jobN++
+		jobMu.Unlock()
+		writeJSON(w, map[string]any{"job": "cncf-report", "status": s})
 	})
 
 	log.Printf("CNCF reference API listening on :%s (%d projects)", port, len(projects))

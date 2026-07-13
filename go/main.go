@@ -57,6 +57,26 @@ func trackEvent(path string) {
 	trackTimed(path)
 	trackGraphQL(path)
 	trackCursor()
+	trackPoll()
+}
+
+// trackPoll polls a job-status endpoint whose answer changes each call
+// (pending→running→done) while the request itself never changes — same URL, no
+// query, no body. The recording therefore holds several identical-signature
+// requests with different responses, which is exactly the stateful endpoint the
+// tuner flags: a mock keys on the signature, so it can only replay the first
+// response and the client would hang on "pending". No masking fix helps; the
+// remedy is a sequenced mock. Needs the lab reference server's /v1/job/status,
+// so it is a no-op against a downstream that lacks the route.
+func trackPoll() {
+	for i := 0; i < 3; i++ {
+		resp, err := http.Get(downstream + "/v1/job/status")
+		if err != nil {
+			return
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
 }
 
 // trackTimed is the time-anchored companion to the UUID beacon: it fires a second

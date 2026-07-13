@@ -7,12 +7,15 @@ package main
 import (
 	"bytes"
 	"crypto/rand"
+	"encoding/base32"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"sync"
@@ -50,6 +53,268 @@ func trackEvent(path string) {
 	}
 	_, _ = io.Copy(io.Discard, resp.Body)
 	_ = resp.Body.Close()
+
+	trackTimed(path)
+	trackGraphQL(path)
+	trackCursor()
+	trackPoll()
+	trackCreateUse()
+	trackAuth()
+}
+
+// trackAuth exercises an auth/session flow: POST mints a fresh access token and a
+// rotated session cookie, then the client replays both on GET /v1/me — the bearer
+// in Authorization, the session in Cookie. Both rotate every run, but they ride in
+// HEADERS, outside the mock signature, so they never cause a mock miss. The tuner
+// surfaces them as credentials to correlate for a validating replay rather than a
+// mask. Needs the lab reference server's auth routes; a no-op elsewhere.
+func trackAuth() {
+	resp, err := http.Post(downstream+"/v1/auth/token", "application/json", bytes.NewReader([]byte(`{"grant_type":"client_credentials"}`)))
+	if err != nil {
+		return
+	}
+	var tok struct {
+		AccessToken string `json:"access_token"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&tok)
+	cookie := ""
+	for _, c := range resp.Cookies() {
+		if c.Name == "SESSIONID" {
+			cookie = c.Name + "=" + c.Value
+		}
+	}
+	_ = resp.Body.Close()
+	if tok.AccessToken == "" {
+		return
+	}
+	req, err := http.NewRequest(http.MethodGet, downstream+"/v1/me", nil)
+	if err != nil {
+		return
+	}
+	req.Header.Set("Authorization", "Bearer "+tok.AccessToken)
+	if cookie != "" {
+		req.Header.Set("Cookie", cookie)
+	}
+	resp2, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp2.Body)
+	_ = resp2.Body.Close()
+}
+
+// trackCreateUse chains a resource lifecycle: POST mints a new order id, then the
+// client GETs that order by the id the *response* just handed back. The id rotates
+// every run, so on replay the GET misses — but it is a CREATED id (issued by a 2xx
+// POST), not free noise, so the tuner must bind it, not wildcard /v1/orders/* (which
+// would match ids the mock never issued). This is the create→use provenance edge.
+// Needs the lab reference server's /v1/orders routes; a no-op elsewhere.
+func trackCreateUse() {
+	resp, err := http.Post(downstream+"/v1/orders", "application/json", bytes.NewReader([]byte(`{"item":"cncf-report"}`)))
+	if err != nil {
+		return
+	}
+	var created struct {
+		ID string `json:"id"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&created)
+	_ = resp.Body.Close()
+	if created.ID == "" {
+		return
+	}
+	resp2, err := http.Get(downstream + "/v1/orders/" + created.ID)
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp2.Body)
+	_ = resp2.Body.Close()
+}
+
+// trackPoll polls a job-status endpoint whose answer changes each call
+// (pending→running→done) while the request itself never changes — same URL, no
+// query, no body. The recording therefore holds several identical-signature
+// requests with different responses, which is exactly the stateful endpoint the
+// tuner flags: a mock keys on the signature, so it can only replay the first
+// response and the client would hang on "pending". No masking fix helps; the
+// remedy is a sequenced mock. Needs the lab reference server's /v1/job/status,
+// so it is a no-op against a downstream that lacks the route.
+func trackPoll() {
+	// The job poll goes pending→running→done — a real state change (flagged
+	// stateful). /v1/time changes only in a rotating timestamp — pure response
+	// noise the differential probe discounts (not flagged, listed as volatile).
+	for _, path := range []string{"/v1/job/status", "/v1/job/status", "/v1/job/status", "/v1/time", "/v1/time"} {
+		resp, err := http.Get(downstream + path)
+		if err != nil {
+			return
+		}
+		_, _ = io.Copy(io.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}
+}
+
+// trackTimed is the time-anchored companion to the UUID beacon: it fires a second
+// tracking call whose rotating ids all carry an embedded timestamp — a ULID in
+// the path segment, and a bare unix epoch plus a Snowflake as query params. All
+// three change on every call, so replaying a recording misses on them too. They
+// exercise the patterns the mock match-rate tuner learns to mask beyond rotating
+// UUIDs: a base32 id segment the plain id heuristic overlooks, and integer values
+// (epoch, Snowflake) that are only distinguishable from ordinary numbers because
+// their decoded time lands in the recording's own capture window. Same
+// EMIT_TELEMETRY gate, same fire-and-forget contract.
+func trackTimed(path string) {
+	now := time.Now()
+	body, _ := json.Marshal(map[string]string{
+		"event": "api_request_timed",
+		"path":  path,
+	})
+	// One call carrying every time-anchored id format the match-rate tuner learns
+	// to recognize: a ULID path segment, plus a bare epoch, Snowflake, Mongo
+	// ObjectId, UUIDv7, xid, and KSUID as query params. All embed *this run's* time
+	// and all rotate, so on replay each is a distinct miss the tuner can classify.
+	u := fmt.Sprintf("%s/v1/track/%s?ts=%d&sid=%d&oid=%s&u7=%s&xid=%s&ksuid=%s",
+		downstream, newULID(now), now.Unix(), newSnowflake(now),
+		newObjectID(now), newUUIDv7(now), newXID(now), newKSUID(now))
+	resp, err := http.Post(u, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+}
+
+// crockford is the ULID / Crockford base32 alphabet (no I, L, O, U).
+const crockford = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+
+// newULID builds a 26-char ULID: the first 10 chars encode now's 48-bit
+// millisecond timestamp (Crockford base32, most-significant first) and the rest
+// are random — the standard ULID layout, so the id sorts by time and decodes back
+// to now.
+func newULID(now time.Time) string {
+	ms := now.UnixMilli()
+	var out [26]byte
+	for i := 9; i >= 0; i-- {
+		out[i] = crockford[ms&0x1f]
+		ms >>= 5
+	}
+	var r [16]byte
+	_, _ = rand.Read(r[:])
+	for i := 10; i < 26; i++ {
+		out[i] = crockford[int(r[i-10])&0x1f]
+	}
+	return string(out[:])
+}
+
+// discordEpochMillis is the Discord Snowflake epoch (2015-01-01); a Snowflake
+// packs milliseconds-since-epoch in its high 42 bits, so newSnowflake decodes
+// back to now.
+const discordEpochMillis = 1420070400000
+
+func newSnowflake(now time.Time) uint64 {
+	var r [2]byte
+	_, _ = rand.Read(r[:])
+	seq := uint64(r[0])<<8 | uint64(r[1])
+	return uint64(now.UnixMilli()-discordEpochMillis)<<22 | (seq & 0x3fffff)
+}
+
+// newObjectID builds a 24-hex Mongo ObjectId: 4 bytes unix seconds + 8 random.
+func newObjectID(now time.Time) string {
+	var r [8]byte
+	_, _ = rand.Read(r[:])
+	return fmt.Sprintf("%08x%s", uint32(now.Unix()), hex.EncodeToString(r[:]))
+}
+
+// newUUIDv7 builds a UUIDv7: first 48 bits are unix millis, version nibble 7.
+func newUUIDv7(now time.Time) string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	ms := uint64(now.UnixMilli())
+	b[0], b[1], b[2] = byte(ms>>40), byte(ms>>32), byte(ms>>24)
+	b[3], b[4], b[5] = byte(ms>>16), byte(ms>>8), byte(ms)
+	b[6] = 0x70 | (b[6] & 0x0f) // version 7
+	b[8] = 0x80 | (b[8] & 0x3f) // variant
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// xidEnc is xid's lowercase base32-hex alphabet, no padding.
+var xidEnc = base32.NewEncoding("0123456789abcdefghijklmnopqrstuv").WithPadding(base32.NoPadding)
+
+// newXID builds a 20-char xid: 4 bytes unix seconds + 8 random, base32hex.
+func newXID(now time.Time) string {
+	var b [12]byte
+	secs := uint32(now.Unix())
+	b[0], b[1], b[2], b[3] = byte(secs>>24), byte(secs>>16), byte(secs>>8), byte(secs)
+	_, _ = rand.Read(b[4:])
+	return xidEnc.EncodeToString(b[:])
+}
+
+// base62Alphabet is KSUID's encoding alphabet.
+const base62Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+// ksuidEpoch is KSUID's epoch offset (2014-05-13), subtracted from unix seconds.
+const ksuidEpoch = 1400000000
+
+// newKSUID builds a 27-char base62 KSUID: 4 bytes (unix seconds − ksuidEpoch) + 16
+// random, base62-encoded.
+func newKSUID(now time.Time) string {
+	var raw [20]byte
+	ts := uint32(now.Unix() - ksuidEpoch)
+	raw[0], raw[1], raw[2], raw[3] = byte(ts>>24), byte(ts>>16), byte(ts>>8), byte(ts)
+	_, _ = rand.Read(raw[4:])
+	n := new(big.Int).SetBytes(raw[:])
+	base, rem := big.NewInt(62), new(big.Int)
+	out := make([]byte, 27)
+	for i := 26; i >= 0; i-- {
+		n.DivMod(n, base, rem)
+		out[i] = base62Alphabet[rem.Int64()]
+	}
+	return string(out)
+}
+
+// trackGraphQL fires an outbound GraphQL call whose per-request variable rotates
+// while the operation identity (operationName + query) stays fixed. On replay the
+// variable drifts and misses, but the tuner recognizes the GraphQL body and
+// recommends masking only the variable — never the query/operationName, which
+// discriminate the operation (every GraphQL call shares one URL).
+func trackGraphQL(path string) {
+	body, _ := json.Marshal(map[string]any{
+		"operationName": "TrackEvent",
+		"query":         "query TrackEvent($id: ID!, $path: String!) { event(id: $id, path: $path) { ok } }",
+		"variables":     map[string]string{"id": newULID(time.Now()), "path": path},
+	})
+	resp, err := http.Post(downstream+"/graphql", "application/json", bytes.NewReader(body))
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
+}
+
+// trackCursor chains a paginated read: fetch the first page, then request the next
+// page using the cursor the *response* handed back. The cursor rotates every run,
+// so on replay the second request misses — and because the value flows
+// response→request, it is a correlation (bind the cursor), not noise to mask. This
+// is the edge the value-provenance index detects; it needs a downstream that
+// issues a nextCursor (the lab reference server's /v1/feed), so it is a no-op
+// against a downstream that lacks the route.
+func trackCursor() {
+	resp, err := http.Get(downstream + "/v1/feed")
+	if err != nil {
+		return
+	}
+	var page struct {
+		NextCursor string `json:"nextCursor"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&page)
+	_ = resp.Body.Close()
+	if page.NextCursor == "" {
+		return
+	}
+	resp2, err := http.Get(downstream + "/v1/feed?cursor=" + url.QueryEscape(page.NextCursor))
+	if err != nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, resp2.Body)
+	_ = resp2.Body.Close()
 }
 
 // In-memory auth + order state. The access_token and order_id are the two unique
@@ -76,7 +341,33 @@ func randID(prefix string, n int) string {
 	return prefix + hex.EncodeToString(b)
 }
 
+// proxyFromEnvAnyHost returns the HTTP(S)_PROXY from the environment for EVERY
+// request, including localhost. Go's net/http (http.ProxyFromEnvironment) hardcodes
+// a bypass for localhost/loopback, so when this app records against a downstream on
+// localhost (the lab reference server), its outbound calls would skip proxymock's
+// capture proxy and only inbound traffic would be recorded. proxymock exports the
+// proxy env into this process; honoring it for all hosts is what lets the downstream
+// and beacon calls be captured. A no-op when no proxy env is set (normal runs go
+// direct). NO_PROXY is intentionally not consulted — the whole point is to override
+// the implicit localhost exemption.
+func proxyFromEnvAnyHost(req *http.Request) (*url.URL, error) {
+	keys := []string{"HTTP_PROXY", "http_proxy"}
+	if req.URL.Scheme == "https" {
+		keys = []string{"HTTPS_PROXY", "https_proxy"}
+	}
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return url.Parse(v)
+		}
+	}
+	return nil, nil
+}
+
 func main() {
+	// Record outbound-to-localhost too — see proxyFromEnvAnyHost.
+	if tr, ok := http.DefaultTransport.(*http.Transport); ok {
+		tr.Proxy = proxyFromEnvAnyHost
+	}
 	downstream = os.Getenv("DOWNSTREAM_URL")
 	if downstream == "" {
 		downstream = "https://demo-api.trafficreplay.com"

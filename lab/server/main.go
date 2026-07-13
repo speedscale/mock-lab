@@ -5,7 +5,9 @@
 package main
 
 import (
+	"crypto/rand"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"log"
@@ -14,6 +16,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 )
 
 //go:embed data/projects.json
@@ -119,9 +123,94 @@ func main() {
 	mux.HandleFunc("POST /v1/track/{id}", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"tracked": true})
 	})
+	// Cursor feed for the correlation/provenance demo: each call hands back a fresh
+	// opaque nextCursor, so a client that pages with it produces a rotating
+	// response→request value — a correlation to bind, not noise to mask. Accepts
+	// ?cursor= and ignores it (the payload is a stub; only the rotating cursor
+	// matters). Only the opt-in beacon hits this, so committed recordings are
+	// unaffected.
+	mux.HandleFunc("GET /v1/feed", func(w http.ResponseWriter, r *http.Request) {
+		var c [16]byte
+		_, _ = rand.Read(c[:])
+		writeJSON(w, map[string]any{
+			"items":      []string{"cncf-1", "cncf-2", "cncf-3"},
+			"nextCursor": hex.EncodeToString(c[:]),
+		})
+	})
+	// Stateful job poll for the sequenced-mock demo: the SAME request (fixed URL,
+	// no query, no body) is answered with a different status each call, cycling
+	// pending→running→done. A mock keys on the request signature, so it can only
+	// replay one of these — the tuner flags /v1/job/status as a stateful endpoint
+	// that needs a sequenced mock, not a masking fix. Only the opt-in beacon hits
+	// it, so committed recordings are unaffected.
+	var jobMu sync.Mutex
+	jobStates := []string{"pending", "running", "done"}
+	jobN := 0
+	mux.HandleFunc("GET /v1/job/status", func(w http.ResponseWriter, r *http.Request) {
+		jobMu.Lock()
+		s := jobStates[jobN%len(jobStates)]
+		jobN++
+		jobMu.Unlock()
+		// status is the substantive field (a few values over many polls → low
+		// volatility → keeps the endpoint stateful); checkedAt rotates every call
+		// (unique → high volatility → the differential probe flags it as noise the
+		// mock can ignore, separated from the real state change).
+		writeJSON(w, map[string]any{
+			"job":       "cncf-report",
+			"status":    s,
+			"checkedAt": time.Now().UTC().Format(time.RFC3339Nano),
+		})
+	})
+	// Purely-noisy endpoint for the differential-probe demo: the SAME request is
+	// answered with a body that differs ONLY in a rotating timestamp. A whole-body
+	// comparison would wrongly call this stateful; the field-level probe discounts
+	// the volatile `now` leaf and leaves the endpoint correctly unflagged, listing
+	// `now` as an observed-volatile response field instead.
+	mux.HandleFunc("GET /v1/time", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{
+			"region": "lab",
+			"now":    time.Now().UTC().Format(time.RFC3339Nano),
+		})
+	})
+	// Create→use demo: POST mints a fresh order id (returned in the Location header
+	// and the body) and the client then GETs /v1/orders/{that id}. The id rotates
+	// every run, so the GET is a mock miss — but it's a CREATED id, not free noise:
+	// the tuner must NOT wildcard /v1/orders/* (that would match ids never issued),
+	// it recognizes the create→use chain instead. Only the opt-in beacon hits these.
+	mux.HandleFunc("POST /v1/orders", func(w http.ResponseWriter, r *http.Request) {
+		id := newOrderID()
+		w.Header().Set("Location", "/v1/orders/"+id)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": id, "status": "created"})
+	})
+	mux.HandleFunc("GET /v1/orders/{id}", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"id": r.PathValue("id"), "status": "open", "items": []string{"cncf-1", "cncf-2"}})
+	})
+	// Auth/session demo (S-12418): mint a fresh access token AND a rotated session
+	// cookie, then the client replays both in headers on GET /v1/me. Tokens rotate
+	// every run, but they ride in headers — outside the mock signature — so they
+	// never cause a mock miss; the tuner surfaces them as credentials to correlate
+	// for a validating replay, not as a mask. Only the opt-in beacon hits these.
+	mux.HandleFunc("POST /v1/auth/token", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Set-Cookie", "SESSIONID="+newOrderID()+"; Path=/; HttpOnly")
+		writeJSON(w, map[string]any{"access_token": newOrderID(), "token_type": "Bearer", "expires_in": 3600})
+	})
+	mux.HandleFunc("GET /v1/me", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{"user": "cncf-bot", "plan": "oss"})
+	})
 
 	log.Printf("CNCF reference API listening on :%s (%d projects)", port, len(projects))
 	log.Fatal(http.ListenAndServe(":"+port, mux))
+}
+
+// newOrderID mints a fresh UUID-shaped order id, so tooling reads the path segment
+// as a rotating id (not a literal) — the create→use demo needs it to rotate.
+func newOrderID() string {
+	var b [16]byte
+	_, _ = rand.Read(b[:])
+	h := hex.EncodeToString(b[:])
+	return h[0:8] + "-" + h[8:12] + "-" + h[12:16] + "-" + h[16:20] + "-" + h[20:32]
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

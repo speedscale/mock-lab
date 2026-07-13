@@ -341,7 +341,33 @@ func randID(prefix string, n int) string {
 	return prefix + hex.EncodeToString(b)
 }
 
+// proxyFromEnvAnyHost returns the HTTP(S)_PROXY from the environment for EVERY
+// request, including localhost. Go's net/http (http.ProxyFromEnvironment) hardcodes
+// a bypass for localhost/loopback, so when this app records against a downstream on
+// localhost (the lab reference server), its outbound calls would skip proxymock's
+// capture proxy and only inbound traffic would be recorded. proxymock exports the
+// proxy env into this process; honoring it for all hosts is what lets the downstream
+// and beacon calls be captured. A no-op when no proxy env is set (normal runs go
+// direct). NO_PROXY is intentionally not consulted — the whole point is to override
+// the implicit localhost exemption.
+func proxyFromEnvAnyHost(req *http.Request) (*url.URL, error) {
+	keys := []string{"HTTP_PROXY", "http_proxy"}
+	if req.URL.Scheme == "https" {
+		keys = []string{"HTTPS_PROXY", "https_proxy"}
+	}
+	for _, k := range keys {
+		if v := os.Getenv(k); v != "" {
+			return url.Parse(v)
+		}
+	}
+	return nil, nil
+}
+
 func main() {
+	// Record outbound-to-localhost too — see proxyFromEnvAnyHost.
+	if tr, ok := http.DefaultTransport.(*http.Transport); ok {
+		tr.Proxy = proxyFromEnvAnyHost
+	}
 	downstream = os.Getenv("DOWNSTREAM_URL")
 	if downstream == "" {
 		downstream = "https://demo-api.trafficreplay.com"

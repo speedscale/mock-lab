@@ -10,12 +10,29 @@ The Go version of the [mock-lab](../README.md) proxymock demo. It serves an HTTP
 go run .
 ```
 
-Set `EMIT_TELEMETRY=1` to enable the opt-in telemetry beacon: every downstream-backed API
-request additionally fires `POST /v1/track/{event_id}` with a fresh UUID in the path and a
-timestamp in the body. Both rotate on every call, so replaying a recording produces mock
-misses — the raw material for the [mock match-rate tuning
+Set `EMIT_TELEMETRY=1` to enable the opt-in telemetry beacon. It fires several extra outbound
+calls per API request, each rotating on every run so a replay produces mock misses by
+construction — the raw material for the [mock match-rate tuning
 guide](https://docs.speedscale.com/proxymock/guides/mock-match-rate/). Off by default; the
-beacon is fire-and-forget and never affects API responses.
+beacon is fire-and-forget and never affects API responses. Each call exercises a different
+capability of the match-rate tuner:
+
+| Beacon call | Exercises |
+| --- | --- |
+| `POST /v1/track/{uuid}` + `ts` in body | rotating UUID in the path (the baseline) |
+| `POST /v1/track/{ulid}?ts=&sid=&oid=&u7=&xid=&ksuid=` | **time-anchored ids** — a ULID path segment plus a bare epoch, Snowflake, Mongo ObjectId, UUIDv7, xid, and KSUID query params. Each embeds this run's time; the tuner recognizes them as volatile because their decoded time lands in the recording's capture window (the disambiguation that lets a bare epoch be told from an ordinary numeric id). |
+| `POST /graphql` | **GraphQL** — a rotating `variables.id` with a fixed `operationName`/`query`. The tuner recommends masking only the variable, never the operation identity (every GraphQL call shares one URL, so masking `query` would collapse distinct operations). |
+| `GET /v1/feed` → `GET /v1/feed?cursor=…` | **correlation / provenance** — the second request pages with the cursor the first *response* handed back. A rotating value that flows response→request is a correlation to *bind*, not noise to mask; `POST /api/mocks/provenance` surfaces the edge. |
+| `GET /v1/job/status` ×3 | **stateful endpoint** — the same request (fixed URL, no query, no body) is answered with a cycling `status` (pending→running→done). A mock keys on the signature, so it can only replay one response; the tuner flags it as needing a *sequenced* mock, not a mask. Its `checkedAt` timestamp rotates every call and is split out as volatile noise. |
+| `GET /v1/time` ×2 | **differential noise probe** — the response differs *only* in a rotating `now` timestamp. A whole-body comparison would wrongly call this stateful; the field-level probe discounts the volatile leaf and leaves the endpoint unflagged, listing `now` as an observed-volatile response field. |
+| `POST /v1/orders` → `GET /v1/orders/{id}` | **create→use id** — the POST mints a fresh order id (in `Location` + body) that the GET then uses in its path. The tuner recognizes the create→use chain and does *not* wildcard `/v1/orders/*` (that would match ids the mock never issued); at mock time the client reuses the issued id, so it self-satisfies. |
+| `POST /v1/auth/token` → `GET /v1/me` | **credentials / session** — a fresh access token and a rotated `SESSIONID` cookie are issued, then replayed in the `Authorization` and `Cookie` headers. Headers are outside the mock signature, so these never cause a miss; the tuner surfaces them under *Credentials & session* to correlate for a validating replay, not to mask. |
+
+The cursor, poll, create→use, and auth flows all call the **lab reference server** for their
+routes, so run the beacon with `DOWNSTREAM_URL=http://localhost:8090` against `../lab/server`
+to exercise them (`cd ../lab/server && go run .` in another terminal). The app's own auth +
+order flow (below) is a further correlation example: the `access_token` and `order_id` flow
+response→request too.
 
 ## proxymock: record, mock, replay
 

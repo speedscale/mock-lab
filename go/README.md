@@ -53,4 +53,15 @@ proxymock replay --test-against http://localhost:8080   # 5. replay (or use Repl
 
 This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. The quickstart's `../lab/tests/run_tests.sh` drives this flow too. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see the [root README](../README.md#auth-handshake--the-two-moving-ids) and [`../lab/proxymock/`](../lab/proxymock/) for the ready-to-run recording + blueprint.
 
+## Credential styles (Sessions replay-readiness demo)
+
+The `/oauth/token` bearer above is **opaque**, which the proxymock web **Sessions → Replay readiness** view classifies as *Opaque · preflight*. Two additive endpoints supply the other two credential classes so that view — and the *Replace credentials* wizard (Basic / Bearer-opaque / Bearer-JWT and their sub-options) — has something to act on:
+
+| Endpoint | Credential | Readiness class |
+| --- | --- | --- |
+| `POST /auth/login` → `GET /api/profile` | Signed **HS256 JWT** bearer (`{"username": "..."}` → per-subject token) | *JWT · re-sign* |
+| `GET /api/account` | **HTTP Basic** (`acme:acme-secret`, `globex:globex-secret`) | *Basic · cred set* |
+
+Run `CREDS=1 ../lab/tests/run_tests.sh --recording` to drive these as distinct users (`alice`/`bob` for JWT, `acme`/`globex` for Basic) — the recording then holds one session per subject/user across all three credential classes. The step is **opt-in** (the shared driver only enables it under `CREDS=1`) because these routes are Go-only; the default run is unchanged. The JWT is hand-rolled HS256 (stdlib only, fixed demo secret `mock-lab-demo-signing-key`) so the app stays dependency-free — never hardcode a signing key outside a demo.
+
 Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../lab/openapi.yaml).

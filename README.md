@@ -172,9 +172,11 @@ measure the misses, replay against the tuned mock set, and verify the hit rate i
 
 ## More proxymock skills
 
-The same recordings power seven more agent skills in [`skills/`](skills/). Each ships a script and
+The same recordings power eight more agent skills in [`skills/`](skills/). Each ships a script and
 a `prove-*.sh`, runs against the committed `lab/proxymock/recording`, and needs no Speedscale Cloud
-account.
+account. Not sure which one applies? Start with
+[`quality-loop`](skills/quality-loop/SKILL.md): it routes an intent to the right skill and its
+`doctor` checks the environment.
 
 | Skill | What it does | Wraps |
 | --- | --- | --- |
@@ -185,8 +187,14 @@ account.
 | [`proxymock-verify-fix`](skills/proxymock-verify-fix/SKILL.md) | Prove a bug fix by replaying the incident capture at the fixed build; "recorded 500 -> observed 200" is the fix signal, any other new mismatch is collateral, and an all-match run means the bug still reproduces | `proxymock replay` |
 | [`proxymock-perf-container`](skills/proxymock-perf-container/SKILL.md) | Load-test one service with its downstream mocked: walk a VU ladder to the throughput knee, gate rps/p99 budgets there with margins, and refuse to report harness saturation as an app limit (per-level CPU attribution) | `proxymock replay --vus` via `proxymock-load-test` |
 | [`proxymock-chaos-mock`](skills/proxymock-chaos-mock/SKILL.md) | Inject faults into a mock by editing a copy of the recording so the downstream lies on demand: latency, 503s, 429s with `Retry-After`, garbage bodies, and exact deterministic flaky ratios via duplicate-signature round-robin | RRPair edits on a copy + `proxymock mock --mock-timing` |
+| [`quality-loop`](skills/quality-loop/SKILL.md) | The entry point: route an intent (regression gate, fix verification, capacity, chaos, comparison, summary, tuning, load) to the right skill above, with the one-time setup playbook, the shared gotcha catalog, and a `doctor` that checks proxymock, recordings, blueprints, and ports | dispatches the sibling skill scripts |
 
 ```shell
+# check the environment, then route any intent through the quality loop
+./skills/quality-loop/scripts/quality-loop.sh doctor
+./skills/quality-loop/scripts/quality-loop.sh regression --in lab/proxymock/recording \
+  --test-against http://localhost:8080
+
 # quick load test against the mocked app (run `cd go && proxymock mock --in ../lab/proxymock/recording -- go run .` first)
 ./skills/proxymock-load-test/scripts/proxymock-load-test.sh \
   --in lab/proxymock/recording/localhost --test-against http://localhost:8080 --vus 8 --for 20s

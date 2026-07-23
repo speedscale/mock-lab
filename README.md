@@ -172,7 +172,7 @@ measure the misses, replay against the tuned mock set, and verify the hit rate i
 
 ## More proxymock skills
 
-The same recordings power six more agent skills in [`skills/`](skills/). Each ships a script and
+The same recordings power seven more agent skills in [`skills/`](skills/). Each ships a script and
 a `prove-*.sh`, runs against the committed `lab/proxymock/recording`, and needs no Speedscale Cloud
 account.
 
@@ -184,6 +184,7 @@ account.
 | [`proxymock-regression-test`](skills/proxymock-regression-test/SKILL.md) | Replay a recording at a target and gate on per-RRPair result-match tags and budget flips, not transport failures; catches status-code regressions that `requests.failed` misses | `proxymock replay` + `proxymock report --baseline` |
 | [`proxymock-verify-fix`](skills/proxymock-verify-fix/SKILL.md) | Prove a bug fix by replaying the incident capture at the fixed build; "recorded 500 -> observed 200" is the fix signal, any other new mismatch is collateral, and an all-match run means the bug still reproduces | `proxymock replay` |
 | [`proxymock-perf-container`](skills/proxymock-perf-container/SKILL.md) | Load-test one service with its downstream mocked: walk a VU ladder to the throughput knee, gate rps/p99 budgets there with margins, and refuse to report harness saturation as an app limit (per-level CPU attribution) | `proxymock replay --vus` via `proxymock-load-test` |
+| [`proxymock-chaos-mock`](skills/proxymock-chaos-mock/SKILL.md) | Inject faults into a mock by editing a copy of the recording so the downstream lies on demand: latency, 503s, 429s with `Retry-After`, garbage bodies, and exact deterministic flaky ratios via duplicate-signature round-robin | RRPair edits on a copy + `proxymock mock --mock-timing` |
 
 ```shell
 # quick load test against the mocked app (run `cd go && proxymock mock --in ../lab/proxymock/recording -- go run .` first)
@@ -212,6 +213,11 @@ account.
 ./skills/proxymock-perf-container/scripts/proxymock-perf-container.sh \
   --in lab/proxymock/recording/localhost --test-against http://localhost:8080 \
   --assert-rps 2000 --assert-p99 50ms
+
+# make the mocked downstream fail exactly 1 request in 3 and serve the lying mock
+./skills/proxymock-chaos-mock/scripts/proxymock-chaos-mock.sh \
+  --in lab/proxymock/recording --scenario flaky --target '^/v1/projects' \
+  --ratio 1/3 --serve
 ```
 
 ## The downstream API

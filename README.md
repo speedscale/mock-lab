@@ -228,6 +228,33 @@ account. Not sure which one applies? Start with
   --ratio 1/3 --serve
 ```
 
+## Works with your stack
+
+The skills consume recordings, not test frameworks, so most of your existing stack plugs in
+as-is:
+
+- **Any test driver.** Whatever pushes traffic through the record proxy becomes the capture
+  source: this repo's curl harness, your integration tests, Postman collections via
+  [newman](https://www.npmjs.com/package/newman), k6 scripts, a staging soak, or live
+  production capture with the Speedscale operator. Record once with
+  `proxymock record -- <your app>` while your driver runs, and every skill above works on
+  the result.
+- **Traffic captured elsewhere imports directly.** `proxymock import` converts GoReplay
+  captures, HAR documents, raw HTTP wire dumps, Postman collections, and WireMock projects
+  into RRPairs, so the loop does not require re-recording what you already have.
+- **Any downstream mock, for the replay-based skills.** `proxymock-regression-test`,
+  `proxymock-verify-fix`, and `proxymock-perf-container` only need proxymock for record,
+  replay, and diff; the thing mocking your dependencies is just an HTTP endpoint. If you
+  already run WireMock or similar for downstreams, keep it.
+- **proxymock-specific, by design:** `proxymock-chaos-mock` drives proxymock's mock engine
+  directly (timing control, deterministic duplicate-signature rotation), and the replay
+  match tags and `response_diff` verdicts all read RRPair data. The fault scenarios and
+  interpretation guidance in its SKILL.md port to any mock system; the mechanics do not.
+- **Your traffic stays portable.** RRPairs are plain markdown files you can read, diff, and
+  check in, and `proxymock export` converts recordings to WireMock stub mappings, Postman
+  collections, k6 scripts, Gatling simulations, or Datadog Synthetics bundles if you need
+  them elsewhere.
+
 ## The downstream API
 
 The apps query a hosted CNCF projects API (default `demo-api.trafficreplay.com`). You don't

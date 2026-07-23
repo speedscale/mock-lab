@@ -123,6 +123,16 @@ func main() {
 	mux.HandleFunc("POST /v1/track/{id}", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]any{"tracked": true})
 	})
+	// GraphQL sink for the beacon's rotating-variable demo: the app POSTs a fixed
+	// operation (operationName + query) whose variables.id rotates every run. The
+	// tuner masks only the variable, never the operation identity — every GraphQL
+	// call shares this one URL. Deterministic body shaped like the operation's
+	// selection set so recordings stay valid. Only the opt-in beacon hits this.
+	mux.HandleFunc("POST /graphql", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{
+			"data": map[string]any{"event": map[string]any{"ok": true}},
+		})
+	})
 	// Cursor feed for the correlation/provenance demo: each call hands back a fresh
 	// opaque nextCursor, so a client that pages with it produces a rotating
 	// response→request value — a correlation to bind, not noise to mask. Accepts

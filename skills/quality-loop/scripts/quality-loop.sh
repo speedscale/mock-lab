@@ -16,6 +16,7 @@ Routes:
   verify-fix   proxymock-verify-fix        incident: reproduce, then prove the fix
   perf         proxymock-perf-container    what can this service sustain / budget
   chaos        proxymock-chaos-mock        downstream misbehaves / resilience
+  contract     proxymock-contract-test     traffic vs OpenAPI spec / mock from spec
   compare      proxymock-compare-results   before/after result comparison
   summarize    proxymock-summarize-recording   what is in this recording
   tune         proxymock-replay-tuning     mock misses / match-rate tuning
@@ -43,6 +44,7 @@ route_script() {
     verify-fix) echo "$skills_root/proxymock-verify-fix/scripts/proxymock-verify-fix.sh" ;;
     perf)       echo "$skills_root/proxymock-perf-container/scripts/proxymock-perf-container.sh" ;;
     chaos)      echo "$skills_root/proxymock-chaos-mock/scripts/proxymock-chaos-mock.sh" ;;
+    contract)   echo "$skills_root/proxymock-contract-test/scripts/proxymock-contract-test.sh" ;;
     compare)    echo "$skills_root/proxymock-compare-results/scripts/proxymock-compare-results.sh" ;;
     summarize)  echo "$skills_root/proxymock-summarize-recording/scripts/proxymock-summarize-recording.sh" ;;
     tune)       echo "$skills_root/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh" ;;

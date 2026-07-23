@@ -62,6 +62,7 @@ regression:proxymock-regression-test.sh
 verify-fix:proxymock-verify-fix.sh
 perf:proxymock-perf-container.sh
 chaos:proxymock-chaos-mock.sh
+contract:proxymock-contract-test.sh
 compare:proxymock-compare-results.sh
 summarize:proxymock-summarize-recording.sh
 tune:tune-proxymock-replay.sh

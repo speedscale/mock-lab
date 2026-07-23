@@ -1,7 +1,7 @@
 ---
 name: quality-loop
-description: Route a development intent to the right validated proxymock skill (regression gate, incident fix verification, capacity budget, chaos resilience, comparison, summarization, match-rate tuning, load) and get a repo into the traffic quality loop with one recording. Includes a doctor that checks proxymock, recordings, blueprints, runtime proxy support, and ports. Use when users ask how to test a change with recorded traffic, which proxymock skill applies to a task, to set up the quality loop in a repo, or to check whether the environment is ready.
-argument-hint: <doctor|regression|verify-fix|perf|chaos|compare|summarize|tune|load> [args...]
+description: Route a development intent to the right validated proxymock skill (regression gate, incident fix verification, capacity budget, chaos resilience, contract conformance, comparison, summarization, match-rate tuning, load) and get a repo into the traffic quality loop with one recording. Includes a doctor that checks proxymock, recordings, blueprints, runtime proxy support, and ports. Use when users ask how to test a change with recorded traffic, which proxymock skill applies to a task, to set up the quality loop in a repo, or to check whether the environment is ready.
+argument-hint: <doctor|regression|verify-fix|perf|chaos|contract|compare|summarize|tune|load> [args...]
 ---
 
 # proxymock Quality Loop
@@ -32,6 +32,7 @@ argument; args after it pass through to the sibling script unchanged.
 | "Prod incident: reproduce it and prove the fix" | `verify-fix` | **proxymock-verify-fix** |
 | "What can this service sustain?", capacity planning, perf budget gate | `perf` | **proxymock-perf-container** |
 | "How does it behave when the downstream misbehaves?", resilience, retry/timeout audit | `chaos` | **proxymock-chaos-mock** |
+| "Does my dependency's behavior match its spec?", "can I mock from the spec before recording?" | `contract` | **proxymock-contract-test** |
 | "What changed between these two runs?", before/after result comparison | `compare` | **proxymock-compare-results** |
 | "What is in this recording?", describe captured traffic | `summarize` | **proxymock-summarize-recording** |
 | "Replay misses the mock", match-rate tuning, signature/transform fixes | `tune` | **proxymock-replay-tuning** |
@@ -143,7 +144,8 @@ The dispatcher forwards everything after the route to the sibling script;
 see that skill's SKILL.md for its flags.
 
 - `<route> [args...]`: one of `regression`, `verify-fix`, `perf`, `chaos`,
-  `compare`, `summarize`, `tune`, `load`. Args pass through unchanged, so
+  `contract`, `compare`, `summarize`, `tune`, `load`. Args pass through
+  unchanged, so
   `quality-loop.sh regression --help` prints the regression script's own
   usage.
 - `doctor [--root DIR]`: precondition check and environment report over
@@ -216,6 +218,8 @@ location (`../../<skill>/scripts/`).
   gate, CPU-attribution honesty gate.
 - **proxymock-chaos-mock**: the `chaos` route; fault-injected mock variants
   with deterministic flaky ratios.
+- **proxymock-contract-test**: the `contract` route; spec-vs-traffic
+  conformance and mock-from-spec.
 - **proxymock-compare-results**: the `compare` route; deep report and drift
   comparison between two result sets.
 - **proxymock-summarize-recording**: the `summarize` route; what a recording

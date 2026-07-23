@@ -3,9 +3,14 @@ info:
   title: CNCF Demo API
   version: "1.0.0"
   description: >
-    Read-only CNCF projects API used as the downstream dependency for the mock-lab
-    demo apps. Served as static JSON from S3 behind CloudFront — deterministic, a
-    frozen snapshot of the CNCF landscape for demo purposes.
+    CNCF projects API used as the downstream dependency for the mock-lab demo apps.
+    The read-only project routes are served as static JSON from S3 behind
+    CloudFront — deterministic, a frozen snapshot of the CNCF landscape. The
+    beacon routes (/v1/track, /v1/feed, /v1/job/status, /v1/time, /v1/orders,
+    /v1/auth/token, /v1/me) are served only by the live lab reference server
+    (lab/server); they are hit by the apps' opt-in telemetry beacon
+    (EMIT_TELEMETRY=1) and are intentionally non-deterministic — each exercises a
+    distinct rotating-value pattern for the mock match-rate tuning demo.
 servers:
   - url: https://demo-api.trafficreplay.com
     description: Production (the apps' default)
@@ -84,6 +89,249 @@ paths:
                 type: object
                 properties:
                   status: { type: string, example: ok }
+  /v1/track/{id}:
+    post:
+      summary: Telemetry sink (acknowledge and discard)
+      operationId: trackEvent
+      description: >
+        Accepts a tracking event and discards it. The path id rotates every call
+        (UUID- or ULID-shaped), and the time-anchored variant adds rotating id
+        query params — deliberate mock-miss material for the tuning demo. The
+        response body is deterministic.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          example: 3f2a9c1e-8b4d-4e6f-9a0b-1c2d3e4f5a6b
+        - name: ts
+          in: query
+          required: false
+          schema: { type: integer }
+          description: Unix epoch seconds
+        - name: sid
+          in: query
+          required: false
+          schema: { type: integer }
+          description: Snowflake id
+        - name: oid
+          in: query
+          required: false
+          schema: { type: string }
+          description: Mongo ObjectId
+        - name: u7
+          in: query
+          required: false
+          schema: { type: string }
+          description: UUIDv7
+        - name: xid
+          in: query
+          required: false
+          schema: { type: string }
+          description: xid
+        - name: ksuid
+          in: query
+          required: false
+          schema: { type: string }
+          description: KSUID
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event: { type: string, example: api_request }
+                path: { type: string, example: /projects }
+                ts: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Event acknowledged (and discarded)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tracked: { type: boolean, example: true }
+  /v1/feed:
+    get:
+      summary: Cursor-paged feed with a rotating nextCursor
+      operationId: getFeed
+      description: >
+        Every call returns a fresh opaque nextCursor, so a client that pages with
+        it produces a rotating response-to-request value — a correlation to bind,
+        not noise to mask. The cursor query param is accepted and ignored; the
+        items payload is a stub.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema: { type: string }
+          description: Opaque cursor from a prior response's nextCursor
+      responses:
+        "200":
+          description: One page of the feed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, nextCursor]
+                properties:
+                  items:
+                    type: array
+                    items: { type: string }
+                    example: [cncf-1, cncf-2, cncf-3]
+                  nextCursor:
+                    type: string
+                    description: Fresh opaque hex value on every call
+  /v1/job/status:
+    get:
+      summary: Stateful job poll (same request, different answer each call)
+      operationId: getJobStatus
+      description: >
+        Cycles status pending -> running -> done across calls with an identical
+        request signature — the stateful endpoint the tuner flags as needing a
+        sequenced mock. checkedAt rotates every call and is pure response noise.
+      responses:
+        "200":
+          description: Current job state
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job, status, checkedAt]
+                properties:
+                  job: { type: string, example: cncf-report }
+                  status:
+                    type: string
+                    enum: [pending, running, done]
+                  checkedAt: { type: string, format: date-time }
+  /v1/time:
+    get:
+      summary: Purely-noisy endpoint (body differs only in a timestamp)
+      operationId: getTime
+      description: >
+        The same request is answered with a body that differs only in the
+        rotating now field — volatile response noise a field-level probe
+        discounts, not a stateful endpoint.
+      responses:
+        "200":
+          description: Current lab time
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [region, now]
+                properties:
+                  region: { type: string, example: lab }
+                  now: { type: string, format: date-time }
+  /v1/orders:
+    post:
+      summary: Create an order (mints a fresh id)
+      operationId: createOrder
+      description: >
+        Mints a fresh UUID-shaped order id, returned in both the Location header
+        and the body. The client then GETs /v1/orders/{id} with it — a
+        created-then-used id the tuner must bind via the create-to-use chain, not
+        wildcard.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                item: { type: string, example: cncf-report }
+      responses:
+        "201":
+          description: Order created
+          headers:
+            Location:
+              schema: { type: string }
+              description: Path of the created order, /v1/orders/{id}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status]
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string, example: created }
+  /v1/orders/{id}:
+    get:
+      summary: Get an order by id
+      operationId: getOrder
+      description: >
+        Returns a stub order for any id — the server does not 404 on unknown ids.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: The order
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, items]
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string, example: open }
+                  items:
+                    type: array
+                    items: { type: string }
+                    example: [cncf-1, cncf-2]
+  /v1/auth/token:
+    post:
+      summary: Mint an access token and rotated session cookie
+      operationId: createToken
+      description: >
+        Returns a fresh bearer access_token and sets a rotated SESSIONID cookie.
+        The client replays both in headers on GET /v1/me. Both rotate every run
+        but ride outside the mock signature — credentials to correlate for a
+        validating replay, not a mask.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                grant_type: { type: string, example: client_credentials }
+      responses:
+        "200":
+          description: Token minted
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+              description: Rotated session cookie, SESSIONID={id}; Path=/; HttpOnly
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [access_token, token_type, expires_in]
+                properties:
+                  access_token: { type: string }
+                  token_type: { type: string, example: Bearer }
+                  expires_in: { type: integer, example: 3600 }
+  /v1/me:
+    get:
+      summary: Current user (token and cookie accepted but not validated)
+      operationId: getMe
+      description: >
+        The client sends the bearer token from /v1/auth/token in Authorization
+        and the SESSIONID cookie in Cookie; the reference server accepts the
+        request without validating either.
+      responses:
+        "200":
+          description: The (fixed) demo user
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [user, plan]
+                properties:
+                  user: { type: string, example: cncf-bot }
+                  plan: { type: string, example: oss }
 components:
   schemas:
     Project:

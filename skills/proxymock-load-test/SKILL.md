@@ -1,7 +1,7 @@
 ---
 name: proxymock-load-test
 description: Run a quick load test by replaying recorded proxymock RRPair traffic at a target with parallel virtual users, then report latency percentiles, throughput, and match rate. Use when users ask for a load test, stress test, or to push concurrent traffic at a local app or service using recorded proxymock traffic.
-argument-hint: --in <dir> --test-against <url> [--vus N] [--for 30s | --times N]
+argument-hint: --in <dir> --test-against <url> [--vus N] [--for 30s | --times N] [--performance]
 ---
 
 # proxymock Quick Load Test
@@ -25,6 +25,8 @@ Speedscale Cloud access.
 - `--for` / `--times`: load shape — run for a duration (loops the set) or a
   fixed number of passes. Default is `--for 10s`.
 - `--fail-if`: SLO gate, repeatable; trips a nonzero exit (see below).
+- `--performance`: opt-in high-throughput mode (see below). Not combinable
+  with a `--fail-if` on `requests.result-match-pct`.
 
 Run the bundled script:
 
@@ -52,6 +54,25 @@ cd go && proxymock mock --in ../lab/proxymock/recording -- go run .
   --in lab/proxymock/recording/localhost \
   --test-against http://localhost:8080 --vus 8 --for 20s
 ```
+
+## High-throughput mode (--performance)
+
+For pure-load runs where match rate does not matter, pass `--performance`.
+It forwards proxymock's `--performance` replay flag (renamed `--load-test`
+in newer proxymock builds, where `--performance` stays as a deprecated
+alias), which skips per-response match scoring and granular response
+collection on the generator. Combined
+with starting the mock side as `proxymock mock --no-out ...` (skip writing
+every observed pair to disk, the biggest mock-side CPU cost), profiling on
+an 18-core M-series host measured +67% throughput (13.7k to 22.9k rps) and
+p99 down from 52 to 28 ms on identical hardware versus default flags.
+
+The caveat: match scoring is skipped, so `requests.result-match-pct` is not
+a real measurement in this mode. The summary reports `matchPct` as null with
+an explanatory note instead of a number, and the script refuses a `--fail-if`
+on `requests.result-match-pct` when `--performance` is set. It is opt-in, not
+the default, because the default mode's match data is what several consumers
+(and the Interpretation section below) gate on.
 
 ## SLO gating with --fail-if
 
@@ -81,7 +102,8 @@ summary carries the aggregate (`-ALL-`) metrics plus a per-endpoint breakdown:
   test cares mostly about latency, throughput, and `failed`; a low `matchPct`
   is expected when responses carry per-call values (tokens, IDs, timestamps)
   and is a correctness signal for the **proxymock-replay-tuning** skill, not a
-  load failure.
+  load failure. Under `--performance` it is null (match scoring is skipped)
+  and `matchPctNote` says so.
 
 When reporting results, lead with p95/p99 latency, RPS, and failed count, and
 include the absolute path to `summary.json`.

@@ -1,7 +1,7 @@
 ---
 name: proxymock-perf-container
 description: Load-test a single service with its downstream mocked by replaying recorded traffic up a virtual-user ladder, report sustainable throughput at the knee, and gate rps/p99 budgets there with margins while per-level CPU attribution refuses to pass off load-generator saturation as an app limit. Use when users ask what a container or service can sustain, want a performance budget gate on recorded traffic, or need load numbers that distinguish app saturation from harness saturation.
-argument-hint: --in <recording-dir> --test-against <url> [--vus-ladder "1,4,16,50"] [--for 30s] [--assert-rps N] [--assert-p99 Nms] [--margin-pct 10] [--repeats 2]
+argument-hint: --in <recording-dir> --test-against <url> [--vus-ladder "1,4,16,50"] [--for 30s] [--assert-rps N] [--assert-p99 Nms] [--margin-pct 10] [--repeats 2] [--no-performance]
 ---
 
 # proxymock Perf Container
@@ -51,6 +51,17 @@ Speedscale Cloud access.
 - `--load-test-script`: path to `proxymock-load-test.sh` when the sibling
   skill is not in its default location.
 - `--proxymock`: proxymock binary, forwarded to the load-test script.
+- `--no-performance`: disable the default high-throughput replay mode. By
+  default every load run passes the load-test script's `--performance` flag
+  (proxymock's own `--performance` replay flag), which skips per-response
+  match scoring on the generator. This skill never gates on match rate, so
+  the default only makes the numbers more honest: the reported rps and p99
+  are pure load figures, with no scoring overhead riding on the generator's
+  back (profiling on an 18-core M-series host measured +67% throughput and
+  p99 52 to 28 ms for `--performance` replay plus `mock --no-out` versus
+  defaults). The cost is
+  that `matchPct` is not scored and shows as `not scored` in the ladder;
+  opt out if you want match rates in the report.
 
 Run the bundled script:
 
@@ -159,10 +170,13 @@ Exit codes:
   milliseconds, so sub-5ms p50/p95 deltas are rounding artifacts, not
   regressions. The summary flags this, and the skill gates only on rps and
   p99 by design.
-- **`matchPct` below 100 with `failed` 0**: succeeded-but-unmatched
-  responses (rotating tokens, moving IDs) count toward matchPct, not
-  failures. It is reported for context but never gated here; correctness
-  gating over the same recording is **proxymock-regression-test**'s job.
+- **`match=not scored` in the ladder**: the default high-throughput mode
+  skips match scoring (see `--no-performance`), so no match rate exists to
+  report and `matchPct` is null in `summary.json`. This is expected, not a
+  data problem. With `--no-performance`, `matchPct` below 100 with `failed`
+  0 means succeeded-but-unmatched responses (rotating tokens, moving IDs);
+  reported for context but never gated here; correctness gating over the
+  same recording is **proxymock-regression-test**'s job.
 - **`failed` > 0 at some level**: transport errors or timeouts under load;
   check the app log at that level's `load.out` before trusting rps there.
 

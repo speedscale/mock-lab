@@ -22,6 +22,10 @@ Options:
                          --fail-if 'latency.p99>100'
                          --fail-if 'requests.result-match-pct<95'
                          --fail-if 'requests.failed!=0'
+  --performance        High-throughput mode: passes 'proxymock replay
+                       --performance' so match scoring is skipped and matchPct
+                       is not reported. Off by default. Start the mock side
+                       with 'proxymock mock --no-out' for a pure-load run.
   --work-dir DIR       Where to write summary.json and result.json
   --proxymock PATH     proxymock binary (default: proxymock from PATH)
   -h, --help           Show this help
@@ -66,6 +70,7 @@ for_dur=""
 times=""
 work_dir=""
 proxymock_bin="${PROXYMOCK:-proxymock}"
+performance="0"
 fail_if=()
 
 while [[ $# -gt 0 ]]; do
@@ -78,6 +83,7 @@ while [[ $# -gt 0 ]]; do
     --fail-if) [[ $# -ge 2 ]] || die "--fail-if requires a value"; fail_if+=("$2"); shift 2 ;;
     --work-dir) [[ $# -ge 2 ]] || die "--work-dir requires a value"; work_dir="$2"; shift 2 ;;
     --proxymock) [[ $# -ge 2 ]] || die "--proxymock requires a value"; proxymock_bin="$2"; shift 2 ;;
+    --performance) performance="1"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
@@ -109,7 +115,21 @@ work_dir="$(abs_path "$work_dir")"
 result_json="$work_dir/result.json"
 summary_json="$work_dir/summary.json"
 
+# --performance skips match scoring, so a match-pct gate can never be
+# evaluated honestly in that mode; refuse the combination up front.
+if [[ "$performance" == "1" ]]; then
+  for cond in "${fail_if[@]:-}"; do
+    [[ "$cond" == *result-match-pct* ]] && die "--performance skips match scoring; a --fail-if on requests.result-match-pct cannot be evaluated (drop one of the two)"
+  done
+fi
+
 replay_args=(replay --in "$in_dir" --test-against "$target" --vus "$vus" --output json --no-out)
+if [[ "$performance" == "1" ]]; then
+  # released proxymock calls this flag --performance; newer builds rename it
+  # --load-test but keep --performance as a deprecated alias, so passing
+  # --performance works on both (a deprecation notice may land in replay.log)
+  replay_args+=(--performance)
+fi
 if [[ -n "$for_dur" ]]; then
   replay_args+=(--for "$for_dur")
 fi
@@ -120,18 +140,23 @@ for cond in "${fail_if[@]:-}"; do
   [[ -n "$cond" ]] && replay_args+=(--fail-if "$cond")
 done
 
-echo "load test: vus=${vus} ${for_dur:+for=${for_dur} }${times:+times=${times} }-> ${target}"
+perf_note=""
+if [[ "$performance" == "1" ]]; then
+  perf_note=" [--performance: match scoring off]"
+fi
+echo "load test: vus=${vus} ${for_dur:+for=${for_dur} }${times:+times=${times} }-> ${target}${perf_note}"
 replay_rc=0
 "$proxymock_bin" "${replay_args[@]}" >"$result_json" 2>"$work_dir/replay.log" || replay_rc=$?
 
 [[ -s "$result_json" ]] || { cat "$work_dir/replay.log" >&2; die "proxymock replay produced no JSON result (see $work_dir/replay.log)"; }
 
-python3 - "$result_json" "$summary_json" "$replay_rc" <<'PY'
+python3 - "$result_json" "$summary_json" "$replay_rc" "$performance" <<'PY'
 import json, sys
 
 result = json.load(open(sys.argv[1]))
 summary_json = sys.argv[2]
 replay_rc = int(sys.argv[3])
+performance = sys.argv[4] == "1"
 
 endpoints = result.get("endpoints", [])
 overall = next((e for e in endpoints if e.get("url") == "-ALL-"), None)
@@ -172,15 +197,26 @@ summary = {
     "resultJson": sys.argv[1],
 }
 
+# In --performance mode match scoring is skipped; whatever the metric key
+# holds (older binaries report a meaningless 100), the honest value is null.
+if performance:
+    summary["matchPct"] = None
+    summary["matchPctNote"] = "n/a (--performance skips match scoring)"
+    for e in summary["perEndpoint"]:
+        e["matchPct"] = None
+
 with open(summary_json, "w") as f:
     json.dump(summary, f, indent=2, sort_keys=True)
     f.write("\n")
 
 lat = summary["latencyMs"]
-mp = summary["matchPct"]
-mp_str = f"{mp:.1f}" if isinstance(mp, (int, float)) else str(mp)
+if performance:
+    mp_str = "match scoring off (--performance)"
+else:
+    mp = summary["matchPct"]
+    mp_str = f"{mp:.1f}% match" if isinstance(mp, (int, float)) else f"{mp}% match"
 print("\n=== load test summary ===")
-print(f"requests   : {summary['totalRequests']} total · {summary['failed']} failed · {mp_str}% match")
+print(f"requests   : {summary['totalRequests']} total · {summary['failed']} failed · {mp_str}")
 print(f"throughput : {summary['rps']:.1f} req/s" if isinstance(summary['rps'], (int, float)) else f"throughput : {summary['rps']} req/s")
 print(f"latency ms : p50={lat['p50']} p90={lat['p90']} p95={lat['p95']} p99={lat['p99']} max={lat['max']}")
 print(f"summary    : {summary_json}")

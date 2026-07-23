@@ -27,6 +27,14 @@ Options:
                        gates pass/fail (default: 2)
   --pin-vus N          Evaluate assertions at this ladder level instead of the
                        detected knee (must be a ladder member)
+  --no-performance     Disable the default high-throughput replay mode. By
+                       default every load run passes --performance to the
+                       load-test script (proxymock replay --performance): match
+                       scoring is skipped, so rps/p99 describe pure load with
+                       no scoring overhead on the generator, and matchPct is
+                       reported as null / "not scored". This skill never gates
+                       on matchPct, so the default costs nothing; opt out only
+                       if you want match rates in the ladder report.
   --work-dir DIR       Where to write per-level runs and summary.json
   --load-test-script P Path to proxymock-load-test.sh (default: the sibling
                        proxymock-load-test skill's script)
@@ -96,6 +104,7 @@ pin_vus=""
 work_dir=""
 load_script=""
 proxymock_bin=""
+performance="1"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -111,6 +120,8 @@ while [[ $# -gt 0 ]]; do
     --work-dir) [[ $# -ge 2 ]] || die "--work-dir requires a value"; work_dir="$2"; shift 2 ;;
     --load-test-script) [[ $# -ge 2 ]] || die "--load-test-script requires a value"; load_script="$2"; shift 2 ;;
     --proxymock) [[ $# -ge 2 ]] || die "--proxymock requires a value"; proxymock_bin="$2"; shift 2 ;;
+    --performance) performance="1"; shift ;;
+    --no-performance) performance="0"; shift ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument: $1" ;;
   esac
@@ -308,6 +319,9 @@ run_level() {
   echo "level VU=${vus}: replaying for ${for_dur} against ${target}"
   local rc=0
   local lt_args=(--in "$in_dir" --test-against "$target" --vus "$vus" --for "$for_dur" --work-dir "$outdir/load")
+  if [[ "$performance" == "1" ]]; then
+    lt_args+=(--performance)
+  fi
   if [[ -n "$proxymock_bin" ]]; then
     lt_args+=(--proxymock "$proxymock_bin")
   fi
@@ -631,9 +645,13 @@ print("ladder     :")
 for r in levels:
     lat = r["latencyMs"]
     cpu = r["cpu"]
+    # matchPct is null when the load run used --performance (match scoring
+    # skipped); print "not scored" rather than a fake percentage
+    match_s = (f"{r['matchPct']:.1f}%"
+               if isinstance(r["matchPct"], (int, float)) else "not scored")
     line = (f"  VU {r['vus']:<4}: {fnum(r['rps'])} rps  "
             f"p50={lat.get('p50')} p95={lat.get('p95')} p99={lat.get('p99')} ms  "
-            f"failed={r['failed']}  match={fnum(r['matchPct'])}%  "
+            f"failed={r['failed']}  match={match_s}  "
             f"gen={fnum(cpu['generatorMaxPct'], '{:.0f}')}% "
             f"app={fnum(cpu['appMaxPct'], '{:.0f}')}% "
             f"idle={fnum(cpu['hostIdleMinPct'], '{:.0f}')}%")

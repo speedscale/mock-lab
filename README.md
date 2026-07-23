@@ -172,7 +172,7 @@ measure the misses, replay against the tuned mock set, and verify the hit rate i
 
 ## More proxymock skills
 
-The same recordings power three more agent skills in [`skills/`](skills/). Each ships a script and
+The same recordings power four more agent skills in [`skills/`](skills/). Each ships a script and
 a `prove-*.sh`, runs against the committed `lab/proxymock/recording`, and needs no Speedscale Cloud
 account.
 
@@ -181,6 +181,7 @@ account.
 | [`proxymock-load-test`](skills/proxymock-load-test/SKILL.md) | Replay recorded traffic at a target with parallel virtual users; report latency percentiles, throughput, and match rate, with `--fail-if` SLO gates | `proxymock replay --vus --for --fail-if` |
 | [`proxymock-compare-results`](skills/proxymock-compare-results/SKILL.md) | Deep before/after comparison of two replay/recording sets — what regressed, improved, or persisted across performance/reliability/security; writes JSON, HTML, and an LLM digest | `proxymock report --baseline` + `proxymock drift` |
 | [`proxymock-summarize-recording`](skills/proxymock-summarize-recording/SKILL.md) | Summarize a recording: hosts, inbound/outbound endpoints, methods, status mix, volume, plus the report digest | `proxymock report --format prompt` |
+| [`proxymock-regression-test`](skills/proxymock-regression-test/SKILL.md) | Replay a recording at a target and gate on per-RRPair result-match tags and budget flips, not transport failures; catches status-code regressions that `requests.failed` misses | `proxymock replay` + `proxymock report --baseline` |
 
 ```shell
 # quick load test against the mocked app (run `cd go && proxymock mock --in ../lab/proxymock/recording -- go run .` first)
@@ -194,6 +195,11 @@ account.
 # summarize what a recording contains
 ./skills/proxymock-summarize-recording/scripts/proxymock-summarize-recording.sh \
   --in lab/proxymock/recording --out recording-brief.md
+
+# regression-test a change against a known-good replay
+./skills/proxymock-regression-test/scripts/proxymock-regression-test.sh \
+  --in lab/proxymock/recording --test-against http://localhost:8080 \
+  --baseline ./regress-base/replayed --fail-on-regression
 ```
 
 ## The downstream API

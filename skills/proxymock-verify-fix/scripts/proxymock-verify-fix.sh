@@ -20,7 +20,13 @@ recorded truth, so the pass/fail semantics invert: a match failure of the form
 a run where every pair matches means the bug STILL REPRODUCES (the buggy
 behavior equals the recording). requests.failed cannot see any of this: a
 status change still completes the HTTP exchange, so the fix appears only in
-the per-RRPair match tags.
+the per-RRPair verdict. The partition and its exit codes come from replay
+--verify-fix, read back from <out>/replay-verdict.json.
+
+That verdict is STATUS-ONLY (measured on v2.5.805: a body-only collateral
+regression alongside a real fix still scores "fix-confirmed" and exits 0). It
+is necessary but NOT sufficient: diff bodies with the proxymock MCP tool
+response_diff, against the noise allowlist, before accepting the fix.
 
 Required:
   --in DIR              Incident recording directory (RRPair files captured
@@ -65,6 +71,7 @@ Exit codes:
 
 Output files (in --work-dir):
   replayed/ (or run-N/replayed/)  replay output RRPairs
+  replayed/replay-verdict.json    proxymock's native per-pair verdict
   result.json (or run-N/result.json)  replay metrics
   summary.json                    machine-readable verdict with reproduced,
                                   fixed, and collateral lists (recorded and
@@ -179,10 +186,15 @@ elif [[ "$has_outbound" == "1" ]]; then
 fi
 
 run_replay() {
-  # run_replay OUT_DIR RESULT_JSON LOG_FILE
+  # run_replay OUT_DIR RESULT_JSON LOG_FILE [EXTRA_REPLAY_FLAG...]: replay the
+  # incident capture in proxymock's native --verify-fix mode, which owns the
+  # recorded-error partition and the 0/2/3 exit mapping
   local out="$1" result="$2" log="$3"
+  shift 3
   ql_check_replay_out_empty "$out" 4
-  ql_run_replay "$proxymock_bin" "$in_dir" "$target" "$out" "$result" "$log" 4
+  ql_run_replay "$proxymock_bin" "$in_dir" "$target" "$out" "$result" "$log" 4 \
+    --verify-fix "$@"
+  ql_echo_replay_verdict_lines "$log"
   # The console blueprint line lies (see ql_smart_replace_file_count); only
   # smart_replace events in the replay output prove a blueprint applied.
   if [[ "$bp_count" -gt 0 ]]; then
@@ -195,340 +207,199 @@ run_replay() {
   fi
 }
 
-# --- shared analysis: pair scanning and incident partitioning ----------------
-# Written once to a temp python file so reproduce and verify modes share it.
-gate_py="$work_dir/.verify-fix-gate.py"
-cat >"$gate_py" <<'PY'
-import json, pathlib, re, sys
-
-internal_re = re.compile(r"json:\s*(\{.*\})", re.S)
-
-def load_rr(path):
-    m = internal_re.search(path.read_text(errors="ignore"))
-    if not m:
-        return None
-    try:
-        return json.loads(m.group(1))
-    except Exception:
-        return None
-
-def scan_replay(root):
-    """refUuid -> replay pair info from the INTERNAL json of every RRPair."""
-    pairs = {}
-    if not root:
-        return pairs
-    for path in sorted(pathlib.Path(root).rglob("*.md")):
-        rr = load_rr(path)
-        if rr is None:
-            continue
-        tags = rr.get("tags", {})
-        ref = tags.get("refUuid")
-        if not ref:
-            continue
-        http = rr.get("http", {})
-        info = {
-            "match": tags.get("match"),
-            "method": http.get("req", {}).get("method"),
-            "uri": http.get("req", {}).get("uri"),
-            "observedStatus": http.get("res", {}).get("statusCode"),
-            "sourceFile": tags.get("file"),
-            "replayFile": str(path),
-        }
-        # aggregate duplicates (multi-pass replays): any fail wins
-        prev = pairs.get(ref)
-        if prev is None or info["match"] == "fail":
-            pairs[ref] = info
-    return pairs
-
-def scan_recording(root):
-    """source file path -> recorded inbound pair info."""
-    rec = {}
-    for path in sorted(pathlib.Path(root).rglob("*.md")):
-        rr = load_rr(path)
-        if rr is None or rr.get("direction") != "IN":
-            continue
-        http = rr.get("http", {})
-        rec[str(path)] = {
-            "method": http.get("req", {}).get("method"),
-            "uri": http.get("req", {}).get("uri"),
-            "recordedStatus": http.get("res", {}).get("statusCode"),
-        }
-    return rec
-
-def is_error(status):
-    return isinstance(status, int) and status >= 400
-
-def is_success(status):
-    return isinstance(status, int) and 200 <= status < 400
-
-def incident_files(recording, expect):
-    """The incident set: recorded-error pairs, filtered by --expect if given.
-
-    The recorded response IS the bug: an incident capture stores the failing
-    responses as recorded truth, so recorded status >= 400 identifies the
-    incident endpoints without any hand-written expectation."""
-    out = {}
-    pat = re.compile(expect) if expect else None
-    for path, info in recording.items():
-        if not is_error(info["recordedStatus"]):
-            continue
-        if pat and not pat.search(info["uri"] or ""):
-            continue
-        out[path] = info
-    return out
-
-def overall_metrics(result_json):
-    result = json.load(open(result_json))
-    overall = next((e for e in result.get("endpoints", []) if e.get("url") == "-ALL-"), {})
-    return overall.get("metrics", {})
-
-def row(ref, p, recorded):
-    return {
-        "refUuid": ref,
-        "method": p["method"],
-        "uri": p["uri"],
-        "recordedStatus": recorded,
-        "observedStatus": p["observedStatus"],
-        "sourceFile": p["sourceFile"],
-        "replayFile": p["replayFile"],
-    }
-
-def partition(replay_pairs, recording, incident):
-    """Split replayed pairs into fixed / reproduced / other-mismatch.
-
-    SEMANTIC INVERSION: for a pair whose recording is an error, match=pass
-    means the target faithfully reproduced the recorded error (bug present)
-    and match=fail with an observed success status means the behavior changed
-    away from the recorded error (fix signal)."""
-    fixed, reproduced, other_fails = [], [], []
-    replayed_sources = set()
-    for ref, p in sorted(replay_pairs.items()):
-        src = p.get("sourceFile")
-        replayed_sources.add(src)
-        rec_info = recording.get(src)
-        recorded = rec_info["recordedStatus"] if rec_info else None
-        if src in incident:
-            if p["match"] == "pass" or not is_success(p["observedStatus"]):
-                # still the recorded error, or a different error: not fixed
-                reproduced.append(row(ref, p, recorded))
-            else:
-                fixed.append(row(ref, p, recorded))
-        elif p["match"] == "fail":
-            other_fails.append(row(ref, p, recorded))
-    unreplayed = [
-        {"sourceFile": path, **info}
-        for path, info in sorted(incident.items())
-        if path not in replayed_sources
-    ]
-    return fixed, reproduced, other_fails, unreplayed
-
-mode = sys.argv[1]
-
-if mode == "verify":
-    (in_dir, replay_out, baseline_dir, result_json, summary_json,
-     expect, fail_on_collateral) = sys.argv[2:9]
-    fail_on_collateral = fail_on_collateral == "1"
-
-    recording = scan_recording(in_dir)
-    if not recording:
-        print("error: no inbound RRPairs found in " + in_dir, file=sys.stderr)
-        sys.exit(4)
-    incident = incident_files(recording, expect)
-    if not incident:
-        if expect:
-            print("error: --expect matched no recorded-error pairs; the incident "
-                  "endpoint must have its FAILING response in the recording",
-                  file=sys.stderr)
-        else:
-            print("error: no recorded-error pairs in the recording; this is not "
-                  "an incident capture (or pass --expect to name the endpoint)",
-                  file=sys.stderr)
-        sys.exit(4)
-
-    replay_pairs = scan_replay(replay_out)
-    if not replay_pairs:
-        print("error: no replay RRPairs with match tags found in " + replay_out,
-              file=sys.stderr)
-        sys.exit(4)
-    baseline = scan_replay(baseline_dir)
-    if baseline_dir and not baseline:
-        print("error: --baseline contains no replay RRPairs: " + baseline_dir,
-              file=sys.stderr)
-        sys.exit(4)
-    baseline_fail_refs = {ref for ref, p in baseline.items() if p["match"] == "fail"}
-
-    fixed, reproduced, other_fails, unreplayed = partition(
-        replay_pairs, recording, incident)
-
-    # collateral: a non-incident pair whose recording succeeded but which now
-    # observes something different. Baseline-known mismatches are environment
-    # noise (they failed against the buggy build too) unless escalated.
-    collateral_new = [r for r in other_fails if r["refUuid"] not in baseline_fail_refs]
-    collateral_known = [r for r in other_fails if r["refUuid"] in baseline_fail_refs]
-
-    fix_confirmed = not reproduced and not unreplayed and bool(fixed)
-    collateral_fatal = bool(collateral_new) or (fail_on_collateral and bool(collateral_known))
-
-    exit_code = 0
-    if collateral_fatal:
-        exit_code = 3
-    elif not fix_confirmed:
-        exit_code = 2
-
-    metrics = overall_metrics(result_json)
-    verdict = ("collateral" if exit_code == 3
-               else "not-fixed" if exit_code == 2 else "fixed")
-    summary = {
-        "mode": "verify",
-        "verdict": verdict,
-        "incidentRecording": in_dir,
-        "replayDir": replay_out,
-        "baselineDir": baseline_dir or None,
-        "expect": expect or None,
-        "incidentEndpoints": len(incident),
-        "requestsTotal": metrics.get("requests.total"),
-        "requestsFailed": metrics.get("requests.failed"),
-        "fixed": fixed,
-        "reproduced": reproduced,
-        "unreplayedIncident": unreplayed,
-        "collateral": {"new": collateral_new, "baselineKnown": collateral_known},
-        "failOnCollateral": fail_on_collateral,
-        "exitCode": exit_code,
-    }
-    with open(summary_json, "w") as f:
-        json.dump(summary, f, indent=2, sort_keys=True)
-        f.write("\n")
-
-    print("")
-    print("=== fix verification verdict ===")
-    print(f"incident set : {len(incident)} recorded-error pair(s)"
-          + (f" matching --expect {expect}" if expect else " (auto-detected)"))
-    print(f"requests     : {metrics.get('requests.total')} total, "
-          f"{metrics.get('requests.failed')} transport-failed")
-    for r in fixed:
-        print(f"  FIXED      : {r['method']} {r['uri']} "
-              f"recorded {r['recordedStatus']} -> observed {r['observedStatus']}")
-    for r in reproduced:
-        print(f"  REPRODUCED : {r['method']} {r['uri']} "
-              f"recorded {r['recordedStatus']} -> observed {r['observedStatus']}")
-    for r in unreplayed:
-        print(f"  UNREPLAYED : {r['method']} {r['uri']} "
-              f"recorded {r['recordedStatus']} (no replay outcome)")
-    for r in collateral_new:
-        print(f"  COLLATERAL : {r['method']} {r['uri']} "
-              f"recorded {r['recordedStatus']} -> observed {r['observedStatus']}")
-    for r in collateral_known:
-        print(f"  known noise: {r['method']} {r['uri']} "
-              f"recorded {r['recordedStatus']} -> observed {r['observedStatus']}"
-              " (also failed in baseline)")
-    if verdict == "fixed":
-        print("fix confirmed: incident endpoints no longer return the recorded error")
-    elif verdict == "not-fixed" and not fixed and not unreplayed:
-        print("bug reproduces; fix not present (incident endpoints still return "
-              "the recorded error)")
-    elif verdict == "not-fixed":
-        print("fix NOT confirmed: some incident endpoints still fail or were not replayed")
-    else:
-        print("collateral regression: a recorded-success pair changed behavior")
-    print(f"replay dir   : {replay_out}")
-    print(f"summary      : {summary_json}")
-    sys.exit(exit_code)
-
-elif mode == "reproduce":
-    in_dir, summary_json, expect = sys.argv[2:5]
-    run_dirs = sys.argv[5:]
-
-    recording = scan_recording(in_dir)
-    if not recording:
-        print("error: no inbound RRPairs found in " + in_dir, file=sys.stderr)
-        sys.exit(4)
-    incident = incident_files(recording, expect)
-    if not incident:
-        print("error: no recorded-error pairs to reproduce (see --expect)",
-              file=sys.stderr)
-        sys.exit(4)
-
-    runs = []
-    outcome_maps = []
-    for run_dir in run_dirs:
-        pairs = scan_replay(run_dir)
-        if not pairs:
-            print("error: no replay RRPairs with match tags found in " + run_dir,
-                  file=sys.stderr)
-            sys.exit(4)
-        fixed, reproduced, other_fails, unreplayed = partition(
-            pairs, recording, incident)
-        outcome_maps.append({ref: p["match"] for ref, p in pairs.items()})
-        runs.append({
-            "replayDir": run_dir,
-            "incidentReproduced": len(reproduced),
-            "incidentNotReproduced": len(fixed) + len(unreplayed),
-            "otherMismatches": len(other_fails),
-            "notReproduced": fixed + [dict(r, observedStatus=None) for r in unreplayed],
-        })
-
-    deterministic = all(m == outcome_maps[0] for m in outcome_maps[1:])
-    reproduces = all(
-        r["incidentReproduced"] == len(incident) and r["incidentNotReproduced"] == 0
-        for r in runs)
-
-    exit_code = 0 if (deterministic and reproduces) else 2
-    summary = {
-        "mode": "reproduce",
-        "verdict": "reproduces" if exit_code == 0 else "does-not-reproduce",
-        "incidentRecording": in_dir,
-        "expect": expect or None,
-        "incidentEndpoints": len(incident),
-        "runs": runs,
-        "deterministic": deterministic,
-        "exitCode": exit_code,
-    }
-    with open(summary_json, "w") as f:
-        json.dump(summary, f, indent=2, sort_keys=True)
-        f.write("\n")
-
-    print("")
-    print("=== reproduction verdict ===")
-    print(f"incident set : {len(incident)} recorded-error pair(s)"
-          + (f" matching --expect {expect}" if expect else " (auto-detected)"))
-    for i, r in enumerate(runs, 1):
-        print(f"  run {i}      : {r['incidentReproduced']}/{len(incident)} incident "
-              f"pair(s) reproduced, {r['otherMismatches']} other mismatch(es)")
-    if exit_code == 0:
-        print(f"deterministic reproduction confirmed across {len(runs)} run(s)")
-    elif not reproduces:
-        print("the incident did NOT reproduce: incident endpoints returned "
-              "something other than the recorded error")
-    else:
-        print("match outcomes differed between runs: the capture is not a "
-              "deterministic reproduction")
-    print(f"summary      : {summary_json}")
-    sys.exit(exit_code)
-
-else:
-    print("error: unknown gate mode: " + mode, file=sys.stderr)
-    sys.exit(4)
-PY
-
 rc=0
 if [[ "$reproduce" == "1" ]]; then
+  # No native equivalent: -n/--times replays repeatedly but never compares the
+  # runs, so per-run stability is still computed here from each run's verdict.
   run_dirs=()
+  expect_flags=()
+  [[ -n "$expect" ]] && expect_flags+=(--expect "$expect")
   for i in $(seq 1 "$runs"); do
     run_dir="$work_dir/run-$i"
     mkdir -p "$run_dir"
     echo "reproduce run $i/$runs: $in_dir -> $target"
-    run_replay "$run_dir/replayed" "$run_dir/result.json" "$run_dir/replay.log"
+    run_replay "$run_dir/replayed" "$run_dir/result.json" "$run_dir/replay.log" \
+      ${expect_flags[@]+"${expect_flags[@]}"}
     run_dirs+=("$run_dir/replayed")
   done
-  python3 "$gate_py" reproduce "$in_dir" "$summary_json" "$expect" \
-    "${run_dirs[@]}" || rc=$?
+  python3 - "$in_dir" "$summary_json" "$expect" "${run_dirs[@]}" <<'PY' || rc=$?
+import json, pathlib, sys
+
+in_dir, summary_json, expect = sys.argv[1:4]
+run_dirs = sys.argv[4:]
+
+def row(p):
+    return {
+        "refUuid": p.get("refUuid"),
+        "method": p.get("method"),
+        "uri": p.get("endpoint"),
+        "recordedStatus": p.get("recordedStatus"),
+        "observedStatus": p.get("observedStatus"),
+        "sourceFile": p.get("sourceFile"),
+        "replayFile": p.get("replayFile"),
+    }
+
+runs, outcome_maps, incident_counts = [], [], []
+for run_dir in run_dirs:
+    verdict = json.load(open(pathlib.Path(run_dir) / "replay-verdict.json"))
+    pairs = verdict.get("pairs") or []
+    reproduced = [p for p in pairs if p.get("classification") == "bug-reproduced"]
+    fixed = [p for p in pairs if p.get("classification") == "fix-confirmed"]
+    other = [p for p in pairs
+             if p.get("match") != "pass"
+             and p.get("classification") not in ("bug-reproduced", "fix-confirmed")]
+    incident_counts.append(len(reproduced) + len(fixed))
+    # stability is judged on the whole scored set, not just the incident pairs
+    outcome_maps.append({p.get("refUuid"): (p.get("match"), p.get("classification"))
+                         for p in pairs})
+    runs.append({
+        "replayDir": run_dir,
+        "incidentReproduced": len(reproduced),
+        "incidentNotReproduced": len(fixed),
+        "otherMismatches": len(other),
+        "notReproduced": [row(p) for p in fixed],
+    })
+
+deterministic = all(m == outcome_maps[0] for m in outcome_maps[1:])
+reproduces = all(r["incidentReproduced"] > 0 and r["incidentNotReproduced"] == 0
+                 for r in runs)
+
+exit_code = 0 if (deterministic and reproduces) else 2
+summary = {
+    "mode": "reproduce",
+    "verdict": "reproduces" if exit_code == 0 else "does-not-reproduce",
+    "incidentRecording": in_dir,
+    "expect": expect or None,
+    "incidentEndpoints": incident_counts[0] if incident_counts else 0,
+    "runs": runs,
+    "deterministic": deterministic,
+    "exitCode": exit_code,
+}
+with open(summary_json, "w") as f:
+    json.dump(summary, f, indent=2, sort_keys=True)
+    f.write("\n")
+
+print("")
+print("=== reproduction verdict ===")
+print(f"incident set : {summary['incidentEndpoints']} recorded-error pair(s)"
+      + (f" matching --expect {expect}" if expect else " (auto-detected)"))
+for i, r in enumerate(runs, 1):
+    print(f"  run {i}      : {r['incidentReproduced']}/{summary['incidentEndpoints']} "
+          f"incident pair(s) reproduced, {r['otherMismatches']} other mismatch(es)")
+if exit_code == 0:
+    print(f"deterministic reproduction confirmed across {len(runs)} run(s)")
+elif not reproduces:
+    print("the incident did NOT reproduce: incident endpoints returned "
+          "something other than the recorded error")
+else:
+    print("match outcomes differed between runs: the capture is not a "
+          "deterministic reproduction")
+print(f"summary      : {summary_json}")
+sys.exit(exit_code)
+PY
 else
   echo "replaying incident recording: $in_dir -> $target"
-  run_replay "$work_dir/replayed" "$work_dir/result.json" "$work_dir/replay.log"
-  python3 "$gate_py" verify "$in_dir" "$work_dir/replayed" "$baseline_dir" \
-    "$work_dir/result.json" "$summary_json" "$expect" "$fail_on_collateral" || rc=$?
+  vf_flags=()
+  [[ -n "$expect" ]] && vf_flags+=(--expect "$expect")
+  [[ -n "$baseline_dir" ]] && vf_flags+=(--baseline "$baseline_dir")
+  run_replay "$work_dir/replayed" "$work_dir/result.json" "$work_dir/replay.log" \
+    ${vf_flags[@]+"${vf_flags[@]}"}
+  python3 - "$in_dir" "$work_dir/replayed" "$baseline_dir" "$work_dir/result.json" \
+    "$summary_json" "$expect" "$fail_on_collateral" "$ql_replay_rc" <<'PY' || rc=$?
+import json, pathlib, sys
+
+(in_dir, replay_out, baseline_dir, result_json, summary_json, expect,
+ fail_on_collateral, replay_rc) = sys.argv[1:9]
+fail_on_collateral = fail_on_collateral == "1"
+replay_rc = int(replay_rc)
+
+# --verify-fix owns the partition: it classifies each pair as fix-confirmed,
+# bug-reproduced, collateral (new) or known-mismatch (also failed in
+# --baseline), and maps that onto exit 0 / 2 / 3
+verdict = json.load(open(pathlib.Path(replay_out) / "replay-verdict.json"))
+pairs = verdict.get("pairs") or []
+
+def rows(classification):
+    return [{
+        "refUuid": p.get("refUuid"),
+        "method": p.get("method"),
+        "uri": p.get("endpoint"),
+        "recordedStatus": p.get("recordedStatus"),
+        "observedStatus": p.get("observedStatus"),
+        "sourceFile": p.get("sourceFile"),
+        "replayFile": p.get("replayFile"),
+    } for p in pairs if p.get("classification") == classification]
+
+fixed = rows("fix-confirmed")
+reproduced = rows("bug-reproduced")
+collateral_new = rows("collateral")
+collateral_known = rows("known-mismatch")
+
+# native exit codes already match this script's contract (2 bug reproduces,
+# 3 collateral); only --fail-on-collateral escalates beyond them
+exit_code = replay_rc
+if fail_on_collateral and collateral_known:
+    exit_code = 3
+
+result = json.load(open(result_json))
+overall = next((e for e in result.get("endpoints", []) if e.get("url") == "-ALL-"), {})
+metrics = overall.get("metrics", {})
+
+verdict_name = ("collateral" if exit_code == 3
+                else "not-fixed" if exit_code == 2 else "fixed")
+summary = {
+    "mode": "verify",
+    "verdict": verdict_name,
+    "incidentRecording": in_dir,
+    "replayDir": replay_out,
+    "baselineDir": baseline_dir or None,
+    "expect": expect or None,
+    "incidentEndpoints": len(fixed) + len(reproduced),
+    "requestsTotal": metrics.get("requests.total"),
+    "requestsFailed": metrics.get("requests.failed"),
+    "fixed": fixed,
+    "reproduced": reproduced,
+    # the native verdict scores only pairs that were actually replayed, so an
+    # incident pair with no replay outcome is not reported; a nonzero
+    # requests.failed is the signal that one went missing
+    "unreplayedIncident": [],
+    "collateral": {"new": collateral_new, "baselineKnown": collateral_known},
+    "failOnCollateral": fail_on_collateral,
+    "exitCode": exit_code,
+}
+with open(summary_json, "w") as f:
+    json.dump(summary, f, indent=2, sort_keys=True)
+    f.write("\n")
+
+print("")
+print("=== fix verification verdict ===")
+print(f"incident set : {summary['incidentEndpoints']} recorded-error pair(s)"
+      + (f" matching --expect {expect}" if expect else " (auto-detected)"))
+print(f"requests     : {metrics.get('requests.total')} total, "
+      f"{metrics.get('requests.failed')} transport-failed")
+if metrics.get("requests.failed"):
+    print("WARNING: transport failures present; an incident pair that never "
+          "replayed is invisible to the verdict", file=sys.stderr)
+for r in collateral_known:
+    print(f"  known noise: {r['method']} {r['uri']} "
+          f"recorded {r['recordedStatus']} -> observed {r['observedStatus']}"
+          " (also failed in baseline)")
+if verdict_name == "fixed":
+    print("fix confirmed: incident endpoints no longer return the recorded error")
+elif verdict_name == "not-fixed":
+    print("bug reproduces; fix not present (incident endpoints still return "
+          "the recorded error)")
+else:
+    print("collateral regression: a recorded-success pair changed behavior")
+print("STATUS-LEVEL GATING ONLY: a body-only regression scores 'fix-confirmed'")
+print("here. Body-level diffing with the MCP tool response_diff (against the")
+print("noise allowlist) is REQUIRED before accepting the fix.")
+print(f"replay dir   : {replay_out}")
+print(f"verdict json : {replay_out}/replay-verdict.json")
+print(f"summary      : {summary_json}")
+sys.exit(exit_code)
+PY
 fi
-rm -f "$gate_py"
 
 if [[ "$rc" -eq 2 && "$reproduce" == "1" ]]; then
   echo "FAIL: the capture is not a deterministic reproduction" >&2

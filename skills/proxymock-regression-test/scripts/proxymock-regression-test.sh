@@ -14,10 +14,16 @@ Usage:
   proxymock-regression-test.sh --in DIR --test-against URL [options]
 
 Replay a recorded proxymock session at a target and gate on regressions:
-per-RRPair result-match tags (pass/fail) and, with a baseline, budget flips
-from a Compare report. requests.failed is NOT the gate: a status-code
-regression (201 -> 200) completes the HTTP exchange cleanly and leaves
-requests.failed at 0; only the match tag catches it.
+proxymock's native replay verdict (--baseline --fail-on-new-mismatch, read
+from <out>/replay-verdict.json) and, with a baseline, budget flips from a
+Compare report. requests.failed is NOT the gate: a status-code regression
+(201 -> 200) completes the HTTP exchange cleanly and leaves requests.failed
+at 0; only the verdict catches it.
+
+The native verdict is STATUS-ONLY (measured on v2.5.805: a changed response
+body scores verdict "pass" with mismatches 0). It is necessary but NOT
+sufficient: diff bodies with the proxymock MCP tool response_diff, against
+the noise allowlist, before calling a build clean.
 
 Required:
   --in DIR              Recording directory to replay (RRPair files)
@@ -25,8 +31,8 @@ Required:
 
 Options:
   --baseline DIR        A prior known-good replay output directory. Enables
-                        baseline-relative match gating (only NEW failures
-                        count) and the budget-flip gate.
+                        replay's native baseline-relative gating (only NEW
+                        mismatches count) and the budget-flip gate.
   --fail-on-regression  Exit nonzero when regressions are found; without it
                         findings are reported and the exit code is 0.
   --work-dir DIR        Where to write the replay output and reports
@@ -37,11 +43,12 @@ Options:
 Exit codes:
   0  no regression (or findings present without --fail-on-regression)
   2  precondition failure (bad args, missing dirs, replay did not run)
-  3  match-tag regressions (with --fail-on-regression)
+  3  status-level regressions (with --fail-on-regression)
   4  budget flips (with --fail-on-regression; requires --baseline)
 
 Output files (in --work-dir):
   replayed/             replay output RRPairs (use as --baseline next run)
+  replayed/replay-verdict.json  proxymock's native per-pair verdict
   result.json           replay metrics (latency, requests.failed, match pct)
   report.json/.html/.prompt.md   proxymock report (Compare report with --baseline)
   summary.json          machine-readable verdict
@@ -131,10 +138,21 @@ if ql_has_outbound "$in_dir"; then
   echo "note: mocked, 'proxymock mock' requires an explicit --in <recording>."
 fi
 
-# --- replay ------------------------------------------------------------------
+# --- replay (native verdict gate) --------------------------------------------
+# --fail-on-new-mismatch requires --baseline (measured: it errors without one),
+# so without a baseline the gate is applied locally over the verdict file,
+# where every mismatch counts. With a baseline, replay's exit 3 IS the gate.
 echo "replaying: $in_dir -> $target"
+replay_flags=()
+if [[ -n "$baseline_dir" ]]; then
+  replay_flags+=(--baseline "$baseline_dir")
+  [[ "$fail_on_regression" == "1" ]] && replay_flags+=(--fail-on-new-mismatch)
+fi
 ql_run_replay "$proxymock_bin" "$in_dir" "$target" "$replay_out" \
-  "$result_json" "$replay_log" 2
+  "$result_json" "$replay_log" 2 \
+  ${replay_flags[@]+"${replay_flags[@]}"}
+replay_rc="$ql_replay_rc"
+ql_echo_replay_verdict_lines "$replay_log"
 
 # The console blueprint line lies (see ql_smart_replace_file_count); the only
 # trustworthy signal is smart_replace events in the replay output RRPairs.
@@ -164,85 +182,41 @@ for fmt in json html prompt; do
   "$proxymock_bin" "${base_args[@]}" --format "$fmt" --out "$out" --exit-zero
 done
 
-# --- gate: match tags + budget flips -----------------------------------------
+# --- gate: native verdict + budget flips --------------------------------------
 rc=0
 python3 - "$replay_out" "$baseline_dir" "$work_dir/report.json" "$result_json" \
-  "$summary_json" "$fail_on_regression" <<'PY' || rc=$?
-import json, pathlib, re, sys
+  "$summary_json" "$fail_on_regression" "$replay_rc" <<'PY' || rc=$?
+import json, pathlib, sys
 
-replay_out, baseline_dir, report_json, result_json, summary_json, gate = sys.argv[1:7]
+(replay_out, baseline_dir, report_json, result_json, summary_json, gate,
+ replay_rc) = sys.argv[1:8]
 gate = gate == "1"
+replay_rc = int(replay_rc)
 
-internal_re = re.compile(r"json:\s*(\{.*\})", re.S)
-
-def scan(root):
-    """refUuid -> pair info from the INTERNAL json of every RRPair file."""
-    pairs = {}
-    if not root:
-        return pairs
-    for path in sorted(pathlib.Path(root).rglob("*.md")):
-        m = internal_re.search(path.read_text(errors="ignore"))
-        if not m:
-            continue
-        try:
-            rr = json.loads(m.group(1))
-        except Exception:
-            continue
-        tags = rr.get("tags", {})
-        ref = tags.get("refUuid")
-        if not ref:
-            continue
-        http = rr.get("http", {})
-        info = {
-            "match": tags.get("match"),
-            "method": http.get("req", {}).get("method"),
-            "uri": http.get("req", {}).get("uri"),
-            "observedStatus": http.get("res", {}).get("statusCode"),
-            "sourceFile": tags.get("file"),
-            "replayFile": str(path),
-        }
-        # aggregate duplicates (multi-pass replays): any fail wins
-        prev = pairs.get(ref)
-        if prev is None or info["match"] == "fail":
-            pairs[ref] = info
-    return pairs
-
-def recorded_status(source_file):
-    if not source_file:
-        return None
-    p = pathlib.Path(source_file)
-    if not p.is_file():
-        return None
-    m = internal_re.search(p.read_text(errors="ignore"))
-    if not m:
-        return None
-    try:
-        rr = json.loads(m.group(1))
-    except Exception:
-        return None
-    return rr.get("http", {}).get("res", {}).get("statusCode")
-
-current = scan(replay_out)
-if not current:
-    print("error: no replay RRPairs with match tags found in " + replay_out, file=sys.stderr)
+# proxymock writes this on every non-load-test replay; it carries the recorded
+# and observed status, the baseline comparison and the gate decision per pair
+verdict = json.load(open(pathlib.Path(replay_out) / "replay-verdict.json"))
+pairs = verdict.get("pairs") or []
+if not pairs:
+    print("error: replay-verdict.json scored no pairs in " + replay_out, file=sys.stderr)
     sys.exit(2)
 
-baseline = scan(baseline_dir)
-if baseline_dir and not baseline:
-    print("error: --baseline contains no replay RRPairs: " + baseline_dir, file=sys.stderr)
-    sys.exit(2)
+def row(p):
+    return {
+        "refUuid": p.get("refUuid"),
+        "method": p.get("method"),
+        "uri": p.get("endpoint"),
+        "recordedStatus": p.get("recordedStatus"),
+        "observedStatus": p.get("observedStatus"),
+        "sourceFile": p.get("sourceFile"),
+        "replayFile": p.get("replayFile"),
+    }
 
-fails = {ref: p for ref, p in current.items() if p["match"] == "fail"}
-baseline_fail_refs = {ref for ref, p in baseline.items() if p["match"] == "fail"}
-
-# baseline-relative: a failure already present in the baseline is the known
-# noise floor, not a regression; without a baseline every failure counts
-if baseline:
-    new_failures = {ref: p for ref, p in fails.items() if ref not in baseline_fail_refs}
+fails = [p for p in pairs if p.get("match") != "pass"]
+if baseline_dir:
+    new_failures = [p for p in fails if p.get("newMismatch")]
 else:
-    new_failures = dict(fails)
-for ref, p in new_failures.items():
-    p["recordedStatus"] = recorded_status(p.get("sourceFile"))
+    new_failures = list(fails)
 
 flips = []
 if baseline_dir:
@@ -262,12 +236,15 @@ result = json.load(open(result_json))
 overall = next((e for e in result.get("endpoints", []) if e.get("url") == "-ALL-"), {})
 metrics = overall.get("metrics", {})
 
+# replay's own exit 3 is the gate whenever a baseline was given; the local
+# check covers the no-baseline case, where --fail-on-new-mismatch is rejected
 exit_code = 0
-if gate and new_failures:
+if gate and (replay_rc == 3 or new_failures):
     exit_code = 3
 elif gate and flips:
     exit_code = 4
 
+vsummary = verdict.get("summary") or {}
 work_dir = str(pathlib.Path(summary_json).parent)
 summary = {
     "replayDir": replay_out,
@@ -276,13 +253,10 @@ summary = {
     "requestsFailed": metrics.get("requests.failed"),
     "resultMatchPct": metrics.get("requests.result-match-pct"),
     "match": {
-        "pairs": len(current),
-        "failures": len(fails),
-        "baselineFailures": len(baseline_fail_refs) if baseline else None,
-        "newFailures": [
-            {"refUuid": ref, **{k: v for k, v in p.items() if k != "match"}}
-            for ref, p in sorted(new_failures.items())
-        ],
+        "pairs": vsummary.get("pairs", len(pairs)),
+        "failures": vsummary.get("mismatches", len(fails)),
+        "baselineFailures": vsummary.get("baselineMismatches", 0) if baseline_dir else None,
+        "newFailures": [row(p) for p in new_failures],
     },
     "budgetFlips": flips,
     "reports": {
@@ -297,28 +271,29 @@ with open(summary_json, "w") as f:
     json.dump(summary, f, indent=2, sort_keys=True)
     f.write("\n")
 
+m = summary["match"]
 print("")
 print("=== regression verdict ===")
 print(f"requests    : {summary['requestsTotal']} total, {summary['requestsFailed']} transport-failed")
-print(f"match tags  : {len(current)} pairs, {len(fails)} fail"
-      + (f" ({len(baseline_fail_refs)} in baseline noise floor)" if baseline else " (no baseline: all count)"))
-for ref, p in sorted(new_failures.items()):
-    rec = p.get("recordedStatus")
-    rec_s = str(rec) if rec is not None else "?"
-    print(f"  NEW FAIL  : {p['method']} {p['uri']} recorded {rec_s} -> observed {p['observedStatus']}")
+print(f"verdict     : {verdict.get('verdict')} -- {m['pairs']} pairs, {m['failures']} mismatch"
+      + (f" ({m['baselineFailures']} baseline-known)" if baseline_dir else " (no baseline: all count)"))
 for f_ in flips:
     print(f"  BUDGET FLIP: {f_['metric']} {f_['op']} {f_['value']}{f_['unit'] or ''} "
           f"(baseline {f_['baselineObserved']} pass -> current {f_['currentObserved']} fail)")
 if not new_failures and not flips:
-    print("no regressions detected")
+    print("no status-level regressions detected")
+print("STATUS-LEVEL GATING ONLY: a body-only regression scores 'pass' here.")
+print("Body-level diffing with the MCP tool response_diff (against the noise")
+print("allowlist) is REQUIRED before calling this build clean.")
 print(f"replay dir  : {replay_out}")
+print(f"verdict json: {replay_out}/replay-verdict.json")
 print(f"summary     : {summary_json}")
 print(f"digest      : {work_dir}/report.prompt.md")
 sys.exit(exit_code)
 PY
 
 if [[ "$rc" -eq 3 ]]; then
-  echo "FAIL: match-tag regression(s) detected" >&2
+  echo "FAIL: status-level regression(s) detected" >&2
 elif [[ "$rc" -eq 4 ]]; then
   echo "FAIL: budget flip(s) detected" >&2
 fi

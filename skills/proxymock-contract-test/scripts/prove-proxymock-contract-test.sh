@@ -8,14 +8,15 @@
 # a usage error (exit 4).
 set -euo pipefail
 
-die() {
-  echo "FAIL: $*" >&2
+# shared ql_* helpers; a copied skill needs skills/lib/common.sh too
+if [[ ! -r "$(dirname "$0")/../../lib/common.sh" ]]; then
+  echo "FAIL: missing $(dirname "$0")/../../lib/common.sh (copy skills/lib/common.sh alongside this skill)" >&2
   exit 1
-}
+fi
+source "$(dirname "$0")/../../lib/common.sh"
 
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
+die() { ql_fail "$@"; }
+need_cmd() { ql_prove_need_cmd "$1"; }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 skill_dir="$(cd "$script_dir/.." && pwd)"
@@ -39,11 +40,9 @@ mock_pid=""
 mock_port=""
 cleanup() {
   if [[ -n "$mock_pid" ]]; then
-    kill "$mock_pid" 2>/dev/null || true
-    wait "$mock_pid" 2>/dev/null || true
-  fi
-  if [[ -n "$mock_port" ]]; then
-    lsof -ti "tcp:${mock_port}" 2>/dev/null | xargs kill 2>/dev/null || true
+    ql_stop_pid_and_port "$mock_pid" "$mock_port"
+  elif [[ -n "$mock_port" ]]; then
+    ql_sweep_port "$mock_port"
   fi
   if [[ "${KEEP_PROOF_TMP:-0}" != "1" ]]; then
     rm -rf "$tmp"
@@ -138,9 +137,7 @@ grep -q 'example_value' "$tmp/d.out" \
 grep -q 'mock is up' "$tmp/d.out" || die "case d: mock did not report loaded"
 [[ -n "$mock_pid" ]] || die "case d: serve.json missing pid"
 echo "generated $pair_count pair(s), all 200 bodies non-empty, enum warning fired, mock loaded"
-kill "$mock_pid" 2>/dev/null || true
-wait "$mock_pid" 2>/dev/null || true
-lsof -ti "tcp:${mock_port}" 2>/dev/null | xargs kill 2>/dev/null || true
+ql_stop_pid_and_port "$mock_pid" "$mock_port"
 mock_pid=""
 mock_port=""
 

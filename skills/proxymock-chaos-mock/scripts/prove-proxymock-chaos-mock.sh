@@ -8,24 +8,15 @@
 # exit 3.
 set -euo pipefail
 
-die() {
-  echo "FAIL: $*" >&2
+# shared ql_* helpers; a copied skill needs skills/lib/common.sh too
+if [[ ! -r "$(dirname "$0")/../../lib/common.sh" ]]; then
+  echo "FAIL: missing $(dirname "$0")/../../lib/common.sh (copy skills/lib/common.sh alongside this skill)" >&2
   exit 1
-}
+fi
+source "$(dirname "$0")/../../lib/common.sh"
 
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
-
-pick_port() {
-  python3 - <<'PY'
-import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()
-PY
-}
+die() { ql_fail "$@"; }
+need_cmd() { ql_prove_need_cmd "$1"; }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 skill_dir="$(cd "$script_dir/.." && pwd)"
@@ -44,25 +35,9 @@ recording="$repo_root/lab/proxymock/recording"
 tmp="${TMPDIR:-/tmp}/proxymock-chaos-proof.$$"
 pids=()
 ports=()
-cleanup() {
-  for pid in "${pids[@]:-}"; do
-    kill "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
-  done
-  # --serve backgrounds a mock the script does not own; sweep our ports so
-  # nothing this proof started outlives it (scoped to OUR ports only: other
-  # proxymock sessions on the host must not be touched)
-  for port in "${ports[@]:-}"; do
-    [[ -n "$port" ]] || continue
-    lsof -ti "tcp:${port}" 2>/dev/null | xargs kill 2>/dev/null || true
-  done
-  if [[ "${KEEP_PROOF_TMP:-0}" != "1" ]]; then
-    rm -rf "$tmp"
-  else
-    echo "kept proof workspace: $tmp"
-  fi
-}
-trap cleanup EXIT
+# --serve backgrounds a mock the script does not own; ql_prove_cleanup sweeps
+# our ports so nothing this proof started outlives it
+trap ql_prove_cleanup EXIT
 mkdir -p "$tmp"
 
 # every recorded downstream URI, reachable through the mock's proxy port with
@@ -113,8 +88,8 @@ fi
 echo "  source recording untouched"
 
 echo "step 2: flaky serves an exact deterministic 1/2 ratio (direct proxy curls)"
-flaky_port="$(pick_port)"
-flaky_health="$(pick_port)"
+flaky_port="$(ql_pick_port)"
+flaky_health="$(ql_pick_port)"
 ports+=("$flaky_port" "$flaky_health")
 rm -rf "$tmp/flaky-serve"
 "$chaos_script" --in "$recording" --scenario flaky --target '^/v1/categories' \
@@ -146,11 +121,11 @@ for i in 1 2 3; do
     || die "restored mock still serving faults"
 done
 echo "  healthy 200s after restore"
-lsof -ti "tcp:${flaky_port}" 2>/dev/null | xargs kill 2>/dev/null || true
+ql_sweep_port "$flaky_port"
 
 echo "step 4: slow injects at least the configured per-endpoint latency"
-slow_port="$(pick_port)"
-slow_health="$(pick_port)"
+slow_port="$(ql_pick_port)"
+slow_health="$(ql_pick_port)"
 ports+=("$slow_port" "$slow_health")
 rm -rf "$tmp/slow-serve"
 "$chaos_script" --in "$recording" --scenario slow --target '^/v1/categories' \
@@ -168,7 +143,7 @@ t = float(sys.argv[1])
 assert t >= 0.5, f"observed latency {t}s < configured 0.5s"
 print(f"  target endpoint took {t:.3f}s (>= 0.500s configured)")
 PY
-lsof -ti "tcp:${slow_port}" 2>/dev/null | xargs kill 2>/dev/null || true
+ql_sweep_port "$slow_port"
 
 echo "step 5: bogus --target exits 2"
 rc=0

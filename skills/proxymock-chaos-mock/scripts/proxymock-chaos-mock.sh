@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# shared ql_* helpers; a copied skill needs skills/lib/common.sh too
+if [[ ! -r "$(dirname "$0")/../../lib/common.sh" ]]; then
+  echo "error: missing $(dirname "$0")/../../lib/common.sh (copy skills/lib/common.sh alongside this skill)" >&2
+  exit 4
+fi
+source "$(dirname "$0")/../../lib/common.sh"
+
 usage() {
   cat <<'USAGE'
 Usage:
@@ -80,36 +87,8 @@ USAGE
 }
 
 # precondition failures use exit 4 per the output contract
-die() {
-  echo "error: $*" >&2
-  exit 4
-}
-
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
-
-abs_path() {
-  local path="$1"
-  if [[ -d "$path" ]]; then
-    (cd "$path" && pwd)
-  else
-    local dir base
-    dir="$(dirname "$path")"
-    base="$(basename "$path")"
-    (cd "$dir" && printf '%s/%s\n' "$(pwd)" "$base")
-  fi
-}
-
-pick_port() {
-  python3 - <<'PY'
-import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()
-PY
-}
+die() { ql_die 4 "$@"; }
+need_cmd() { ql_need_cmd "$1" 4; }
 
 in_dir=""
 scenario=""
@@ -146,11 +125,7 @@ done
 need_cmd python3
 need_cmd curl
 need_cmd lsof
-if [[ "$proxymock_bin" == */* ]]; then
-  [[ -x "$proxymock_bin" ]] || die "proxymock is not executable: $proxymock_bin"
-else
-  command -v "$proxymock_bin" >/dev/null 2>&1 || die "proxymock not found on PATH"
-fi
+ql_check_proxymock_bin "$proxymock_bin" 4
 
 wait_health() {
   # wait_health PID HEALTH_PORT LOG_FILE -> 0 loaded, 1 failed to load
@@ -171,14 +146,6 @@ wait_health() {
     sleep 0.25
   done
   return 1
-}
-
-stop_mock() {
-  # stop_mock PID PORT: SIGTERM, wait, then sweep any survivor on the port
-  local pid="$1" port="$2"
-  kill "$pid" 2>/dev/null || true
-  wait "$pid" 2>/dev/null || true
-  lsof -ti "tcp:${port}" 2>/dev/null | xargs kill 2>/dev/null || true
 }
 
 wait_port_free() {
@@ -239,7 +206,7 @@ print_instructions() {
 if [[ "$restore" == "1" ]]; then
   [[ -n "$work_dir" ]] || die "--restore requires --work-dir"
   [[ -d "$work_dir" ]] || die "--work-dir is not a directory: $work_dir"
-  work_dir="$(abs_path "$work_dir")"
+  work_dir="$(ql_abs_path "$work_dir")"
   serve_json="$work_dir/serve.json"
   [[ -s "$serve_json" ]] || die "no serve.json in $work_dir; nothing to restore (was --serve used?)"
 
@@ -252,7 +219,7 @@ PY
   [[ -d "$source_rec" ]] || die "original recording no longer exists: $source_rec"
 
   echo "stopping chaos mock (pid $old_pid) on proxy port $old_proxy_port"
-  stop_mock "$old_pid" "$old_proxy_port"
+  ql_stop_pid_and_port "$old_pid" "$old_proxy_port"
   wait_port_free "$old_proxy_port" || die "proxy port $old_proxy_port did not free up"
 
   echo "restarting mock from the healthy recording: $source_rec"
@@ -265,7 +232,7 @@ PY
   new_pid=$!
   if ! wait_health "$new_pid" "$old_health_port" "$work_dir/mock.log" \
      || ! wait_port_listening "$old_proxy_port"; then
-    stop_mock "$new_pid" "$old_proxy_port"
+    ql_stop_pid_and_port "$new_pid" "$old_proxy_port"
     die "healthy mock did not come up; see $work_dir/mock.log"
   fi
   python3 - "$serve_json" "$new_pid" <<'PY'
@@ -298,12 +265,12 @@ fi
 [[ "$ratio" =~ ^[1-9][0-9]*/[1-9][0-9]*$ ]] || die "--ratio must look like F/N (e.g. 1/3): $ratio"
 [[ "$retry_after" =~ ^[0-9]+$ ]] || die "--retry-after must be an integer: $retry_after"
 
-in_dir="$(abs_path "$in_dir")"
+in_dir="$(ql_abs_path "$in_dir")"
 if [[ -z "$work_dir" ]]; then
   work_dir="proxymock-chaos-$(date -u +%Y%m%dT%H%M%SZ)"
 fi
 mkdir -p "$work_dir"
-work_dir="$(abs_path "$work_dir")"
+work_dir="$(ql_abs_path "$work_dir")"
 variant_dir="$work_dir/chaos-recording"
 manifest="$work_dir/manifest.json"
 
@@ -558,8 +525,8 @@ mock_timing="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["
 # directory ("failed to parse response line"), so never declare a variant
 # ready without proving the mock loads it.
 validate_log="$work_dir/validate.log"
-vp="$(pick_port)"
-vh="$(pick_port)"
+vp="$(ql_pick_port)"
+vh="$(ql_pick_port)"
 echo "validating: mock dry-start on the variant"
 "$proxymock_bin" mock \
   --in "$variant_dir" \
@@ -572,7 +539,7 @@ loaded="false"
 if wait_health "$vpid" "$vh" "$validate_log"; then
   loaded="true"
 fi
-stop_mock "$vpid" "$vp"
+ql_stop_pid_and_port "$vpid" "$vp"
 
 python3 - "$manifest" "$loaded" "$validate_log" <<'PY'
 import json, sys
@@ -591,7 +558,7 @@ echo "validated: mock loads the variant"
 
 # --- serve --------------------------------------------------------------------
 if [[ "$serve" == "1" ]]; then
-  [[ -n "$health_port" ]] || health_port="$(pick_port)"
+  [[ -n "$health_port" ]] || health_port="$(ql_pick_port)"
   mock_log="$work_dir/mock.log"
   serve_args=(mock --in "$variant_dir"
               --proxy-out-port "$proxy_out_port"
@@ -605,7 +572,7 @@ if [[ "$serve" == "1" ]]; then
   mpid=$!
   if ! wait_health "$mpid" "$health_port" "$mock_log" \
      || ! wait_port_listening "$proxy_out_port"; then
-    stop_mock "$mpid" "$proxy_out_port"
+    ql_stop_pid_and_port "$mpid" "$proxy_out_port"
     die "chaos mock did not come up; see $mock_log"
   fi
   python3 - "$work_dir/serve.json" "$mpid" "$proxy_out_port" "$health_port" \

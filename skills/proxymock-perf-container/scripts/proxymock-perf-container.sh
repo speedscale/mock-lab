@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# shared ql_* helpers; a copied skill needs skills/lib/common.sh too
+if [[ ! -r "$(dirname "$0")/../../lib/common.sh" ]]; then
+  echo "error: missing $(dirname "$0")/../../lib/common.sh (copy skills/lib/common.sh alongside this skill)" >&2
+  exit 4
+fi
+source "$(dirname "$0")/../../lib/common.sh"
+
 usage() {
   cat <<'USAGE'
 Usage:
@@ -58,26 +65,8 @@ Test hooks (proof/testing only, both clearly non-production):
 USAGE
 }
 
-die() {
-  echo "error: $*" >&2
-  exit 4
-}
-
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
-
-abs_path() {
-  local path="$1"
-  if [[ -d "$path" ]]; then
-    (cd "$path" && pwd)
-  else
-    local dir base
-    dir="$(dirname "$path")"
-    base="$(basename "$path")"
-    (cd "$dir" && printf '%s/%s\n' "$(pwd)" "$base")
-  fi
-}
+die() { ql_die 4 "$@"; }
+need_cmd() { ql_need_cmd "$1" 4; }
 
 # Honesty-gate constants (from the Tier 3 experiment):
 # - a level is harness-bound when host idle drops under 20%, or the generator
@@ -142,7 +131,7 @@ if [[ -z "$load_script" ]]; then
   load_script="$script_dir/../../proxymock-load-test/scripts/proxymock-load-test.sh"
 fi
 [[ -x "$load_script" ]] || die "proxymock-load-test script not found or not executable: $load_script (copy the proxymock-load-test skill alongside this one, or pass --load-test-script)"
-load_script="$(abs_path "$load_script")"
+load_script="$(ql_abs_path "$load_script")"
 
 [[ "$vus_ladder" =~ ^[0-9]+(,[0-9]+)*$ ]] || die "--vus-ladder must be comma-separated integers: $vus_ladder"
 IFS=',' read -r -a ladder <<<"$vus_ladder"
@@ -166,12 +155,12 @@ if [[ -n "$pin_vus" ]]; then
   [[ "$found" == "1" ]] || die "--pin-vus $pin_vus is not a --vus-ladder level ($vus_ladder); add it to the ladder"
 fi
 
-in_dir="$(abs_path "$in_dir")"
+in_dir="$(ql_abs_path "$in_dir")"
 if [[ -z "$work_dir" ]]; then
   work_dir="proxymock-perf-container-$(date -u +%Y%m%dT%H%M%SZ)"
 fi
 mkdir -p "$work_dir"
-work_dir="$(abs_path "$work_dir")"
+work_dir="$(ql_abs_path "$work_dir")"
 
 # --- CPU attribution --------------------------------------------------------
 # Parse the target host/port so the app process can be found by its listening

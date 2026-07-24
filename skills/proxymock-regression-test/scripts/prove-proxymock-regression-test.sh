@@ -6,36 +6,15 @@
 # requests.failed stays 0.
 set -euo pipefail
 
-die() {
-  echo "FAIL: $*" >&2
+# shared ql_* helpers; a copied skill needs skills/lib/common.sh too
+if [[ ! -r "$(dirname "$0")/../../lib/common.sh" ]]; then
+  echo "FAIL: missing $(dirname "$0")/../../lib/common.sh (copy skills/lib/common.sh alongside this skill)" >&2
   exit 1
-}
+fi
+source "$(dirname "$0")/../../lib/common.sh"
 
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
-
-pick_port() {
-  python3 - <<'PY'
-import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()
-PY
-}
-
-wait_url() {
-  local url="$1"
-  local deadline=$((SECONDS + 60))
-  while (( SECONDS < deadline )); do
-    if curl -fsS "$url" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 0.25
-  done
-  return 1
-}
+die() { ql_fail "$@"; }
+need_cmd() { ql_prove_need_cmd "$1"; }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 skill_dir="$(cd "$script_dir/.." && pwd)"
@@ -55,30 +34,13 @@ recording="$repo_root/lab/proxymock/recording"
 tmp="${TMPDIR:-/tmp}/proxymock-regression-proof.$$"
 pids=()
 ports=()
-cleanup() {
-  for pid in "${pids[@]:-}"; do
-    kill "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
-  done
-  # proxymock mock wraps the app; killing the wrapper can strand the child
-  # go binary on its port, so sweep any survivor still bound to a proof port
-  for port in "${ports[@]:-}"; do
-    [[ -n "$port" ]] || continue
-    lsof -ti "tcp:${port}" 2>/dev/null | xargs kill 2>/dev/null || true
-  done
-  if [[ "${KEEP_PROOF_TMP:-0}" != "1" ]]; then
-    rm -rf "$tmp"
-  else
-    echo "kept proof workspace: $tmp"
-  fi
-}
-trap cleanup EXIT
+trap ql_prove_cleanup EXIT
 mkdir -p "$tmp"
 
-app_port="$(pick_port)"
-out_port="$(pick_port)"
-health_port="$(pick_port)"
-stub_port="$(pick_port)"
+app_port="$(ql_pick_port)"
+out_port="$(ql_pick_port)"
+health_port="$(ql_pick_port)"
+stub_port="$(ql_pick_port)"
 ports=("$app_port" "$out_port" "$health_port" "$stub_port")
 
 echo "starting mock-lab Go app with downstream mocked from the recording"
@@ -90,7 +52,7 @@ echo "starting mock-lab Go app with downstream mocked from the recording"
       -- go run . ) >"$tmp/mock.log" 2>&1 &
 pids+=("$!")
 
-wait_url "http://127.0.0.1:${app_port}/" || die "app under proxymock mock did not start; see $tmp/mock.log"
+ql_wait_url "http://127.0.0.1:${app_port}/" || die "app under proxymock mock did not start; see $tmp/mock.log"
 
 echo "step 1: baseline replay (no baseline, no gate; expect exit 0)"
 "$regress_script" \
@@ -151,7 +113,7 @@ HTTPServer(("127.0.0.1", int(sys.argv[1])), Handler).serve_forever()
 PYEOF
 python3 "$tmp/stub.py" "$stub_port" &
 pids+=("$!")
-wait_url "http://127.0.0.1:${stub_port}/" || die "regression stub did not start"
+ql_wait_url "http://127.0.0.1:${stub_port}/" || die "regression stub did not start"
 
 regress_rc=0
 "$regress_script" \

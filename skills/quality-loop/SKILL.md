@@ -175,7 +175,9 @@ Run the bundled script:
 If this skill has been copied outside `mock-lab`, replace
 `./skills/quality-loop` with the copied skill directory and copy the sibling
 skills alongside it: the dispatcher resolves them relative to its own
-location (`../../<skill>/scripts/`).
+location (`../../<skill>/scripts/`). The prove script and the sibling skill
+scripts also source shared helpers from `skills/lib/common.sh` (resolved as
+`../../lib/common.sh` relative to the scripts), so copy that file alongside.
 
 ## Output contract
 

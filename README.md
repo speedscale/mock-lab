@@ -174,7 +174,8 @@ measure the misses, replay against the tuned mock set, and verify the hit rate i
 
 The same recordings power nine more agent skills in [`skills/`](skills/). Each ships a script and
 a `prove-*.sh`, runs against the committed `lab/proxymock/recording`, and needs no Speedscale Cloud
-account. Not sure which one applies? Start with
+account. Shared bash helpers for the skill scripts live in
+[`skills/lib/common.sh`](skills/lib/common.sh). Not sure which one applies? Start with
 [`quality-loop`](skills/quality-loop/SKILL.md): it routes an intent to the right skill and its
 `doctor` checks the environment.
 

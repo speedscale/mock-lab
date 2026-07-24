@@ -7,14 +7,15 @@
 # cloud, no live downstream, no app build, no servers.
 set -euo pipefail
 
-die() {
-  echo "FAIL: $*" >&2
+# shared ql_* helpers; a copied skill needs skills/lib/common.sh too
+if [[ ! -r "$(dirname "$0")/../../lib/common.sh" ]]; then
+  echo "FAIL: missing $(dirname "$0")/../../lib/common.sh (copy skills/lib/common.sh alongside this skill)" >&2
   exit 1
-}
+fi
+source "$(dirname "$0")/../../lib/common.sh"
 
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
+die() { ql_fail "$@"; }
+need_cmd() { ql_prove_need_cmd "$1"; }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 skill_dir="$(cd "$script_dir/.." && pwd)"

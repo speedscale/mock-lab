@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# shared ql_* helpers; a copied skill needs skills/lib/common.sh too
+if [[ ! -r "$(dirname "$0")/../../lib/common.sh" ]]; then
+  echo "error: missing $(dirname "$0")/../../lib/common.sh (copy skills/lib/common.sh alongside this skill)" >&2
+  exit 4
+fi
+source "$(dirname "$0")/../../lib/common.sh"
+
 usage() {
   cat <<'USAGE'
 Usage:
@@ -76,26 +83,8 @@ USAGE
 }
 
 # precondition failures use exit 4 per the output contract
-die() {
-  echo "error: $*" >&2
-  exit 4
-}
-
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
-
-abs_path() {
-  local path="$1"
-  if [[ -d "$path" ]]; then
-    (cd "$path" && pwd)
-  else
-    local dir base
-    dir="$(dirname "$path")"
-    base="$(basename "$path")"
-    (cd "$dir" && printf '%s/%s\n' "$(pwd)" "$base")
-  fi
-}
+die() { ql_die 4 "$@"; }
+need_cmd() { ql_need_cmd "$1" 4; }
 
 in_dir=""
 target=""
@@ -133,21 +122,17 @@ done
 [[ "$runs" =~ ^[1-9][0-9]*$ ]] || die "--runs must be a positive integer: $runs"
 
 need_cmd python3
-if [[ "$proxymock_bin" == */* ]]; then
-  [[ -x "$proxymock_bin" ]] || die "proxymock is not executable: $proxymock_bin"
-else
-  command -v "$proxymock_bin" >/dev/null 2>&1 || die "proxymock not found on PATH"
-fi
+ql_check_proxymock_bin "$proxymock_bin" 4
 
-in_dir="$(abs_path "$in_dir")"
-[[ -n "$baseline_dir" ]] && baseline_dir="$(abs_path "$baseline_dir")"
-[[ -n "$mocks_dir" ]] && mocks_dir="$(abs_path "$mocks_dir")"
+in_dir="$(ql_abs_path "$in_dir")"
+[[ -n "$baseline_dir" ]] && baseline_dir="$(ql_abs_path "$baseline_dir")"
+[[ -n "$mocks_dir" ]] && mocks_dir="$(ql_abs_path "$mocks_dir")"
 
 if [[ -z "$work_dir" ]]; then
   work_dir="proxymock-verify-fix-$(date -u +%Y%m%dT%H%M%SZ)"
 fi
 mkdir -p "$work_dir"
-work_dir="$(abs_path "$work_dir")"
+work_dir="$(ql_abs_path "$work_dir")"
 summary_json="$work_dir/summary.json"
 
 # --- precondition: blueprint anchoring ---------------------------------------
@@ -157,11 +142,8 @@ summary_json="$work_dir/summary.json"
 # not the current directory"). Without a blueprint, endpoints that chain
 # moving IDs replay with stale recorded values and fail for reasons unrelated
 # to the fix, polluting the collateral list.
-bp_dir="$(dirname "$in_dir")/blueprints"
-bp_count=0
-if [[ -d "$bp_dir" ]]; then
-  bp_count="$(find "$bp_dir" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
-fi
+bp_dir="$(ql_blueprint_dir "$in_dir")"
+bp_count="$(ql_blueprint_count "$bp_dir")"
 if [[ "$bp_count" -eq 0 ]]; then
   echo "WARNING: no blueprints found at $bp_dir" >&2
   echo "WARNING: moving-ID endpoints (auth tokens, created ids) may fail replay" >&2
@@ -181,7 +163,7 @@ fi
 # flags (verified: mocks from both dirs serve), so union the incident capture
 # with a healthy recording via --mocks.
 has_outbound="0"
-if grep -rl '"direction":"OUT"' "$in_dir" >/dev/null 2>&1; then
+if ql_has_outbound "$in_dir"; then
   has_outbound="1"
 fi
 if [[ -n "$mocks_dir" ]]; then
@@ -198,25 +180,14 @@ fi
 
 run_replay() {
   # run_replay OUT_DIR RESULT_JSON LOG_FILE
-  local out="$1" result="$2" log="$3" rc=0
-  if [[ -d "$out" ]] && [[ -n "$(ls -A "$out" 2>/dev/null)" ]]; then
-    die "replay output dir already has content, pick a fresh --work-dir: $out"
-  fi
-  "$proxymock_bin" replay \
-    --in "$in_dir" \
-    --test-against "$target" \
-    --out "$out" \
-    --output json >"$result" 2>"$log" || rc=$?
-  if [[ "$rc" -ne 0 || ! -s "$result" || ! -d "$out" ]]; then
-    cat "$log" >&2
-    die "proxymock replay did not complete (exit $rc); see $log"
-  fi
-  # The console line "Applied N active blueprint(s)" reflects snapshot-scoped
-  # state, not the workspace; only smart_replace events in the replay output
-  # prove a blueprint actually applied.
+  local out="$1" result="$2" log="$3"
+  ql_check_replay_out_empty "$out" 4
+  ql_run_replay "$proxymock_bin" "$in_dir" "$target" "$out" "$result" "$log" 4
+  # The console blueprint line lies (see ql_smart_replace_file_count); only
+  # smart_replace events in the replay output prove a blueprint applied.
   if [[ "$bp_count" -gt 0 ]]; then
     local sr_files
-    sr_files="$( (grep -ril 'smart_replace' "$out" 2>/dev/null || true) | wc -l | tr -d ' ')"
+    sr_files="$(ql_smart_replace_file_count "$out")"
     if [[ "$sr_files" -eq 0 ]]; then
       echo "WARNING: blueprint(s) present but no smart_replace events in $out;" >&2
       echo "WARNING: the blueprint did not demonstrably apply to this replay." >&2

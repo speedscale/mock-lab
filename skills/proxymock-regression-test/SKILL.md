@@ -44,7 +44,9 @@ Run the bundled script:
 ```
 
 If this skill has been copied outside `mock-lab`, replace
-`./skills/proxymock-regression-test` with the copied skill directory.
+`./skills/proxymock-regression-test` with the copied skill directory. The
+scripts source shared helpers from `skills/lib/common.sh` (resolved as
+`../../lib/common.sh` relative to the scripts), so copy that file alongside.
 
 ## Preconditions the script checks
 

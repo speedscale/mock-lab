@@ -80,7 +80,9 @@ Run the bundled script:
 If this skill has been copied outside `mock-lab`, replace
 `./skills/proxymock-perf-container` with the copied skill directory, copy the
 `proxymock-load-test` skill alongside it (this skill drives its script), or
-point `--load-test-script` at a copy.
+point `--load-test-script` at a copy. The scripts also source shared helpers
+from `skills/lib/common.sh` (resolved as `../../lib/common.sh` relative to
+the scripts), so copy that file alongside.
 
 To isolate the service, start it with its downstream mocked before loading it
 (see the offline recipe in proxymock-load-test):

@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# shared ql_* helpers; a copied skill needs skills/lib/common.sh too
+if [[ ! -r "$(dirname "$0")/../../lib/common.sh" ]]; then
+  echo "error: missing $(dirname "$0")/../../lib/common.sh (copy skills/lib/common.sh alongside this skill)" >&2
+  exit 2
+fi
+source "$(dirname "$0")/../../lib/common.sh"
+
 usage() {
   cat <<'USAGE'
 Usage:
@@ -52,26 +59,8 @@ USAGE
 }
 
 # precondition failures use a distinct exit code per the output contract
-die() {
-  echo "error: $*" >&2
-  exit 2
-}
-
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
-
-abs_path() {
-  local path="$1"
-  if [[ -d "$path" ]]; then
-    (cd "$path" && pwd)
-  else
-    local dir base
-    dir="$(dirname "$path")"
-    base="$(basename "$path")"
-    (cd "$dir" && printf '%s/%s\n' "$(pwd)" "$base")
-  fi
-}
+die() { ql_die 2 "$@"; }
+need_cmd() { ql_need_cmd "$1" 2; }
 
 in_dir=""
 target=""
@@ -99,28 +88,22 @@ done
 [[ -z "$baseline_dir" || -d "$baseline_dir" ]] || die "--baseline is not a directory: $baseline_dir"
 
 need_cmd python3
-if [[ "$proxymock_bin" == */* ]]; then
-  [[ -x "$proxymock_bin" ]] || die "proxymock is not executable: $proxymock_bin"
-else
-  command -v "$proxymock_bin" >/dev/null 2>&1 || die "proxymock not found on PATH"
-fi
+ql_check_proxymock_bin "$proxymock_bin" 2
 
-in_dir="$(abs_path "$in_dir")"
-[[ -n "$baseline_dir" ]] && baseline_dir="$(abs_path "$baseline_dir")"
+in_dir="$(ql_abs_path "$in_dir")"
+[[ -n "$baseline_dir" ]] && baseline_dir="$(ql_abs_path "$baseline_dir")"
 
 if [[ -z "$work_dir" ]]; then
   work_dir="proxymock-regression-$(date -u +%Y%m%dT%H%M%SZ)"
 fi
 mkdir -p "$work_dir"
-work_dir="$(abs_path "$work_dir")"
+work_dir="$(ql_abs_path "$work_dir")"
 replay_out="$work_dir/replayed"
 result_json="$work_dir/result.json"
 replay_log="$work_dir/replay.log"
 summary_json="$work_dir/summary.json"
 
-if [[ -d "$replay_out" ]] && [[ -n "$(ls -A "$replay_out" 2>/dev/null)" ]]; then
-  die "replay output dir already has content, pick a fresh --work-dir: $replay_out"
-fi
+ql_check_replay_out_empty "$replay_out" 2
 
 # --- precondition: blueprint anchoring ---------------------------------------
 # Blueprints are loaded only from the --in path's parent proxymock directory's
@@ -130,11 +113,8 @@ fi
 # that chain moving IDs (fresh tokens, created order ids) replay with stale
 # recorded values, the target rejects them (401/404), and a regression on
 # those endpoints' SUCCESS paths is undetectable: they fail before and after.
-bp_dir="$(dirname "$in_dir")/blueprints"
-bp_count=0
-if [[ -d "$bp_dir" ]]; then
-  bp_count="$(find "$bp_dir" -maxdepth 1 -name '*.json' -type f | wc -l | tr -d ' ')"
-fi
+bp_dir="$(ql_blueprint_dir "$in_dir")"
+bp_count="$(ql_blueprint_count "$bp_dir")"
 if [[ "$bp_count" -eq 0 ]]; then
   echo "WARNING: no blueprints found at $bp_dir" >&2
   echo "WARNING: auth/moving-ID endpoints will be unreplayable (401s) and any" >&2
@@ -146,31 +126,20 @@ fi
 # --- precondition: mock reminder ---------------------------------------------
 # If the recording has outbound pairs, the target app's downstream is usually
 # served by `proxymock mock`, which does not discover the recording from cwd.
-if grep -rl '"direction":"OUT"' "$in_dir" >/dev/null 2>&1; then
+if ql_has_outbound "$in_dir"; then
   echo "note: recording contains outbound pairs; if the target's downstream is"
   echo "note: mocked, 'proxymock mock' requires an explicit --in <recording>."
 fi
 
 # --- replay ------------------------------------------------------------------
 echo "replaying: $in_dir -> $target"
-replay_rc=0
-"$proxymock_bin" replay \
-  --in "$in_dir" \
-  --test-against "$target" \
-  --out "$replay_out" \
-  --output json >"$result_json" 2>"$replay_log" || replay_rc=$?
+ql_run_replay "$proxymock_bin" "$in_dir" "$target" "$replay_out" \
+  "$result_json" "$replay_log" 2
 
-if [[ "$replay_rc" -ne 0 || ! -s "$result_json" || ! -d "$replay_out" ]]; then
-  cat "$replay_log" >&2
-  die "proxymock replay did not complete (exit $replay_rc); see $replay_log"
-fi
-
-# The console line "Applied N active blueprint(s)" reflects snapshot-scoped
-# state, not the workspace, so it can report blueprints that never touched
-# this replay. The only trustworthy signal is smart_replace events in the
-# replay output RRPairs.
+# The console blueprint line lies (see ql_smart_replace_file_count); the only
+# trustworthy signal is smart_replace events in the replay output RRPairs.
 if [[ "$bp_count" -gt 0 ]]; then
-  sr_files="$( (grep -ril 'smart_replace' "$replay_out" 2>/dev/null || true) | wc -l | tr -d ' ')"
+  sr_files="$(ql_smart_replace_file_count "$replay_out")"
   if [[ "$sr_files" -eq 0 ]]; then
     echo "WARNING: blueprint(s) present but no smart_replace events found in the" >&2
     echo "WARNING: replay output; the blueprint did not demonstrably apply. Do not" >&2

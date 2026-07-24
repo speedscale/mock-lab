@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# shared ql_* helpers; a copied skill needs skills/lib/common.sh too
+if [[ ! -r "$(dirname "$0")/../../lib/common.sh" ]]; then
+  echo "error: missing $(dirname "$0")/../../lib/common.sh (copy skills/lib/common.sh alongside this skill)" >&2
+  exit 4
+fi
+source "$(dirname "$0")/../../lib/common.sh"
+
 usage() {
   cat <<'USAGE'
 Usage:
@@ -82,36 +89,8 @@ USAGE
 }
 
 # precondition/usage failures are exit 4 per the output contract
-die() {
-  echo "error: $*" >&2
-  exit 4
-}
-
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
-
-abs_path() {
-  local path="$1"
-  if [[ -d "$path" ]]; then
-    (cd "$path" && pwd)
-  else
-    local dir base
-    dir="$(dirname "$path")"
-    base="$(basename "$path")"
-    (cd "$dir" && printf '%s/%s\n' "$(pwd)" "$base")
-  fi
-}
-
-pick_port() {
-  python3 - <<'PY'
-import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()
-PY
-}
+die() { ql_die 4 "$@"; }
+need_cmd() { ql_need_cmd "$1" 4; }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 checker="$script_dir/check_conformance.py"
@@ -174,13 +153,13 @@ need_cmd python3
 [[ -f "$checker" ]] || die "bundled checker missing: $checker"
 [[ -n "$spec" ]] || die "--spec is required"
 [[ -f "$spec" ]] || die "spec not found: $spec"
-spec="$(abs_path "$spec")"
+spec="$(ql_abs_path "$spec")"
 
 if [[ -z "$work_dir" ]]; then
   work_dir="proxymock-contract-$(date -u +%Y%m%dT%H%M%SZ)"
 fi
 mkdir -p "$work_dir"
-work_dir="$(abs_path "$work_dir")"
+work_dir="$(ql_abs_path "$work_dir")"
 summary_json="$work_dir/summary.json"
 
 # --- mode: conformance --------------------------------------------------------
@@ -197,15 +176,11 @@ if [[ "$mode" == "conformance" ]]; then
 fi
 
 # --- mode: mock-from-spec -----------------------------------------------------
-if [[ "$proxymock_bin" == */* ]]; then
-  [[ -x "$proxymock_bin" ]] || die "proxymock is not executable: $proxymock_bin"
-else
-  command -v "$proxymock_bin" >/dev/null 2>&1 || die "proxymock not found on PATH"
-fi
+ql_check_proxymock_bin "$proxymock_bin" 4
 
 [[ -n "$out_dir" ]] || out_dir="$work_dir/generated"
 mkdir -p "$out_dir"
-out_dir="$(abs_path "$out_dir")"
+out_dir="$(ql_abs_path "$out_dir")"
 gen_log="$work_dir/generate.log"
 
 gen_args=(generate --out "$out_dir" --direction "$direction")
@@ -258,8 +233,8 @@ serve_ok="false"
 if [[ "$serve" == "1" ]]; then
   need_cmd curl
   need_cmd lsof
-  proxy_out_port="$(pick_port)"
-  health_port="$(pick_port)"
+  proxy_out_port="$(ql_pick_port)"
+  health_port="$(ql_pick_port)"
   mock_log="$work_dir/mock.log"
   echo "starting mock from generated RRPairs (proxy-out $proxy_out_port, health $health_port)"
   "$proxymock_bin" mock \
@@ -283,9 +258,7 @@ if [[ "$serve" == "1" ]]; then
     sleep 0.25
   done
   if [[ "$serve_ok" != "true" ]]; then
-    kill "$serve_pid" 2>/dev/null || true
-    wait "$serve_pid" 2>/dev/null || true
-    lsof -ti "tcp:${proxy_out_port}" 2>/dev/null | xargs kill 2>/dev/null || true
+    ql_stop_pid_and_port "$serve_pid" "$proxy_out_port"
     echo "see $mock_log" >&2
     die "mock did not load the generated RRPairs"
   fi

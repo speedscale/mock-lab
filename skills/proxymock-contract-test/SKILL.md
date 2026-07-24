@@ -88,7 +88,9 @@ Run the bundled script:
 
 If this skill has been copied outside `mock-lab`, replace
 `./skills/proxymock-contract-test` with the copied skill directory; the
-script finds `check_conformance.py` relative to its own location.
+script finds `check_conformance.py` relative to its own location. The
+scripts also source shared helpers from `skills/lib/common.sh` (resolved as
+`../../lib/common.sh` relative to the scripts), so copy that file alongside.
 
 ## Measured limits of generated mocks
 

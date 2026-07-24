@@ -14,36 +14,15 @@
 # The gate's own verdict path is what case d covers.
 set -euo pipefail
 
-die() {
-  echo "FAIL: $*" >&2
+# shared ql_* helpers; a copied skill needs skills/lib/common.sh too
+if [[ ! -r "$(dirname "$0")/../../lib/common.sh" ]]; then
+  echo "FAIL: missing $(dirname "$0")/../../lib/common.sh (copy skills/lib/common.sh alongside this skill)" >&2
   exit 1
-}
+fi
+source "$(dirname "$0")/../../lib/common.sh"
 
-need_cmd() {
-  command -v "$1" >/dev/null 2>&1 || die "missing required command: $1"
-}
-
-pick_port() {
-  python3 - <<'PY'
-import socket
-s = socket.socket()
-s.bind(("127.0.0.1", 0))
-print(s.getsockname()[1])
-s.close()
-PY
-}
-
-wait_url() {
-  local url="$1"
-  local deadline=$((SECONDS + 60))
-  while (( SECONDS < deadline )); do
-    if curl -fsS -o /dev/null "$url" 2>/dev/null; then
-      return 0
-    fi
-    sleep 0.25
-  done
-  return 1
-}
+die() { ql_fail "$@"; }
+need_cmd() { ql_prove_need_cmd "$1"; }
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 skill_dir="$(cd "$script_dir/.." && pwd)"
@@ -63,23 +42,7 @@ recording="$repo_root/lab/proxymock/recording/localhost"
 tmp="${TMPDIR:-/tmp}/proxymock-perf-container-proof.$$"
 pids=()
 ports=()
-cleanup() {
-  for pid in "${pids[@]:-}"; do
-    kill "$pid" 2>/dev/null || true
-    wait "$pid" 2>/dev/null || true
-  done
-  # sweep any survivor still bound to a proof port
-  for port in "${ports[@]:-}"; do
-    [[ -n "$port" ]] || continue
-    lsof -ti "tcp:${port}" 2>/dev/null | xargs kill 2>/dev/null || true
-  done
-  if [[ "${KEEP_PROOF_TMP:-0}" != "1" ]]; then
-    rm -rf "$tmp"
-  else
-    echo "kept proof workspace: $tmp"
-  fi
-}
-trap cleanup EXIT
+trap ql_prove_cleanup EXIT
 mkdir -p "$tmp"
 
 # --- stub target -------------------------------------------------------------
@@ -113,11 +76,11 @@ class Handler(BaseHTTPRequestHandler):
 ThreadingHTTPServer(("127.0.0.1", port), Handler).serve_forever()
 PYEOF
 
-stub_port="$(pick_port)"
+stub_port="$(ql_pick_port)"
 ports=("$stub_port")
 python3 "$tmp/stub.py" "$stub_port" &
 pids+=("$!")
-wait_url "http://127.0.0.1:${stub_port}/" || die "stub did not start"
+ql_wait_url "http://127.0.0.1:${stub_port}/" || die "stub did not start"
 target="http://127.0.0.1:${stub_port}"
 
 # --- case a: ladder run, report-only (expect exit 0) -------------------------

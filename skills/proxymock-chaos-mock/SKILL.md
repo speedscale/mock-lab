@@ -1,84 +1,79 @@
 ---
 name: proxymock-chaos-mock
-description: Inject faults into a proxymock mock by editing a COPY of the recording, so the downstream lies to your service on demand, including latency, 503s, 429s with Retry-After, garbage bodies, and exact deterministic flaky ratios via duplicate-signature round-robin. Use when users ask to chaos-test a service against its dependencies, simulate a slow or failing downstream, test retry/backoff/timeout handling, or check what their app does when a dependency misbehaves.
-argument-hint: --in <recording-dir> --scenario slow|down|ratelimit|garbage|flaky --target <endpoint-or-regex> [--latency 5x|2500ms] [--ratio 1/2] [--retry-after 30] [--serve] [--restore]
+description: Inject faults into a proxymock mock with native --fault flags so the downstream lies to your service on demand, including 503s, 429s with Retry-After, corrupt or truncated bodies, per-endpoint latency, socket-level connection faults, and exact deterministic failure ratios via rate=F/N. Use when users ask to chaos-test a service against its dependencies, simulate a slow or failing downstream, test retry/backoff/timeout handling, or check what their app does when a dependency misbehaves.
+argument-hint: --in <recording-dir> --scenario down|ratelimit|garbage|slow|connection|flaky --target <path-regexp> [--latency 2500ms] [--ratio 1/3] [--retry-after 30] [--connection reset] [--serve] [--restore]
 ---
 
 # proxymock Chaos Mock
 
 Turn a recording into a lying downstream. Given a healthy recording and one
-target endpoint (or endpoint pattern), this skill builds a CHAOS VARIANT of
-the mock data and runs the mock with it, so your service can be exercised
-against a downstream that is slow, erroring, rate-limiting, garbled, or
+target endpoint pattern, this skill builds the right `proxymock mock --fault`
+flags and runs the mock, so your service can be exercised against a
+downstream that is slow, erroring, rate-limiting, garbled, socket-broken, or
 intermittently failing. The faults live in the mock, not the app: what you
 observe is your service's resilience behavior, which is the point.
 
-The source recording is NEVER mutated: every edit happens on a copy in the
-work dir. That is not just hygiene: one malformed RRPair aborts the ENTIRE
-mock at load ("failed to parse response line" kills the whole directory), so
-the skill validates every variant with a mock dry-start before declaring it
-ready. Empirically verified.
+Faults are process flags, not data. The recording is served AS IS: no copy,
+no RRPair edits, no variant to validate, nothing to roll back. Responses that
+carry an injected fault are tagged with `x-speedscale-chaos: proxymock fault`.
 
 This workflow uses local files and the `proxymock` CLI. It does not require
 Speedscale Cloud access.
 
 ## Inputs
 
-- `--in`: the source recording directory (read-only; the variant is a copy).
-- `--scenario`: one of:
-  - `slow`: inject latency. `--latency Nx` (e.g. `5x`) is proxymock's native
-    `--mock-timing` multiplier: no file edits, but GLOBAL, it slows every
-    mocked endpoint. `--latency Nms` (e.g. `2500ms`) edits the `duration`
-    metadata of the target pairs and serves with `--mock-timing recorded`,
-    giving per-endpoint latency. Both empirically verified (600ms configured
-    was observed as 604ms).
-  - `down`: rewrite the recorded status to 503, body intact. The status
-    lives in THREE consistent representations in the RRPair file: the
-    visible status line, the internal `"status":"NNN"`, and
-    `"statusCode":NNN,"statusMessage":...`; the script edits all three.
-  - `ratelimit`: status to 429 plus a `Retry-After: <n>` response header.
-  - `garbage`: keep the 200 but truncate/corrupt the body. Body replacement
-    is the mechanism; do not bother lying about `Content-Length`, the
-    responder recomputes and sanitizes it silently.
-  - `flaky`: duplicate the target RRPair into N copies and edit F of them to
-    503. Duplicate-signature RRPairs serve round-robin, DETERMINISTICALLY,
-    in timestamp order: F/N is an exact periodic failure ratio (1/3 serves
-    exactly 503, 200, 200, 503, 200, 200, ...), not a probability. The
-    edited copies get the earliest timestamps, so the period starts with the
-    faults.
-- `--target`: regex matched against the outbound request URI (e.g.
-  `'^/v1/projects'`). All matching pairs are edited (duplicates included),
-  so `down` means down every time, not intermittently.
-- `--ratio F/N`: flaky only (default `1/2`).
-- `--retry-after N`: ratelimit only (default `30`).
-- `--serve`: after validation, start the chaos mock in the background
-  (standalone, no wrapped app) and print how to point your app at it. The
-  mock keeps running after the script exits; state lands in
-  `<work-dir>/serve.json`. To run your app WRAPPED by the chaos mock
-  instead, use the printed `proxymock mock --in <variant> -- <your app>`
-  command in the foreground.
-- `--restore`: stop the serving chaos mock recorded in `--work-dir` and
-  restart the mock from the ORIGINAL healthy recording on the same ports.
-- `--proxy-out-port` / `--health-port`: ports for `--serve` (defaults: 4140
-  and a free port).
-- `--work-dir`: where the variant, `manifest.json`, and serve state land.
-- `--proxymock`: proxymock binary path.
+- `--in`: the recording directory to serve. Never modified.
+- `--scenario`, and the fault spec it builds:
+  - `down`: `status=503`, body intact.
+  - `ratelimit`: `status=429,header=Retry-After:<n>` (`--retry-after`,
+    default 30). Header syntax is `Name:Value`; `Name=Value` is rejected.
+  - `garbage`: `body=corrupt`, or `--body-fault truncate` /
+    `truncate:BYTES` for a well-formed but short body.
+  - `slow`: `latency=<duration>` per endpoint. `--latency` takes a Go
+    duration and the UNIT IS REQUIRED (`2500ms`, `1.5s`; a bare `2500` is
+    rejected). `--latency Nx` instead uses the global `--mock-timing`
+    multiplier, which slows every mocked endpoint and makes `--target`
+    advisory.
+  - `connection`: `connection=refuse|reset|stall|drop` (`--connection`,
+    default `reset`). Read the HTTP/2 trap below before using this.
+  - `flaky`: `status=503,rate=F/N` (`--ratio`, default `1/2`).
+- `--target`: the fault regexp (RE2), and the single most common source of
+  faults that do nothing. It is **unanchored** and matched against the
+  **bare path** and **host+path**. Scheme, port, and **method** are not in
+  the candidate string, so `'https://api.example.com:443/v1/projects'`
+  parses fine, starts fine, and matches nothing. Use a plain path substring
+  like `'/v1/projects'`. The script pre-checks the pattern against the
+  loaded outbound pairs and exits 2 rather than serving a silent no-op.
+- `--ratio F/N`: composes with any scenario, so
+  `--scenario ratelimit --ratio 1/3` is a 429 on the first request of every
+  three. Only the `F/N` form is accepted by proxymock: `0.5` and `50%` are
+  rejected at startup.
+- `--serve`: start the faulted mock in the background, un-wrapped, and leave
+  it running; state lands in `<work-dir>/serve.json`. Without it the script
+  prints the exact `proxymock mock ... --fault ...` command to run yourself.
+- `--restore`: stop the faulted mock recorded in `--work-dir` and restart it
+  fault-free on the same ports.
+- `--custom-body FILE` / `--flip-body FILE`: RRPair-level body control, see
+  "What still needs file edits".
+- `--proxy-out-port` / `--health-port` / `--reload-interval` / `--work-dir` /
+  `--proxymock`: ports, hot-reload interval (default `1s`), state location,
+  binary path.
 
 Run the bundled script:
 
 ```bash
 # downstream 503s on one endpoint; serve the lying mock
 ./skills/proxymock-chaos-mock/scripts/proxymock-chaos-mock.sh \
-  --in ./proxymock/recording --scenario down --target '^/v1/projects' --serve
+  --in ./proxymock/recording --scenario down --target '/v1/projects' --serve
 
-# exact 1-in-3 deterministic failures
+# exact 1-in-3 deterministic 429s with a Retry-After hint
 ./skills/proxymock-chaos-mock/scripts/proxymock-chaos-mock.sh \
-  --in ./proxymock/recording --scenario flaky --target '^/v1/projects' \
+  --in ./proxymock/recording --scenario ratelimit --target '/v1/projects' \
   --ratio 1/3 --serve
 
 # put the healthy downstream back
 ./skills/proxymock-chaos-mock/scripts/proxymock-chaos-mock.sh \
-  --restore --work-dir ./proxymock-chaos-20260723T000000Z
+  --restore --work-dir ./proxymock-chaos-20260724T000000Z
 ```
 
 If this skill has been copied outside `mock-lab`, replace
@@ -86,47 +81,91 @@ If this skill has been copied outside `mock-lab`, replace
 source shared helpers from `skills/lib/common.sh` (resolved as
 `../../lib/common.sh` relative to the scripts), so copy that file alongside.
 
-## Not supported (do not fake these)
+## The HTTP/2 trap (read before using connection faults)
 
-- **Connection-level faults**: refuse, reset, stall, and mid-response drop
-  are not achievable through mock data. A corrupted status line does not
-  simulate a broken connection; it makes the whole directory fail to load
-  (fail-closed), and a short-body `Content-Length` lie gets sanitized by the
-  responder. Probed and confirmed absent.
-- **Hot reload**: mock data loads once at startup. Restoring healthy files
-  mid-session changes nothing (verified: still 503 seconds after the files
-  were restored); recovery scenarios are stop mock, restore healthy variant,
-  restart, which is what `--restore` does. If your app is WRAPPED by the
-  mock (`proxymock mock -- app`), that restart restarts the app too; the
-  standalone `--serve` pattern restarts only the mock.
-- **MCP parity**: the `mock_server_start` MCP tool does not expose
-  `--mock-timing`, so the slow scenario is CLI-only.
-- **Randomness**: flaky is deterministic round-robin, timestamp-ordered.
-  There is no weighted or random response selection.
+`connection=` faults are **silently ignored when the mocked response is
+HTTP/2**. There is no warning and no log line at any verbosity: the app just
+gets a clean 200 and you conclude your service handles socket failures fine.
+The gate is the protocol, not TLS, and proxymock replays the protocol version
+that was recorded, so a recording captured over h2 makes every connection
+fault invisible.
+
+The script refuses this combination: when the pairs matched by `--target`
+carry an HTTP/2 response line it prints which endpoints are affected and
+**exits 5** instead of starting a mock that would prove nothing. To exercise
+the socket path anyway:
+
+- recapture the dependency over HTTP/1.1, or
+- drive the mock with an h1 client (`curl --http1.1 -x http://127.0.0.1:PORT`),
+  or
+- use `status=` / `body=` faults, which fire on both protocols.
+
+`--allow-http2-connection-fault` downgrades the refusal to a loud warning
+when you know your client negotiates h1.
+
+On the h1 path all four connection actions work: `refuse` is an EOF, `reset`
+an RST, `stall` an unbounded hang, and `drop` cuts the stream mid-response.
+
+## What still needs file edits
+
+Native faults replaced the whole variant-building engine, with two
+exceptions:
+
+- **Custom bodies.** `body=` only does `corrupt` and `truncate`.
+  Scenario-accurate payloads (a real rate-limit envelope, a schema-drifted
+  object) still need an RRPair edit. `--custom-body FILE` makes a writable
+  copy of the recording in `<work-dir>/recording`, rewrites the matched
+  pairs' response bodies, and serves the copy. Content-Length is recomputed
+  by the responder, so it does not need to be touched. The MCP `edit_rrpair`
+  tool does the same thing one pair at a time.
+- **Mid-session flips.** `--fault` is read **once at startup**; only mock
+  DATA hot-reloads. `--flip-body FILE` rewrites the serving copy's bodies
+  while the mock keeps running and `--mock-reload-interval` (default `1s`)
+  picks the change up in about a second; restoring the file recovers about
+  as fast. Anything that changes the FAULT set is a restart, which is what
+  `--restore` does.
+
+Because removing a fault means restarting the mock, run recovery scenarios
+with the mock **un-wrapped** (`--serve`) and the app started separately
+against the proxy port. A mock that wraps your app (`proxymock mock -- app`)
+restarts the app when it restarts, which destroys whatever in-process state
+the recovery was supposed to test.
+
+## Ratio discipline
+
+When the client-visible failure ratio IS the measurement, use `rate=F/N`
+(`--ratio`) or duplicate-signature round-robin. `--response-selection random`
+exists but is weighted by copy count and noisy: a 50% expectation measured
+15/40 in practice, which is useless as an analytical instrument. The script
+always serves with `--response-selection round-robin`.
+
+## MCP parity
+
+Every chaos knob is CLI-only. The `mock_server_start` MCP tool takes only
+`in-directory`, `out-directory`, and `log-to`: no `fault`, no `mock-timing`,
+no `response-selection`, no `mock-reload-interval`, no `app-health-endpoint`,
+not even `proxy-out-port`. `edit_rrpair` is body-only. An MCP-only agent
+cannot run this skill; shell out to the CLI.
 
 ## Output contract
 
-Written to `--work-dir` (default a timestamped dir): `chaos-recording/` (the
-variant; point `proxymock mock --in` at it), `manifest.json` (scenario,
-target, every file edited with original values, mock-timing flag, validation
-result), `validate.log` (the dry-start log), and with `--serve` also
-`serve.json` (pid and ports) and `mock.log`. The script prints the variant
-path and exact instructions for pointing the app at the mock (proxy env vars
-or a direct `curl -x` probe).
+Without `--serve` the script prints the matched endpoints (with their
+recorded HTTP version) and the exact `proxymock mock --fault` command. With
+`--serve` it writes `serve.json` (pid, ports, the fault specs in use, the
+served and source recordings) and `mock.log` to `--work-dir`, plus
+`recording/` when `--custom-body` forced a copy.
 
 Exit codes:
 
-- `0`: variant ready (and serving, if `--serve`); or restore completed.
-- `2`: the target endpoint was not found among the recording's outbound
-  pairs (the available endpoints are listed).
-- `3`: the variant failed validation: the mock will not load it. A mock that
-  dies at startup logging `failed to parse response line` means the edit
-  broke the RRPair; nothing is served.
-- `4`: precondition or usage failure.
-
-The proof-only hook `CHAOS_FORCE_BAD_EDIT=1` corrupts an edited file with
-the documented failure mode so the validation gate can be exercised; never
-set it outside the proof.
+- `0`: fault command ready (and serving, if `--serve`); flip or restore done.
+- `2`: `--target` matched no loaded outbound pair. A fault regexp that
+  matches nothing is a silent no-op, so this is a correctness gate, not a
+  nicety; the available endpoints are listed.
+- `3`: the mock did not come up (see `mock.log`).
+- `4`: precondition or usage failure, including fault specs proxymock would
+  reject (`--latency` without a unit, `--ratio 50%`, an unknown
+  `--connection` action).
+- `5`: a `connection=` fault was requested against HTTP/2 pairs.
 
 ## Interpretation
 
@@ -143,18 +182,25 @@ What the app under test does with each lie is the finding:
 - **garbage**: a dependent endpoint that passes garbage through as 200 is
   proxying decode failures to its own clients; the resilient behavior is a
   5xx from the app when the downstream body fails to parse.
-- **flaky**: because the ratio is exact and periodic, retry policies are
+- **flaky**: because `rate=F/N` is exact and periodic, retry policies are
   testable exactly, not statistically. With `1/2` and one immediate retry,
   every client call should succeed; a client-visible failure rate equal to
   F/N means no retries at all.
-- **slow**: watch for the app's timeout budget. If the injected latency is
-  under the app's timeout you should see slow 200s (latency propagated); if
-  over, whatever the app does instead (5xx, hang, fallback) is the finding.
+- **slow**: watch for the app's timeout budget. Under the app's timeout you
+  should see slow 200s (latency propagated); over it, whatever the app does
+  instead (5xx, hang, fallback) is the finding. A `stall` connection fault
+  finds the same bug harder: the lab app has no client timeout at all and
+  hangs forever.
+- **connection=drop**: the new defect class, and one no file edit could ever
+  surface. The response advertises `Content-Length: 17` and writes 7 bytes.
+  An app that ignores the `io.ReadAll` error returns 200 with a truncated
+  body, so its clients get a short, syntactically plausible payload with no
+  error anywhere in the chain.
 
 ## Related
 
 - **proxymock-regression-test**: run it against the app while this skill's
-  chaos mock is serving to turn observed resilience behavior into a gate.
+  faulted mock is serving to turn observed resilience behavior into a gate.
 - **proxymock-load-test**: drive load at the app while the downstream is
   slow or flaky to see resilience under pressure.
 - **proxymock-verify-fix**: after fixing a resilience bug this skill
@@ -167,12 +213,13 @@ What the app under test does with each lie is the finding:
 ```
 
 The proof is hermetic (no cloud, no live downstream, no app build) and runs
-against a copy of the committed recording. It builds and validates a variant
-for all five scenarios and verifies the source recording stays untouched;
-serves the flaky variant and proves via direct proxy curls that responses
-alternate 503/200 in the exact configured 1/2 ratio while an untargeted
-endpoint stays healthy; proves `--restore` swaps the healthy recording back
-on the same port; measures the slow variant at or above the configured
-500ms; and verifies a bogus `--target` exits 2 and a deliberately broken
-edit (the documented parse-failure mode, via the proof hook) is caught by
-validation with exit 3.
+against the committed recording without modifying it. It serves each fault
+natively and verifies proxy-observed behavior: a 503 on the target with the
+untargeted endpoint still healthy and the `x-speedscale-chaos` header
+present; a 429 carrying `Retry-After: 30`; `rate=1/3` producing exactly
+`503 200 200 503 200 200`; a `latency=500ms` fault delaying only the target;
+and a fault-free downstream after `--restore` on the same port. It also
+proves both silent traps are gated: the scheme+port form of a plausible
+pattern exits 2 with the matching rules explained, and a `connection=reset`
+fault against the recording's HTTP/2 pairs exits 5 (and warns loudly under
+`--allow-http2-connection-fault`).

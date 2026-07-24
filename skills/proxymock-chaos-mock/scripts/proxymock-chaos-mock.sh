@@ -12,76 +12,90 @@ usage() {
   cat <<'USAGE'
 Usage:
   proxymock-chaos-mock.sh --in DIR --scenario NAME --target PATTERN [options]
+  proxymock-chaos-mock.sh --flip-body FILE --target PATTERN --work-dir DIR
   proxymock-chaos-mock.sh --restore --work-dir DIR
 
-Build a CHAOS VARIANT of a proxymock recording for one target endpoint (or
-endpoint pattern) so the mock lies to your service: slow, erroring,
-rate-limiting, garbled, or intermittently failing downstream responses. The
-source recording is never touched: everything happens on a copy in the work
-dir. After editing, the variant is validated with a mock dry-start, because
-one malformed RRPair aborts the ENTIRE mock at load.
+Make a mocked downstream lie to your service using proxymock's native
+`mock --fault` injection. The recording is served AS IS: no copy, no edits,
+no variant to validate. Faults are flags on the mock process.
 
-Scenarios (--scenario):
-  slow       inject latency. '--latency Nx' is a global multiplier (no file
-             edits, --target advisory only); '--latency Nms' edits the
-             duration metadata of the target pairs and serves with
-             --mock-timing recorded (per-endpoint).
-  down       rewrite the target pairs' recorded status to 503, body intact.
-  ratelimit  status to 429 plus a 'Retry-After: <n>' response header.
-  garbage    keep 200, truncate/corrupt the response body.
-  flaky      duplicate the target pair into N copies and edit F of them to
-             503. Duplicate-signature RRPairs serve round-robin,
-             DETERMINISTICALLY, in timestamp order: F/N is an exact,
-             periodic failure ratio, not a probability.
+Scenarios (--scenario) and the fault they build:
+  down       status=503
+  ratelimit  status=429,header=Retry-After:<n>
+  garbage    body=corrupt (or --body-fault truncate[:BYTES])
+  slow       latency=<duration>, or the GLOBAL --mock-timing multiplier when
+             --latency is 'Nx' (every endpoint, --target advisory only)
+  connection connection=refuse|reset|stall|drop (--connection, default reset)
+  flaky      status=503,rate=F/N
 
-Required (build mode):
-  --in DIR              Source recording directory (never modified)
-  --scenario NAME       One of: slow down ratelimit garbage flaky
-  --target PATTERN      Regex matched against the outbound request URI
-                        (e.g. '^/v1/projects')
+--ratio F/N composes with ANY scenario, so `--scenario ratelimit --ratio 1/3`
+is a 429 on the first request of every 3. rate=F/N is deterministic and
+periodic, not probabilistic.
+
+--target is the fault regexp (RE2). It is UNANCHORED and matched against the
+bare path AND host+path; scheme, port, and METHOD are NOT in the candidate
+string, so 'https://api.example.com:443/v1/projects' parses, starts, and
+matches nothing. Use a plain path substring like '/v1/projects'.
+
+Required (fault mode): --in DIR, --scenario NAME, --target PATTERN
 
 Options:
-  --latency VALUE       slow only: 'Nx' multiplier (e.g. 5x, 0.5x) or 'Nms'
-                        per-endpoint duration (e.g. 2500ms). Required for slow.
-  --ratio F/N           flaky only: F faulty copies out of N (default 1/2)
+  --latency VALUE       slow only: Go duration with a UNIT ('2500ms', '1.5s'),
+                        or 'Nx' for the global multiplier. Required for slow.
+  --ratio F/N           rate=F/N composed with the scenario's actions
+                        (flaky defaults to 1/2; other scenarios default off)
   --retry-after N       ratelimit only: Retry-After seconds (default 30)
-  --work-dir DIR        Where the variant, manifest, and serve state land
-                        (default: timestamped dir)
-  --serve               Start the chaos mock on the variant after validation
-                        and leave it running in the background
-  --restore             Stop the chaos mock recorded in --work-dir and
-                        restart the mock from the ORIGINAL healthy recording
-                        on the same ports (mock data loads once at startup;
-                        there is no hot reload, so recovery = restart)
+  --body-fault SPEC     garbage only: corrupt | truncate | truncate:BYTES
+  --connection ACTION   connection only: refuse|reset|stall|drop (default reset)
+  --custom-body FILE    Serve FILE as the matched pairs' response body. Needs
+                        an RRPair edit (body= only does corrupt/truncate), so
+                        this and only this makes a writable copy of the
+                        recording in <work-dir>/recording.
+  --allow-http2-connection-fault
+                        Proceed with a connection= fault on HTTP/2 pairs
+                        (see exit 5)
+  --work-dir DIR        Where serve state and any copy land (default: a
+                        timestamped dir)
+  --serve               Start the faulted mock in the background, un-wrapped
   --proxy-out-port N    Mock proxy port for --serve (default 4140)
   --health-port N       Mock health port for --serve (default: a free port)
+  --reload-interval DUR --mock-reload-interval for --serve (default 1s). Mock
+                        DATA hot-reloads at this interval; --fault does NOT.
+  --flip-body FILE      Mid-session flip: rewrite the matched pairs' response
+                        body in the running mock's copy (--work-dir) and let
+                        hot reload pick it up (~1s). Requires a work dir
+                        created with --custom-body.
+  --restore             Stop the faulted mock recorded in --work-dir and
+                        restart it on the same ports with no faults and the
+                        pristine recording
   --proxymock PATH      proxymock binary (default: proxymock from PATH)
   -h, --help            Show this help
 
 Exit codes:
-  0  variant ready (and serving, if --serve); or restore completed
-  2  target endpoint not found in the recording's outbound pairs
-  3  variant failed validation: the mock will not load it
+  0  fault command ready (and serving, if --serve); flip or restore done
+  2  --target matched no loaded outbound pair (a fault that matches nothing
+     is a SILENT no-op, so this is a correctness gate, not a nicety)
+  3  the mock did not come up
   4  precondition or usage failure
+  5  connection= fault requested against HTTP/2 pairs: proxymock silently
+     ignores it (no warning at any verbosity, the app gets a clean 200).
+     Override with --allow-http2-connection-fault.
 
-Output files (in --work-dir):
-  chaos-recording/   the chaos variant (point 'proxymock mock --in' here)
-  manifest.json      exactly what changed: scenario, target, files edited,
-                     original values, validation result
-  validate.log       mock dry-start log from validation
-  serve.json         pid/ports of the running mock (only with --serve)
-  mock.log           the running mock's log (only with --serve)
+Output files (in --work-dir, only with --serve):
+  serve.json   pid, ports, and the exact fault specs in use
+  mock.log     the running mock's log
+  recording/   writable copy, ONLY when --custom-body is used
 
 Examples:
   # downstream 503s on one endpoint; serve the lying mock
   proxymock-chaos-mock.sh --in ./proxymock/recording \
-    --scenario down --target '^/v1/projects' --serve
+    --scenario down --target '/v1/projects' --serve
 
-  # exact 1-in-3 deterministic failures
+  # exact 1-in-3 deterministic 429s with a Retry-After hint
   proxymock-chaos-mock.sh --in ./proxymock/recording \
-    --scenario flaky --target '^/v1/projects' --ratio 1/3 --serve
+    --scenario ratelimit --target '/v1/projects' --ratio 1/3 --serve
 
-  # put the healthy downstream back (restart required; no hot reload)
+  # put the healthy downstream back
   proxymock-chaos-mock.sh --restore --work-dir ./chaos-work
 USAGE
 }
@@ -94,13 +108,19 @@ in_dir=""
 scenario=""
 target=""
 latency=""
-ratio="1/2"
+ratio=""
 retry_after="30"
+body_fault="corrupt"
+connection="reset"
+custom_body=""
+flip_body=""
+allow_h2="0"
 work_dir=""
 serve="0"
 restore="0"
 proxy_out_port="4140"
 health_port=""
+reload_interval="1s"
 proxymock_bin="${PROXYMOCK:-proxymock}"
 
 while [[ $# -gt 0 ]]; do
@@ -111,11 +131,17 @@ while [[ $# -gt 0 ]]; do
     --latency) [[ $# -ge 2 ]] || die "--latency requires a value"; latency="$2"; shift 2 ;;
     --ratio) [[ $# -ge 2 ]] || die "--ratio requires a value"; ratio="$2"; shift 2 ;;
     --retry-after) [[ $# -ge 2 ]] || die "--retry-after requires a value"; retry_after="$2"; shift 2 ;;
+    --body-fault) [[ $# -ge 2 ]] || die "--body-fault requires a value"; body_fault="$2"; shift 2 ;;
+    --connection) [[ $# -ge 2 ]] || die "--connection requires a value"; connection="$2"; shift 2 ;;
+    --custom-body) [[ $# -ge 2 ]] || die "--custom-body requires a value"; custom_body="$2"; shift 2 ;;
+    --flip-body) [[ $# -ge 2 ]] || die "--flip-body requires a value"; flip_body="$2"; shift 2 ;;
+    --allow-http2-connection-fault) allow_h2="1"; shift ;;
     --work-dir) [[ $# -ge 2 ]] || die "--work-dir requires a value"; work_dir="$2"; shift 2 ;;
     --serve) serve="1"; shift ;;
     --restore) restore="1"; shift ;;
     --proxy-out-port) [[ $# -ge 2 ]] || die "--proxy-out-port requires a value"; proxy_out_port="$2"; shift 2 ;;
     --health-port) [[ $# -ge 2 ]] || die "--health-port requires a value"; health_port="$2"; shift 2 ;;
+    --reload-interval) [[ $# -ge 2 ]] || die "--reload-interval requires a value"; reload_interval="$2"; shift 2 ;;
     --proxymock) [[ $# -ge 2 ]] || die "--proxymock requires a value"; proxymock_bin="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) die "unknown argument: $1" ;;
@@ -128,42 +154,20 @@ need_cmd lsof
 ql_check_proxymock_bin "$proxymock_bin" 4
 
 wait_health() {
-  # wait_health PID HEALTH_PORT LOG_FILE -> 0 loaded, 1 failed to load
-  local pid="$1" port="$2" log="$3"
+  # wait_health PID HEALTH_PORT -> 0 ready, 1 died or never became ready
+  local pid="$1" port="$2"
   local deadline=$((SECONDS + 45))
   while (( SECONDS < deadline )); do
-    if ! kill -0 "$pid" 2>/dev/null; then
-      # one malformed RRPair aborts the entire mock at load: the process
-      # exits and the log carries the parse error
-      return 1
-    fi
-    if curl -fsS -m 2 "http://127.0.0.1:${port}/" >/dev/null 2>&1; then
-      if grep -q 'failed to read from directories' "$log" 2>/dev/null; then
-        return 1
-      fi
-      return 0
-    fi
-    sleep 0.25
-  done
-  return 1
-}
-
-wait_port_free() {
-  local port="$1"
-  local deadline=$((SECONDS + 15))
-  while (( SECONDS < deadline )); do
-    if [[ -z "$(lsof -ti "tcp:${port}" 2>/dev/null)" ]]; then
-      return 0
-    fi
+    kill -0 "$pid" 2>/dev/null || return 1
+    curl -fsS -m 2 "http://127.0.0.1:${port}/" >/dev/null 2>&1 && return 0
     sleep 0.25
   done
   return 1
 }
 
 wait_port_listening() {
-  # the health endpoint can report 200 before the outbound proxy port is
-  # accepting connections (observed during restore, when the port is being
-  # rebound), so wait for the listener explicitly
+  # the health endpoint can report 200 before the outbound proxy port accepts
+  # connections (observed while a restarted mock rebinds), so wait explicitly
   local port="$1"
   local deadline=$((SECONDS + 30))
   while (( SECONDS < deadline )); do
@@ -186,21 +190,71 @@ PY
   return 1
 }
 
-print_instructions() {
-  local port="$1" variant="$2" timing="$3"
-  echo ""
-  echo "point your app at the mock (proxy env vars):"
-  echo "  export http_proxy=http://localhost:${port}"
-  echo "  export https_proxy=http://localhost:${port}"
-  echo "or probe the mock directly:"
-  echo "  curl -x http://localhost:${port} http://<recorded-host>/<recorded-path>"
-  echo "or wrap your app yourself:"
-  if [[ "$timing" == "none" ]]; then
-    echo "  proxymock mock --in ${variant} -- <your app>"
-  else
-    echo "  proxymock mock --in ${variant} --mock-timing ${timing} -- <your app>"
-  fi
+# rewrite the response body of every pair matching a fault pattern. Native
+# body= only does corrupt/truncate, so scenario-accurate payloads (rate-limit
+# envelopes, schema drift) still need an RRPair edit.
+edit_bodies() {
+  # edit_bodies RECORDING TARGET BODY_FILE
+  python3 - "$1" "$2" "$3" <<'PY'
+import json, pathlib, re, sys
+
+rec, target, body_file = sys.argv[1:4]
+body = pathlib.Path(body_file).read_text()
+pat = re.compile(target)
+edited = 0
+for path in sorted(pathlib.Path(rec).rglob("*.md")):
+    text = path.read_text(errors="ignore")
+    m = re.search(r"json:\s*(\{.*\})", text, re.S)
+    if not m:
+        continue
+    try:
+        rr = json.loads(m.group(1))
+    except Exception:
+        continue
+    if rr.get("direction") != "OUT":
+        continue
+    req = rr.get("http", {}).get("req", {})
+    uri = req.get("uri") or ""
+    host = (req.get("host") or "").split(":")[0]
+    if not any(pat.search(c) for c in (uri, host + uri)):
+        continue
+    resp = text.index("### RESPONSE ###")
+    end = text.index("### SIGNATURE ###")
+    fences = list(re.finditer(r"(?ms)^```\n(.*?)^```", text[resp:end]))
+    if len(fences) != 2:
+        print(f"error: no response body block in {path}", file=sys.stderr)
+        sys.exit(4)
+    f = fences[1]
+    start, stop = resp + f.start(1), resp + f.end(1)
+    # Content-Length is recomputed and sanitized by the responder, so the
+    # body block is the only thing that needs to change
+    path.write_text(text[:start] + body.rstrip("\n") + "\n" + text[stop:])
+    edited += 1
+print(f"rewrote {edited} response body/bodies")
+PY
 }
+
+read_serve_field() {
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get(sys.argv[2],""))' "$1" "$2"
+}
+
+# --- flip mode ----------------------------------------------------------------
+if [[ -n "$flip_body" ]]; then
+  [[ -n "$work_dir" ]] || die "--flip-body requires --work-dir"
+  [[ -n "$target" ]] || die "--flip-body requires --target"
+  [[ -r "$flip_body" ]] || die "--flip-body file is not readable: $flip_body"
+  work_dir="$(ql_abs_path "$work_dir")"
+  serve_json="$work_dir/serve.json"
+  [[ -s "$serve_json" ]] || die "no serve.json in $work_dir; nothing is serving"
+  served="$(read_serve_field "$serve_json" servedRecording)"
+  source_rec="$(read_serve_field "$serve_json" sourceRecording)"
+  [[ "$served" != "$source_rec" ]] \
+    || die "this work dir serves the source recording directly; start it with --custom-body to get a writable copy"
+  edit_bodies "$served" "$target" "$flip_body"
+  echo "flipped: hot reload picks this up within $(read_serve_field "$serve_json" reloadInterval)"
+  echo "(--fault is startup-only; only mock DATA reloads)"
+  exit 0
+fi
 
 # --- restore mode -------------------------------------------------------------
 if [[ "$restore" == "1" ]]; then
@@ -210,405 +264,259 @@ if [[ "$restore" == "1" ]]; then
   serve_json="$work_dir/serve.json"
   [[ -s "$serve_json" ]] || die "no serve.json in $work_dir; nothing to restore (was --serve used?)"
 
-  read -r old_pid old_proxy_port old_health_port source_rec < <(python3 - "$serve_json" <<'PY'
-import json, sys
-s = json.load(open(sys.argv[1]))
-print(s["pid"], s["proxyOutPort"], s["healthPort"], s["sourceRecording"])
-PY
-)
+  old_pid="$(read_serve_field "$serve_json" pid)"
+  old_proxy_port="$(read_serve_field "$serve_json" proxyOutPort)"
+  old_health_port="$(read_serve_field "$serve_json" healthPort)"
+  source_rec="$(read_serve_field "$serve_json" sourceRecording)"
+  served="$(read_serve_field "$serve_json" servedRecording)"
   [[ -d "$source_rec" ]] || die "original recording no longer exists: $source_rec"
 
-  echo "stopping chaos mock (pid $old_pid) on proxy port $old_proxy_port"
-  ql_stop_pid_and_port "$old_pid" "$old_proxy_port"
-  wait_port_free "$old_proxy_port" || die "proxy port $old_proxy_port did not free up"
+  echo "stopping faulted mock (pid $old_pid) on proxy port $old_proxy_port"
+  ql_stop_pid_and_port "$old_pid" "$old_proxy_port" || die "proxy port $old_proxy_port is still held"
 
-  echo "restarting mock from the healthy recording: $source_rec"
+  if [[ "$served" != "$source_rec" && -d "$served" ]]; then
+    rm -rf "$served"
+    cp -R "$source_rec" "$served"
+    echo "restored the pristine recording copy: $served"
+  fi
+
+  echo "restarting the mock with no faults: $source_rec"
   "$proxymock_bin" mock \
     --in "$source_rec" \
     --proxy-out-port "$old_proxy_port" \
     --health-port "$old_health_port" \
+    --response-selection round-robin \
     --no-out \
     --log-to "$work_dir/mock.log" >/dev/null 2>&1 &
   new_pid=$!
-  if ! wait_health "$new_pid" "$old_health_port" "$work_dir/mock.log" \
-     || ! wait_port_listening "$old_proxy_port"; then
-    ql_stop_pid_and_port "$new_pid" "$old_proxy_port"
-    die "healthy mock did not come up; see $work_dir/mock.log"
+  if ! wait_health "$new_pid" "$old_health_port" || ! wait_port_listening "$old_proxy_port"; then
+    ql_stop_pid_and_port "$new_pid" "$old_proxy_port" || true
+    ql_die 3 "healthy mock did not come up; see $work_dir/mock.log"
   fi
-  python3 - "$serve_json" "$new_pid" <<'PY'
+  python3 - "$serve_json" "$new_pid" "$source_rec" <<'PY'
 import json, sys
 s = json.load(open(sys.argv[1]))
-s["pid"] = int(sys.argv[2])
-s["mode"] = "restored"
+s.update(pid=int(sys.argv[2]), servedRecording=sys.argv[3], faults=[],
+         mockTiming="none", mode="restored")
 json.dump(s, open(sys.argv[1], "w"), indent=2, sort_keys=True)
 PY
   echo "restored: healthy mock serving on proxy port $old_proxy_port (pid $new_pid)"
-  echo "note: mock data loads once at startup; the restart IS the recovery."
+  echo "note: --fault is startup-only, so removing a fault means a restart."
   echo "In-flight requests during the swap saw a refused connection."
   exit 0
 fi
 
-# --- build mode ---------------------------------------------------------------
+# --- fault mode ---------------------------------------------------------------
 [[ -n "$in_dir" ]] || die "--in is required"
 [[ -n "$scenario" ]] || die "--scenario is required"
 [[ -n "$target" ]] || die "--target is required"
 [[ -d "$in_dir" ]] || die "--in is not a directory: $in_dir"
 case "$scenario" in
-  slow|down|ratelimit|garbage|flaky) ;;
-  *) die "unknown scenario: $scenario (expected slow|down|ratelimit|garbage|flaky)" ;;
+  down|ratelimit|garbage|slow|connection|flaky) ;;
+  *) die "unknown scenario: $scenario (expected down|ratelimit|garbage|slow|connection|flaky)" ;;
 esac
-if [[ "$scenario" == "slow" ]]; then
-  [[ -n "$latency" ]] || die "--scenario slow requires --latency (Nx multiplier or Nms)"
-  [[ "$latency" =~ ^[0-9.]+x$ || "$latency" =~ ^[0-9]+ms$ ]] \
-    || die "--latency must be a multiplier like 5x or a duration like 2500ms: $latency"
-fi
-[[ "$ratio" =~ ^[1-9][0-9]*/[1-9][0-9]*$ ]] || die "--ratio must look like F/N (e.g. 1/3): $ratio"
 [[ "$retry_after" =~ ^[0-9]+$ ]] || die "--retry-after must be an integer: $retry_after"
+[[ -z "$ratio" || "$ratio" =~ ^[1-9][0-9]*/[1-9][0-9]*$ ]] \
+  || die "--ratio must look like F/N (e.g. 1/3); proxymock rejects 0.5 and 50%: $ratio"
+[[ -z "$custom_body" || -r "$custom_body" ]] || die "--custom-body file is not readable: $custom_body"
 
+mock_timing="none"
+actions=""
+case "$scenario" in
+  down) actions="status=503" ;;
+  ratelimit) actions="status=429,header=Retry-After:$retry_after" ;;
+  garbage)
+    [[ "$body_fault" =~ ^(corrupt|truncate|truncate:[0-9]+)$ ]] \
+      || die "--body-fault must be corrupt, truncate, or truncate:BYTES: $body_fault"
+    actions="body=$body_fault" ;;
+  connection)
+    [[ "$connection" =~ ^(refuse|reset|stall|drop)$ ]] \
+      || die "--connection must be refuse|reset|stall|drop: $connection"
+    actions="connection=$connection" ;;
+  flaky)
+    [[ -n "$ratio" ]] || ratio="1/2"
+    actions="status=503" ;;
+  slow)
+    [[ -n "$latency" ]] || die "--scenario slow requires --latency (Go duration with a unit, or Nx)"
+    if [[ "$latency" =~ ^[0-9.]+x$ ]]; then
+      mock_timing="$latency"
+      echo "note: --latency Nx is the GLOBAL --mock-timing multiplier; it slows"
+      echo "every mocked endpoint, not just --target. Use a duration like 2500ms"
+      echo "for a per-endpoint latency fault."
+    elif [[ "$latency" =~ ^[0-9.]+(ns|us|ms|s|m|h)$ ]]; then
+      actions="latency=$latency"
+    else
+      die "--latency must be a Go duration WITH a unit (2500ms, 1.5s) or a multiplier (5x): $latency"
+    fi ;;
+esac
+if [[ -n "$ratio" ]]; then
+  if [[ -n "$actions" ]]; then actions="$actions,rate=$ratio"; else actions="rate=$ratio"; fi
+fi
+
+# --- pre-check: the pattern must match, and connection faults must not be h2 --
+want_conn="0"
+if [[ "$scenario" == "connection" ]]; then want_conn="1"; fi
+python3 - "$in_dir" "$target" "$want_conn" "$allow_h2" <<'PY' || exit $?
+import json, pathlib, re, sys
+
+rec, target, want_conn, allow_h2 = sys.argv[1:5]
+try:
+    pat = re.compile(target)
+except re.error as e:
+    print(f"error: --target is not a valid regexp: {e}", file=sys.stderr)
+    sys.exit(4)
+
+matched, catalog = [], set()
+for path in sorted(pathlib.Path(rec).rglob("*.md")):
+    text = path.read_text(errors="ignore")
+    m = re.search(r"json:\s*(\{.*\})", text, re.S)
+    if not m:
+        continue
+    try:
+        rr = json.loads(m.group(1))
+    except Exception:
+        continue
+    if rr.get("direction") != "OUT":
+        continue
+    req = rr.get("http", {}).get("req", {})
+    uri = req.get("uri") or ""
+    host = (req.get("host") or "").split(":")[0]
+    catalog.add(f'{req.get("method")} {host}{uri}')
+    if not any(pat.search(c) for c in (uri, host + uri)):
+        continue
+    # the mocked response protocol, which is what connection faults are gated on
+    ver = ""
+    idx = text.find("### RESPONSE ###")
+    if idx >= 0:
+        sl = re.search(r"(?m)^HTTP/([0-9.]+) \d{3}", text[idx:])
+        if sl:
+            ver = sl.group(1)
+    matched.append((f'{req.get("method")} {host}{uri}', ver or req.get("version") or "?"))
+
+if not matched:
+    print(f"error: --target {target!r} matched no loaded outbound pair; the "
+          "fault would be a SILENT no-op", file=sys.stderr)
+    print("remember: the pattern is matched against the bare path and "
+          "host+path only - no scheme, no port, no method", file=sys.stderr)
+    print("outbound endpoints in this recording:", file=sys.stderr)
+    for c in sorted(catalog):
+        print(f"  {c}", file=sys.stderr)
+    sys.exit(2)
+
+for label, ver in sorted(set(matched)):
+    print(f"  matches: {label} (HTTP/{ver})")
+
+if want_conn == "1":
+    h2 = sorted({label for label, ver in matched if ver.startswith("2")})
+    if h2:
+        refuse = allow_h2 != "1"
+        head = "error" if refuse else "WARNING"
+        lines = [
+            "connection= faults are SILENTLY IGNORED when the mocked response is",
+            "HTTP/2: no warning at any verbosity, the app gets a clean 200.",
+            "HTTP/2 pairs matched by this pattern:",
+        ] + [f"  {label}" for label in h2] + [
+            "proxymock replays the recorded protocol, so exercise the h1 path:",
+            "  - recapture the dependency over HTTP/1.1, or",
+            "  - drive the mock with an h1 client (curl --http1.1 -x ...), or",
+            "  - use status= / body= faults, which fire on both protocols.",
+        ]
+        if refuse:
+            lines.append("rerun with --allow-http2-connection-fault to proceed anyway.")
+        for line in lines:
+            print(f"{head}: {line}", file=sys.stderr if refuse else sys.stdout)
+        if refuse:
+            sys.exit(5)
+PY
+
+# --- work dir and optional writable copy --------------------------------------
 in_dir="$(ql_abs_path "$in_dir")"
 if [[ -z "$work_dir" ]]; then
   work_dir="proxymock-chaos-$(date -u +%Y%m%dT%H%M%SZ)"
 fi
 mkdir -p "$work_dir"
 work_dir="$(ql_abs_path "$work_dir")"
-variant_dir="$work_dir/chaos-recording"
-manifest="$work_dir/manifest.json"
 
-if [[ -e "$variant_dir" ]]; then
-  die "variant dir already exists, pick a fresh --work-dir: $variant_dir"
+served_dir="$in_dir"
+if [[ -n "$custom_body" ]]; then
+  served_dir="$work_dir/recording"
+  [[ ! -e "$served_dir" ]] || die "copy dir already exists, pick a fresh --work-dir: $served_dir"
+  cp -R "$in_dir" "$served_dir"
+  echo "custom body needs an RRPair edit; serving a copy: $served_dir"
+  edit_bodies "$served_dir" "$target" "$custom_body"
 fi
 
-echo "copying recording (source is never modified): $in_dir -> $variant_dir"
-cp -R "$in_dir" "$variant_dir"
+fault_args=()
+if [[ -n "$actions" ]]; then fault_args+=(--fault "${target}:${actions}"); fi
 
-# --- apply the scenario to the copy ------------------------------------------
-edit_rc=0
-python3 - "$variant_dir" "$scenario" "$target" "$latency" "$ratio" "$retry_after" \
-  "$manifest" "$in_dir" <<'PY' || edit_rc=$?
-import base64, datetime, json, pathlib, re, os, sys, uuid as uuidlib
-
-(variant_dir, scenario, target, latency, ratio, retry_after,
- manifest_path, source_dir) = sys.argv[1:9]
-
-internal_re = re.compile(r"json:\s*(\{.*\})", re.S)
-status_line_re = re.compile(r"(?m)^HTTP/([0-9.]+) (\d+) ([^\n]*)$")
-
-def load(path):
-    text = path.read_text(errors="ignore")
-    m = internal_re.search(text)
-    if not m:
-        return text, None
-    try:
-        return text, json.loads(m.group(1))
-    except Exception:
-        return text, None
-
-# The RRPair stores the response status in THREE places that must stay
-# consistent: the visible status line, the internal '"status":"NNN"', and
-# '"statusCode":NNN,"statusMessage":...'. Inconsistent edits or garbage
-# status lines make the whole directory fail to load.
-def set_status(text, code, message):
-    text = status_line_re.sub(
-        lambda m: f"HTTP/{m.group(1)} {code} {message}", text, count=1)
-    text = re.sub(r'"status":"\d+"', f'"status":"{code}"', text, count=1)
-    text = re.sub(r'"statusCode":\d+,"statusMessage":"[^"]*"',
-                  f'"statusCode":{code},"statusMessage":"{code} {message}"',
-                  text, count=1)
-    return text
-
-def add_header(text, name, value):
-    # replace an existing header of the same name, else insert after the
-    # response status line
-    hdr_re = re.compile(rf"(?mi)^{re.escape(name)}: [^\n]*$")
-    if hdr_re.search(text):
-        return hdr_re.sub(f"{name}: {value}", text, count=1)
-    return status_line_re.sub(
-        lambda m: m.group(0) + f"\n{name}: {value}", text, count=1)
-
-def set_duration(text, ms):
-    return re.sub(r"(?m)^duration: .*$", f"duration: {ms}ms", text, count=1)
-
-def response_body_span(text):
-    # the response body is the second fenced block of the RESPONSE section
-    resp = text.index("### RESPONSE ###")
-    end = text.index("### SIGNATURE ###")
-    fences = list(re.finditer(r"(?ms)^```\n(.*?)^```", text[resp:end]))
-    if len(fences) != 2:
-        return None
-    f = fences[1]
-    return resp + f.start(1), resp + f.end(1)
-
-def set_garbage_body(text):
-    span = response_body_span(text)
-    if span is None:
-        return None, None
-    start, end = span
-    original = text[start:end]
-    stripped = original.strip()
-    if stripped:
-        cut = max(16, len(stripped) // 4)
-        garbage = stripped[:cut].rstrip() + '"tru'
-    else:
-        garbage = '{"chaos": "truncat'
-    return text[:start] + garbage + "\n" + text[end:], {
-        "originalBodyBytes": len(original), "newBody": garbage}
-
-TS_FILE = "%Y-%m-%d_%H-%M-%S.%fZ"
-TS_META = "%Y-%m-%dT%H:%M:%S.%fZ"
-
-def duplicate(path, text, rr, offset_us):
-    # duplicates need a bumped timestamp (filename + metadata + internal, all
-    # consistent) and a FRESH valid uuid: the metadata uuid is parsed
-    # strictly and an invalid one aborts the whole directory at load
-    ts = datetime.datetime.strptime(rr["ts"], TS_META)
-    new_ts = ts + datetime.timedelta(microseconds=offset_us)
-    meta_ts, file_ts = new_ts.strftime(TS_META), new_ts.strftime(TS_FILE)
-    u = uuidlib.uuid4()
-    out = text
-    out = re.sub(r"(?m)^ts: .*$", f"ts: {meta_ts}", out, count=1)
-    out = out.replace(f'"ts":"{rr["ts"]}"', f'"ts":"{meta_ts}"')
-    out = re.sub(r"(?m)^uuid: .*$", f"uuid: {u}", out, count=1)
-    out = re.sub(r'"uuid":"[^"]*"',
-                 lambda m: f'"uuid":"{base64.b64encode(u.bytes).decode()}"',
-                 out, count=1)
-    new_path = path.parent / f"{file_ts}.md"
-    new_path.write_text(out)
-    return new_path
-
-# --- scan outbound pairs and match the target --------------------------------
-pat = re.compile(target)
-matched, all_out_uris = [], set()
-for path in sorted(pathlib.Path(variant_dir).rglob("*.md")):
-    text, rr = load(path)
-    if rr is None or rr.get("direction") != "OUT":
-        continue
-    req = rr.get("http", {}).get("req", {})
-    uri = req.get("uri") or ""
-    all_out_uris.add(f'{req.get("method")} {uri}')
-    if pat.search(uri):
-        matched.append({"path": path, "text": text, "rr": rr,
-                        "uri": uri, "method": req.get("method")})
-
-if not matched:
-    print(f"error: --target {target!r} matched no outbound request URIs",
-          file=sys.stderr)
-    print("outbound endpoints in this recording:", file=sys.stderr)
-    for u in sorted(all_out_uris):
-        print(f"  {u}", file=sys.stderr)
-    sys.exit(2)
-
-edits = []
-mock_timing = "none"
-params = {}
-
-def record(path, action, original, new):
-    edits.append({"file": str(path), "action": action,
-                  "original": original, "new": new})
-
-if scenario == "down":
-    for m in matched:
-        sl = status_line_re.search(m["text"]).group(0)
-        m["path"].write_text(set_status(m["text"], 503, "Service Unavailable"))
-        record(m["path"], "status", {"statusLine": sl},
-               {"statusLine": sl.split(" ")[0] + " 503 Service Unavailable"})
-
-elif scenario == "ratelimit":
-    params["retryAfter"] = int(retry_after)
-    for m in matched:
-        sl = status_line_re.search(m["text"]).group(0)
-        out = set_status(m["text"], 429, "Too Many Requests")
-        out = add_header(out, "Retry-After", retry_after)
-        m["path"].write_text(out)
-        record(m["path"], "status+header", {"statusLine": sl},
-               {"statusLine": sl.split(" ")[0] + " 429 Too Many Requests",
-                "header": f"Retry-After: {retry_after}"})
-
-elif scenario == "garbage":
-    for m in matched:
-        out, info = set_garbage_body(m["text"])
-        if out is None:
-            print(f"error: could not locate response body in {m['path']}",
-                  file=sys.stderr)
-            sys.exit(2)
-        m["path"].write_text(out)
-        record(m["path"], "body", {"bodyBytes": info["originalBodyBytes"]},
-               {"body": info["newBody"]})
-
-elif scenario == "slow":
-    params["latency"] = latency
-    if latency.endswith("x"):
-        # global multiplier: no file edits; timing is a mock flag
-        mock_timing = latency
-        print("note: --latency Nx is a GLOBAL multiplier applied by "
-              "--mock-timing; it slows every mocked endpoint, not just "
-              "--target. Use Nms for per-endpoint latency.")
-    else:
-        mock_timing = "recorded"
-        ms = latency[:-2]
-        for m in matched:
-            orig = re.search(r"(?m)^duration: .*$", m["text"]).group(0)
-            m["path"].write_text(set_duration(m["text"], ms))
-            record(m["path"], "duration", {"duration": orig},
-                   {"duration": f"duration: {ms}ms"})
-
-elif scenario == "flaky":
-    faulty, total = (int(x) for x in ratio.split("/"))
-    if faulty >= total:
-        print(f"error: --ratio F/N needs F < N: {ratio}", file=sys.stderr)
-        sys.exit(4)
-    params["ratio"] = ratio
-    # duplicate-signature RRPairs serve round-robin in timestamp order, so
-    # normalize each matched signature group to exactly N copies and edit the
-    # first F (earliest timestamps): the failure pattern is periodic and
-    # starts with the faults
-    groups = {}
-    for m in matched:
-        key = json.dumps(m["rr"].get("signature", {}), sort_keys=True)
-        groups.setdefault(key, []).append(m)
-    for group in groups.values():
-        group.sort(key=lambda m: m["rr"]["ts"])
-        template = group[0]
-        for extra in group[total:]:
-            extra["path"].unlink()
-            record(extra["path"], "remove-surplus-duplicate",
-                   {"uri": extra["uri"]}, None)
-        group = group[:total]
-        offset = 1
-        while len(group) < total:
-            new_path = duplicate(template["path"], template["text"],
-                                 template["rr"], offset)
-            record(new_path, "duplicate", {"of": str(template["path"])},
-                   {"uri": template["uri"]})
-            text, rr = load(new_path)
-            group.append({"path": new_path, "text": text, "rr": rr,
-                          "uri": template["uri"],
-                          "method": template["method"]})
-            offset += 1
-        group.sort(key=lambda m: m["rr"]["ts"])
-        for m in group[:faulty]:
-            text, _ = load(m["path"])  # re-read: file may be a fresh duplicate
-            sl = status_line_re.search(text).group(0)
-            m["path"].write_text(set_status(text, 503, "Service Unavailable"))
-            record(m["path"], "status", {"statusLine": sl},
-                   {"statusLine": sl.split(" ")[0] + " 503 Service Unavailable"})
-
-# proof-only hook: corrupt the first edited file with the documented failure
-# mode (an invalid response line) so the validation gate can be exercised
-if os.environ.get("CHAOS_FORCE_BAD_EDIT") == "1" and edits:
-    bad = pathlib.Path(edits[0]["file"])
-    if bad.exists():
-        bad.write_text(status_line_re.sub("XXCHAOS-BAD-EDIT", bad.read_text(),
-                                          count=1))
-
-json.dump({
-    "scenario": scenario,
-    "target": target,
-    "sourceRecording": source_dir,
-    "variantDir": variant_dir,
-    "mockTiming": mock_timing,
-    "params": params,
-    "matched": [{"file": str(m["path"]), "method": m["method"],
-                 "uri": m["uri"]} for m in matched],
-    "edits": edits,
-    "validation": None,
-}, open(manifest_path, "w"), indent=2, sort_keys=True)
-print(f"{len(edits)} edit(s) applied for scenario {scenario} "
-      f"({len(matched)} matched pair(s))")
-PY
-if [[ "$edit_rc" -ne 0 ]]; then
-  exit "$edit_rc"
+echo ""
+echo "=== chaos fault ready ==="
+echo "scenario : $scenario"
+echo "recording: $served_dir"
+if [[ -n "$actions" ]]; then
+  echo "fault    : --fault '${target}:${actions}'"
+else
+  echo "fault    : --mock-timing $mock_timing (global, no per-endpoint fault)"
 fi
-mock_timing="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["mockTiming"])' "$manifest")"
-
-# --- validate: mock dry-start on the variant ---------------------------------
-# Mock data loads once at startup and one malformed RRPair aborts the whole
-# directory ("failed to parse response line"), so never declare a variant
-# ready without proving the mock loads it.
-validate_log="$work_dir/validate.log"
-vp="$(ql_pick_port)"
-vh="$(ql_pick_port)"
-echo "validating: mock dry-start on the variant"
-"$proxymock_bin" mock \
-  --in "$variant_dir" \
-  --proxy-out-port "$vp" \
-  --health-port "$vh" \
-  --no-out \
-  --log-to "$validate_log" >/dev/null 2>&1 &
-vpid=$!
-loaded="false"
-if wait_health "$vpid" "$vh" "$validate_log"; then
-  loaded="true"
-fi
-ql_stop_pid_and_port "$vpid" "$vp"
-
-python3 - "$manifest" "$loaded" "$validate_log" <<'PY'
-import json, sys
-m = json.load(open(sys.argv[1]))
-m["validation"] = {"loaded": sys.argv[2] == "true", "mockLog": sys.argv[3]}
-json.dump(m, open(sys.argv[1], "w"), indent=2, sort_keys=True)
-PY
-
-if [[ "$loaded" != "true" ]]; then
-  echo "FAIL: the mock will not load the chaos variant (the edit broke an RRPair)" >&2
-  grep -o 'failed to parse[^"]*' "$validate_log" >&2 || true
-  echo "see $validate_log" >&2
-  exit 3
-fi
-echo "validated: mock loads the variant"
+echo "responses carry 'x-speedscale-chaos: proxymock fault' when a fault fires."
 
 # --- serve --------------------------------------------------------------------
 if [[ "$serve" == "1" ]]; then
   [[ -n "$health_port" ]] || health_port="$(ql_pick_port)"
   mock_log="$work_dir/mock.log"
-  serve_args=(mock --in "$variant_dir"
+  serve_args=(mock --in "$served_dir"
               --proxy-out-port "$proxy_out_port"
               --health-port "$health_port"
+              --response-selection round-robin
+              --mock-reload-interval "$reload_interval"
               --no-out --log-to "$mock_log")
-  if [[ "$mock_timing" != "none" ]]; then
-    serve_args+=(--mock-timing "$mock_timing")
-  fi
-  echo "starting chaos mock: proxy port $proxy_out_port, health port $health_port"
+  if [[ ${#fault_args[@]} -gt 0 ]]; then serve_args+=("${fault_args[@]}"); fi
+  if [[ "$mock_timing" != "none" ]]; then serve_args+=(--mock-timing "$mock_timing"); fi
+  echo "starting faulted mock: proxy port $proxy_out_port, health port $health_port"
   "$proxymock_bin" "${serve_args[@]}" >/dev/null 2>&1 &
   mpid=$!
-  if ! wait_health "$mpid" "$health_port" "$mock_log" \
-     || ! wait_port_listening "$proxy_out_port"; then
-    ql_stop_pid_and_port "$mpid" "$proxy_out_port"
-    die "chaos mock did not come up; see $mock_log"
+  if ! wait_health "$mpid" "$health_port" || ! wait_port_listening "$proxy_out_port"; then
+    ql_stop_pid_and_port "$mpid" "$proxy_out_port" || true
+    ql_die 3 "faulted mock did not come up; see $mock_log"
   fi
   python3 - "$work_dir/serve.json" "$mpid" "$proxy_out_port" "$health_port" \
-    "$variant_dir" "$in_dir" "$mock_timing" "$mock_log" <<'PY'
+    "$served_dir" "$in_dir" "$mock_timing" "$mock_log" "$reload_interval" \
+    "${fault_args[@]:-}" <<'PY'
 import json, sys
+a = sys.argv
 json.dump({
-    "pid": int(sys.argv[2]),
-    "proxyOutPort": int(sys.argv[3]),
-    "healthPort": int(sys.argv[4]),
-    "variantDir": sys.argv[5],
-    "sourceRecording": sys.argv[6],
-    "mockTiming": sys.argv[7],
-    "mockLog": sys.argv[8],
+    "pid": int(a[2]),
+    "proxyOutPort": int(a[3]),
+    "healthPort": int(a[4]),
+    "servedRecording": a[5],
+    "sourceRecording": a[6],
+    "mockTiming": a[7],
+    "mockLog": a[8],
+    "reloadInterval": a[9],
+    "faults": [x for x in a[10:] if x and x != "--fault"],
     "mode": "chaos",
-}, open(sys.argv[1], "w"), indent=2, sort_keys=True)
+}, open(a[1], "w"), indent=2, sort_keys=True)
 PY
-  echo "chaos mock serving (pid $mpid); state in $work_dir/serve.json"
-fi
-
-echo ""
-echo "=== chaos variant ready ==="
-echo "scenario : $scenario (target: $target)"
-echo "variant  : $variant_dir"
-echo "manifest : $manifest"
-if [[ "$serve" == "1" ]]; then
-  print_instructions "$proxy_out_port" "$variant_dir" "$mock_timing"
+  echo "faulted mock serving (pid $mpid); state in $work_dir/serve.json"
   echo ""
-  echo "to restore the healthy downstream (restart; no hot reload):"
+  echo "point your app at the mock (proxy env vars):"
+  echo "  export http_proxy=http://localhost:${proxy_out_port}"
+  echo "  export https_proxy=http://localhost:${proxy_out_port}"
+  echo "or probe the mock directly:"
+  echo "  curl -x http://localhost:${proxy_out_port} http://<recorded-host>/<recorded-path>"
+  echo ""
+  echo "to restore the healthy downstream (restart; --fault is startup-only):"
   echo "  $0 --restore --work-dir $work_dir"
 else
-  echo "serve it with:"
-  if [[ "$mock_timing" == "none" ]]; then
-    echo "  proxymock mock --in $variant_dir -- <your app>"
-  else
-    echo "  proxymock mock --in $variant_dir --mock-timing $mock_timing -- <your app>"
-  fi
-  echo "or rerun with --serve for a standalone chaos mock."
+  echo ""
+  echo "serve it yourself:"
+  cmd="  proxymock mock --in $served_dir"
+  if [[ -n "$actions" ]]; then cmd="$cmd --fault '${target}:${actions}'"; fi
+  if [[ "$mock_timing" != "none" ]]; then cmd="$cmd --mock-timing $mock_timing"; fi
+  echo "$cmd -- <your app>"
+  echo "or rerun with --serve for a standalone faulted mock."
+  echo "note: a mock that WRAPS your app restarts the app when it restarts, so"
+  echo "recovery scenarios should run the mock un-wrapped (--serve) with the app"
+  echo "started separately against the proxy port."
 fi
 exit 0

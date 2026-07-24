@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Proves: every scenario builds a chaos variant of the committed recording
-# that the mock verifiably loads, flaky serves an EXACT deterministic F/N
-# fault ratio (verified via direct proxy curls), slow injects at least the
-# configured per-endpoint latency, restore swaps the healthy recording back,
-# a bogus --target exits 2, and an edit that breaks an RRPair (the documented
-# 'failed to parse response line' failure mode) is caught by validation with
-# exit 3.
+# Proves: native --fault injection serves the documented behavior straight off
+# the UNMODIFIED committed recording - status faults, a Retry-After header, an
+# exact deterministic rate=F/N ratio, per-endpoint latency, the chaos response
+# header, and a fault-free downstream after --restore - and that both silent
+# traps are gated: a pattern matching nothing exits 2, and a connection= fault
+# against HTTP/2 pairs exits 5 instead of being silently ignored.
 set -euo pipefail
 
 # shared ql_* helpers; a copied skill needs skills/lib/common.sh too
@@ -40,134 +39,121 @@ ports=()
 trap ql_prove_cleanup EXIT
 mkdir -p "$tmp"
 
-# every recorded downstream URI, reachable through the mock's proxy port with
+# every recorded downstream URI is reachable through the mock's proxy port with
 # a direct proxy curl (plain http scheme; the mock matches on signature)
 downstream="http://demo-api.trafficreplay.com"
+port=""
+health=""
 
 proxy_curl() {
-  # proxy_curl PORT PATH -> status code
+  # proxy_curl PATH -> status code
   curl -s -o /dev/null -m 10 -w '%{http_code}' \
-    -x "http://127.0.0.1:$1" "${downstream}$2"
+    -x "http://127.0.0.1:$port" "${downstream}$1"
 }
 
-echo "step 1: build + validate a variant for every scenario (expect exit 0)"
-for scenario in down ratelimit garbage flaky slow; do
-  args=(--in "$recording" --scenario "$scenario" --work-dir "$tmp/$scenario")
-  case "$scenario" in
-    slow) args+=(--target '^/v1/categories' --latency 500ms) ;;
-    flaky) args+=(--target '^/v1/categories' --ratio 1/2) ;;
-    ratelimit) args+=(--target '^/v1/projects' --retry-after 30) ;;
-    *) args+=(--target '^/v1/projects') ;;
-  esac
-  "$chaos_script" "${args[@]}" >"$tmp/$scenario.out" 2>&1 || {
-    cat "$tmp/$scenario.out" >&2
-    die "scenario $scenario did not build (expected exit 0)"
-  }
-  [[ -s "$tmp/$scenario/manifest.json" ]] || die "$scenario: no manifest.json"
-  [[ -d "$tmp/$scenario/chaos-recording" ]] || die "$scenario: no variant dir"
-  python3 - "$tmp/$scenario/manifest.json" "$scenario" <<'PY'
-import json, sys
-m = json.load(open(sys.argv[1]))
-scenario = sys.argv[2]
-assert m["scenario"] == scenario, m["scenario"]
-assert m["validation"] and m["validation"]["loaded"], "variant did not validate"
-assert m["matched"], "no matched pairs"
-if scenario != "slow":
-    assert m["edits"], "no edits recorded"
-    assert all(e["original"] is not None or e["action"] == "duplicate"
-               for e in m["edits"])
-print(f"  {scenario}: validated, {len(m['edits'])} edit(s), "
-      f"{len(m['matched'])} matched pair(s)")
-PY
+serve_chaos() {
+  # serve_chaos NAME ARGS...: start a faulted mock on fresh ports
+  local name="$1"
+  shift
+  port="$(ql_pick_port)"
+  health="$(ql_pick_port)"
+  ports+=("$port" "$health")
+  "$chaos_script" --in "$recording" --work-dir "$tmp/$name" --serve \
+    --proxy-out-port "$port" --health-port "$health" "$@" \
+    >"$tmp/$name.out" 2>&1 || {
+      cat "$tmp/$name.out" >&2
+      die "$name: --serve failed"
+    }
+}
+
+echo "step 1: status fault on the unmodified recording, with the chaos header"
+serve_chaos down --scenario down --target '/v1/projects'
+[[ "$(proxy_curl /v1/projects)" == "503" ]] || die "down: target endpoint did not 503"
+[[ "$(proxy_curl /v1/categories)" == "200" ]] || die "down: untargeted endpoint was not healthy"
+curl -s -D- -o /dev/null -m 10 -x "http://127.0.0.1:$port" "${downstream}/v1/projects" \
+  | grep -qi '^x-speedscale-chaos: proxymock fault' \
+  || die "down: response is missing the x-speedscale-chaos header"
+echo "  503 on the target, 200 elsewhere, chaos header present"
+
+echo "step 2: restore puts a fault-free downstream back on the same port"
+"$chaos_script" --restore --work-dir "$tmp/down" >"$tmp/restore.out" 2>&1 || {
+  cat "$tmp/restore.out" >&2
+  die "--restore failed"
+}
+for _ in 1 2 3; do
+  [[ "$(proxy_curl /v1/projects)" == "200" ]] || die "restored mock still faulting"
 done
-# the source recording must be untouched (git-clean check on the committed dir)
+echo "  healthy 200s after restore"
+ql_sweep_port "$port"
+
+echo "step 3: ratelimit injects 429 plus the Retry-After header"
+serve_chaos ratelimit --scenario ratelimit --target '/v1/projects' --retry-after 30
+[[ "$(proxy_curl /v1/projects)" == "429" ]] || die "ratelimit: no 429"
+curl -s -D- -o /dev/null -m 10 -x "http://127.0.0.1:$port" "${downstream}/v1/projects" \
+  | grep -qi '^retry-after: 30' || die "ratelimit: Retry-After header missing"
+echo "  429 with Retry-After: 30"
+ql_sweep_port "$port"
+
+echo "step 4: flaky rate=1/3 is exact and periodic over 6 probes"
+serve_chaos flaky --scenario flaky --target '/v1/categories' --ratio 1/3
+seq_got=""
+for _ in 1 2 3 4 5 6; do
+  seq_got+="$(proxy_curl /v1/categories) "
+done
+[[ "$seq_got" == "503 200 200 503 200 200 " ]] \
+  || die "rate=1/3 not exact: got '$seq_got'"
+[[ "$(proxy_curl /v1/projects)" == "200" ]] \
+  || die "flaky: untargeted endpoint was not healthy"
+echo "  exact 1/3 periodicity confirmed: $seq_got"
+ql_sweep_port "$port"
+
+echo "step 5: latency fault delays only the target endpoint"
+serve_chaos slow --scenario slow --target '/v1/categories' --latency 500ms
+t="$(curl -s -o /dev/null -m 10 -w '%{time_total}' \
+  -x "http://127.0.0.1:$port" "${downstream}/v1/categories")"
+u="$(curl -s -o /dev/null -m 10 -w '%{time_total}' \
+  -x "http://127.0.0.1:$port" "${downstream}/v1/projects")"
+python3 - "$t" "$u" <<'PY'
+import sys
+t, u = float(sys.argv[1]), float(sys.argv[2])
+assert t >= 0.5, f"target latency {t}s < configured 0.5s"
+assert u < 0.5, f"untargeted endpoint also delayed: {u}s"
+print(f"  target {t:.3f}s (>= 0.500s configured), untargeted {u:.3f}s")
+PY
+ql_sweep_port "$port"
+
+echo "step 6: a pattern that matches nothing exits 2 instead of serving a no-op"
+rc=0
+"$chaos_script" --in "$recording" --scenario down \
+  --target 'https://demo-api.trafficreplay.com:443/v1/projects' \
+  --work-dir "$tmp/nomatch" >"$tmp/nomatch.out" 2>&1 || rc=$?
+[[ "$rc" -eq 2 ]] || { cat "$tmp/nomatch.out" >&2; die "expected exit 2, got $rc"; }
+grep -q 'SILENT no-op' "$tmp/nomatch.out" || die "exit 2 without the no-op warning"
+grep -q 'no scheme, no port, no method' "$tmp/nomatch.out" \
+  || die "exit 2 without the matching-rule explanation"
+echo "  exit 2: the scheme+port form matches nothing, as documented"
+
+echo "step 7: connection fault against HTTP/2 pairs is refused with exit 5"
+rc=0
+"$chaos_script" --in "$recording" --scenario connection --connection reset \
+  --target '/v1/projects' --work-dir "$tmp/h2" >"$tmp/h2.out" 2>&1 || rc=$?
+[[ "$rc" -eq 5 ]] || { cat "$tmp/h2.out" >&2; die "expected exit 5, got $rc"; }
+grep -q 'SILENTLY IGNORED' "$tmp/h2.out" || die "exit 5 without the HTTP/2 explanation"
+grep -q 'http1.1' "$tmp/h2.out" || die "exit 5 without the h1 workaround"
+rc=0
+"$chaos_script" --in "$recording" --scenario connection --connection reset \
+  --target '/v1/projects' --allow-http2-connection-fault \
+  --work-dir "$tmp/h2-override" >"$tmp/h2-override.out" 2>&1 || rc=$?
+[[ "$rc" -eq 0 ]] || { cat "$tmp/h2-override.out" >&2; die "override should exit 0, got $rc"; }
+grep -q 'WARNING: connection= faults are SILENTLY IGNORED' "$tmp/h2-override.out" \
+  || die "override did not warn"
+echo "  exit 5 by default, loud WARNING with --allow-http2-connection-fault"
+
+# the recording is served as is: nothing in this proof may have touched it
 if command -v git >/dev/null 2>&1 && git -C "$repo_root" rev-parse >/dev/null 2>&1; then
   dirty="$(git -C "$repo_root" status --porcelain -- lab/proxymock/recording)"
   [[ -z "$dirty" ]] || die "source recording was modified: $dirty"
 fi
 echo "  source recording untouched"
 
-echo "step 2: flaky serves an exact deterministic 1/2 ratio (direct proxy curls)"
-flaky_port="$(ql_pick_port)"
-flaky_health="$(ql_pick_port)"
-ports+=("$flaky_port" "$flaky_health")
-rm -rf "$tmp/flaky-serve"
-"$chaos_script" --in "$recording" --scenario flaky --target '^/v1/categories' \
-  --ratio 1/2 --work-dir "$tmp/flaky-serve" --serve \
-  --proxy-out-port "$flaky_port" --health-port "$flaky_health" \
-  >"$tmp/flaky-serve.out" 2>&1 || {
-    cat "$tmp/flaky-serve.out" >&2
-    die "flaky --serve failed"
-  }
-seq_got=""
-for i in 1 2 3 4 5 6; do
-  seq_got+="$(proxy_curl "$flaky_port" /v1/categories) "
-done
-[[ "$seq_got" == "503 200 503 200 503 200 " ]] \
-  || die "flaky ratio not deterministic 1/2: got '$seq_got'"
-# an untargeted endpoint stays healthy through the same chaos mock
-[[ "$(proxy_curl "$flaky_port" /v1/projects)" == "200" ]] \
-  || die "untargeted endpoint was not healthy under flaky"
-echo "  exact 1/2 alternation confirmed: $seq_got"
-
-echo "step 3: restore swaps the healthy recording back on the same port"
-"$chaos_script" --restore --work-dir "$tmp/flaky-serve" \
-  >"$tmp/restore.out" 2>&1 || {
-    cat "$tmp/restore.out" >&2
-    die "--restore failed"
-  }
-for i in 1 2 3; do
-  [[ "$(proxy_curl "$flaky_port" /v1/categories)" == "200" ]] \
-    || die "restored mock still serving faults"
-done
-echo "  healthy 200s after restore"
-ql_sweep_port "$flaky_port"
-
-echo "step 4: slow injects at least the configured per-endpoint latency"
-slow_port="$(ql_pick_port)"
-slow_health="$(ql_pick_port)"
-ports+=("$slow_port" "$slow_health")
-rm -rf "$tmp/slow-serve"
-"$chaos_script" --in "$recording" --scenario slow --target '^/v1/categories' \
-  --latency 500ms --work-dir "$tmp/slow-serve" --serve \
-  --proxy-out-port "$slow_port" --health-port "$slow_health" \
-  >"$tmp/slow-serve.out" 2>&1 || {
-    cat "$tmp/slow-serve.out" >&2
-    die "slow --serve failed"
-  }
-t="$(curl -s -o /dev/null -m 10 -w '%{time_total}' \
-  -x "http://127.0.0.1:${slow_port}" "${downstream}/v1/categories")"
-python3 - "$t" <<'PY'
-import sys
-t = float(sys.argv[1])
-assert t >= 0.5, f"observed latency {t}s < configured 0.5s"
-print(f"  target endpoint took {t:.3f}s (>= 0.500s configured)")
-PY
-ql_sweep_port "$slow_port"
-
-echo "step 5: bogus --target exits 2"
-rc=0
-"$chaos_script" --in "$recording" --scenario down \
-  --target '^/no/such/endpoint' --work-dir "$tmp/bogus" \
-  >"$tmp/bogus.out" 2>&1 || rc=$?
-[[ "$rc" -eq 2 ]] || { cat "$tmp/bogus.out" >&2; die "expected exit 2, got $rc"; }
-grep -q 'matched no outbound' "$tmp/bogus.out" || die "exit 2 without the target-not-found message"
-echo "  exit 2 with the outbound endpoint list"
-
-echo "step 6: a broken edit fails validation with exit 3"
-rc=0
-CHAOS_FORCE_BAD_EDIT=1 "$chaos_script" --in "$recording" --scenario down \
-  --target '^/v1/projects' --work-dir "$tmp/broken" \
-  >"$tmp/broken.out" 2>&1 || rc=$?
-[[ "$rc" -eq 3 ]] || { cat "$tmp/broken.out" >&2; die "expected exit 3, got $rc"; }
-grep -q 'will not load' "$tmp/broken.out" || die "exit 3 without the validation message"
-grep -q 'failed to parse response line' "$tmp/broken/validate.log" \
-  || die "validate.log does not show the documented parse failure"
-python3 - "$tmp/broken/manifest.json" <<'PY'
-import json, sys
-m = json.load(open(sys.argv[1]))
-assert m["validation"] and m["validation"]["loaded"] is False
-print("  exit 3, manifest records validation.loaded=false, parse error in log")
-PY
-
-echo "PASS: all scenarios validated, flaky ratio exact, slow latency observed, restore clean, exits 2/3 proven"
+echo "PASS: native faults observed (status, header, exact ratio, latency, chaos header), restore clean, exits 2 and 5 proven"

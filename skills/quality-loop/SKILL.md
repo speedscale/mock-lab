@@ -50,13 +50,14 @@ Route-specific notes an agent should apply while routing:
 - **perf**: the answer carries an honesty gate. On a shared host the load
   generator saturates before an efficient app does, so results are lower
   bounds and harness-bound levels are refused, not reported as app limits.
-- **chaos**: five scenarios (slow, down, ratelimit, garbage, flaky), with
-  flaky ratios exact and deterministic via duplicate-signature round-robin.
-  What to look for in the app under test: status swallowing (200 while the
-  downstream 503s), header stripping (`Retry-After` never reaches clients),
-  garbage passthrough (downstream junk proxied as 200), no timeout budget
-  (hangs on a slow downstream), no retry (client-visible failure rate equals
-  the injected ratio).
+- **chaos**: six scenarios (down, ratelimit, garbage, slow, connection,
+  flaky) built from native `mock --fault` flags, with ratios exact and
+  deterministic via `rate=F/N`. What to look for in the app under test:
+  status swallowing (200 while the downstream 503s), header stripping
+  (`Retry-After` never reaches clients), garbage passthrough (downstream junk
+  proxied as 200), no timeout budget (hangs on a slow downstream), no retry
+  (client-visible failure rate equals the injected ratio), and truncated
+  bodies accepted as 200 under `connection=drop`.
 
 Tie-breakers between neighboring rows:
 
@@ -123,12 +124,20 @@ because every flow eventually hits them.
   tokens/order ids, and their `Content-Length` side effects differ between
   any two runs. Allowlist them before judging diffs, and gate
   baseline-relative so they never count as regressions.
-- **One malformed RRPair kills the whole mock directory**: the mock
-  fail-closes at load ("failed to parse response line"), serving nothing.
-  Edit copies, validate with a dry start (the chaos skill automates this).
-- **No hot reload**: mock data loads once at startup. Restoring files
-  mid-session changes nothing; between chaos phases stop the mock, swap the
-  variant, restart.
+- **A malformed RRPair is skipped, silently**: the rest of the directory
+  still serves, but the warning only appears at `-v -v`, so a bad edit
+  degrades to a mysteriously missing endpoint rather than a loud failure.
+- **Mock DATA hot-reloads, FLAGS do not**: `--mock-reload-interval 1s` picks
+  up an RRPair edit in about a second, but `--fault` and the other mock
+  flags are read once at startup, so changing the fault set means a restart.
+  Restarting a mock that WRAPS the app restarts the app too; run recovery
+  scenarios un-wrapped.
+- **A fault regexp that matches nothing is a silent no-op**: the pattern is
+  matched against the bare path and host+path only, with no scheme, port, or
+  method, so a plausible full-URL pattern starts cleanly and does nothing.
+- **`connection=` faults are silently ignored on HTTP/2**: no warning at any
+  verbosity, the app gets a clean 200. The chaos skill refuses the
+  combination rather than let it look like resilience.
 - **Teardown is SIGTERM plus surviving children**: a wrapped app can
   outlive the proxymock process that launched it. After stopping a session,
   kill leftover listeners on your ports (scoped to your own ports).
@@ -218,8 +227,8 @@ scripts also source shared helpers from `skills/lib/common.sh` (resolved as
   an incident capture, reproduce-then-verify.
 - **proxymock-perf-container**: the `perf` route; VU ladder, knee, budget
   gate, CPU-attribution honesty gate.
-- **proxymock-chaos-mock**: the `chaos` route; fault-injected mock variants
-  with deterministic flaky ratios.
+- **proxymock-chaos-mock**: the `chaos` route; native `mock --fault`
+  injection with deterministic `rate=F/N` ratios.
 - **proxymock-contract-test**: the `contract` route; spec-vs-traffic
   conformance and mock-from-spec.
 - **proxymock-compare-results**: the `compare` route; deep report and drift

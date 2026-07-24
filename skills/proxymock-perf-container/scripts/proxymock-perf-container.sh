@@ -36,7 +36,7 @@ Options:
                        detected knee (must be a ladder member)
   --no-performance     Disable the default high-throughput replay mode. By
                        default every load run passes --performance to the
-                       load-test script (proxymock replay --performance): match
+                       load-test script (proxymock replay --load-test): match
                        scoring is skipped, so rps/p99 describe pure load with
                        no scoring overhead on the generator, and matchPct is
                        reported as null / "not scored". This skill never gates
@@ -634,8 +634,8 @@ print("ladder     :")
 for r in levels:
     lat = r["latencyMs"]
     cpu = r["cpu"]
-    # matchPct is null when the load run used --performance (match scoring
-    # skipped); print "not scored" rather than a fake percentage
+    # matchPct is null when the load run used --performance / replay
+    # --load-test (match scoring skipped); print "not scored", not a fake pct
     match_s = (f"{r['matchPct']:.1f}%"
                if isinstance(r["matchPct"], (int, float)) else "not scored")
     line = (f"  VU {r['vus']:<4}: {fnum(r['rps'])} rps  "

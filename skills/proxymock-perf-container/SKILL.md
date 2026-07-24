@@ -18,12 +18,15 @@ one place.
 The core of the skill is an honesty gate. The load generator and the app
 usually share a host, and on that setup the generator saturates the host well
 before an efficient app does, with zero failed requests the whole way; the
-replay output contains no field attributing the ceiling. Measured externally
-at the ceiling, the generator burned roughly 10x the app's CPU with host idle
-at 1-2%, so a naive report calls host saturation an app limit. This skill
-samples CPU for the generator, the app, and the host during every run and
-refuses to make app-limit claims from harness-bound levels. Empirically
-verified.
+replay output contains no field attributing the ceiling. Native saturation
+attribution is still not available as of proxymock v2.5.805 — replay reports
+only latency and request metrics, with no generator CPU, host idle, or
+harness-bound signal in any output surface — so this skill measures it
+externally. Measured that way at the ceiling, the generator burned roughly
+10x the app's CPU with host idle at 1-2%, so a naive report calls host
+saturation an app limit. This skill samples CPU for the generator, the app,
+and the host during every run and refuses to make app-limit claims from
+harness-bound levels. Empirically verified.
 
 This workflow uses local files and the `proxymock` CLI. It does not require
 Speedscale Cloud access.
@@ -52,14 +55,15 @@ Speedscale Cloud access.
   skill is not in its default location.
 - `--proxymock`: proxymock binary, forwarded to the load-test script.
 - `--no-performance`: disable the default high-throughput replay mode. By
-  default every load run passes the load-test script's `--performance` flag
-  (proxymock's own `--performance` replay flag), which skips per-response
-  match scoring on the generator. This skill never gates on match rate, so
-  the default only makes the numbers more honest: the reported rps and p99
-  are pure load figures, with no scoring overhead riding on the generator's
-  back (profiling on an 18-core M-series host measured +67% throughput and
-  p99 52 to 28 ms for `--performance` replay plus `mock --no-out` versus
-  defaults). The cost is
+  default every load run passes the load-test script's `--performance` flag,
+  which as of proxymock v2.5.805 forwards `proxymock replay --load-test` (the
+  flag was renamed; `--performance` still works upstream but prints a
+  deprecation notice). It skips per-response match scoring on the generator.
+  This skill never gates on match rate, so the default only makes the numbers
+  more honest: the reported rps and p99 are pure load figures, with no
+  scoring overhead riding on the generator's back (profiling on an 18-core
+  M-series host measured +67% throughput and p99 52 to 28 ms for
+  high-throughput replay plus `mock --no-out` versus defaults). The cost is
   that `matchPct` is not scored and shows as `not scored` in the ladder;
   opt out if you want match rates in the report.
 
@@ -173,8 +177,9 @@ Exit codes:
   regressions. The summary flags this, and the skill gates only on rps and
   p99 by design.
 - **`match=not scored` in the ladder**: the default high-throughput mode
-  skips match scoring (see `--no-performance`), so no match rate exists to
-  report and `matchPct` is null in `summary.json`. This is expected, not a
+  skips match scoring (`replay --load-test` omits
+  `requests.result-match-pct` outright; see `--no-performance`), so no match
+  rate exists to report and `matchPct` is null in `summary.json`. This is expected, not a
   data problem. With `--no-performance`, `matchPct` below 100 with `failed`
   0 means succeeded-but-unmatched responses (rotating tokens, moving IDs);
   reported for context but never gated here; correctness gating over the
@@ -187,7 +192,13 @@ Exit codes:
 - **proxymock-load-test**: the engine this skill drives, one run per ladder
   level. Use it directly for a single flat-load run with `--fail-if` SLO
   gates; use this skill for knee finding, repeat sampling, and CPU
-  attribution on top of it.
+  attribution on top of it. It also exposes proxymock's `--sessions`
+  (recorded actors replayed in order at recorded think-time) and `--stage`
+  (multi-leg ramps) shapes. This skill deliberately does not use them: the VU
+  ladder needs a flat, comparable level per rung, which is exactly what
+  `--vus` gives and what a ramp or a think-time-paced session does not. Reach
+  for those shapes in proxymock-load-test when you want realism or a ramp
+  profile rather than a capacity ceiling.
 - **proxymock-regression-test**: the correctness gate over the same
   recording; run it before trusting perf numbers from a build that may have
   behavior regressions.

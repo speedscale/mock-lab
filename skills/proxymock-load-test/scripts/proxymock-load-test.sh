@@ -18,12 +18,25 @@ Options:
   --vus N              Parallel virtual users (default: 4)
   --for DURATION       Run for a Go duration (e.g. 30s, 2m). Loops the traffic.
   --times N            Replay the whole set N times (default: 1 if --for unset)
+  --sessions N         Replay N recorded sessions concurrently instead of
+                       virtual users: each slot replays one recorded actor's
+                       requests in order at recorded think-time. Overrides
+                       --vus. Combinable with --for / --times.
+  --stage SPEC         One leg of a load ramp, repeatable, run in order.
+                       SPEC is comma-separated key=value:
+                         vus=N | sessions=N   target for the stage
+                         for=D                hold the stage for D
+                         ramp=D               climb to the target over the
+                                              first D of 'for' (min 5s)
+                       Not combinable with --vus / --sessions / --for /
+                       --times. Example:
+                         --stage vus=5,for=30s --stage vus=50,for=2m,ramp=1m
   --fail-if COND       Fail (exit 1) when COND is true; repeatable. Examples:
                          --fail-if 'latency.p99>100'
                          --fail-if 'requests.result-match-pct<95'
                          --fail-if 'requests.failed!=0'
   --performance        High-throughput mode: passes 'proxymock replay
-                       --performance' so match scoring is skipped and matchPct
+                       --load-test' so match scoring is skipped and matchPct
                        is not reported. Off by default. Start the mock side
                        with 'proxymock mock --no-out' for a pure-load run.
   --work-dir DIR       Where to write summary.json and result.json
@@ -31,7 +44,7 @@ Options:
   -h, --help           Show this help
 
 Notes:
-  - If neither --for nor --times is given, the default is --for 10s.
+  - If neither --for, --times nor --stage is given, the default is --for 10s.
   - Latency values are milliseconds.
 
 Examples:
@@ -39,6 +52,11 @@ Examples:
     --test-against http://localhost:8080 --vus 8 --for 30s
   proxymock-load-test.sh --in ./proxymock --test-against http://localhost:8080 \
     --vus 4 --times 20 --fail-if 'latency.p99>150' --fail-if 'requests.failed!=0'
+  proxymock-load-test.sh --in ./proxymock/recording/localhost \
+    --test-against http://localhost:8080 --sessions 20 --for 2m
+  proxymock-load-test.sh --in ./proxymock/recording/localhost \
+    --test-against http://localhost:8080 \
+    --stage vus=5,for=30s --stage vus=50,for=2m,ramp=1m
 USAGE
 }
 
@@ -66,8 +84,11 @@ abs_path() {
 in_dir=""
 target=""
 vus="4"
+vus_set="0"
 for_dur=""
 times=""
+sessions=""
+stages=()
 work_dir=""
 proxymock_bin="${PROXYMOCK:-proxymock}"
 performance="0"
@@ -77,9 +98,11 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --in) [[ $# -ge 2 ]] || die "--in requires a value"; in_dir="$2"; shift 2 ;;
     --test-against) [[ $# -ge 2 ]] || die "--test-against requires a value"; target="$2"; shift 2 ;;
-    --vus) [[ $# -ge 2 ]] || die "--vus requires a value"; vus="$2"; shift 2 ;;
+    --vus) [[ $# -ge 2 ]] || die "--vus requires a value"; vus="$2"; vus_set="1"; shift 2 ;;
     --for) [[ $# -ge 2 ]] || die "--for requires a value"; for_dur="$2"; shift 2 ;;
     --times) [[ $# -ge 2 ]] || die "--times requires a value"; times="$2"; shift 2 ;;
+    --sessions) [[ $# -ge 2 ]] || die "--sessions requires a value"; sessions="$2"; shift 2 ;;
+    --stage) [[ $# -ge 2 ]] || die "--stage requires a value"; stages+=("$2"); shift 2 ;;
     --fail-if) [[ $# -ge 2 ]] || die "--fail-if requires a value"; fail_if+=("$2"); shift 2 ;;
     --work-dir) [[ $# -ge 2 ]] || die "--work-dir requires a value"; work_dir="$2"; shift 2 ;;
     --proxymock) [[ $# -ge 2 ]] || die "--proxymock requires a value"; proxymock_bin="$2"; shift 2 ;;
@@ -100,8 +123,20 @@ else
   command -v "$proxymock_bin" >/dev/null 2>&1 || die "proxymock not found on PATH"
 fi
 
-# Default to a short duration-based load if the caller picked neither knob.
-if [[ -z "$for_dur" && -z "$times" ]]; then
+# reject 0 explicitly: upstream treats --sessions 0 as "session replay off" and
+# silently falls back to its own VU default, which is not this script's default
+[[ -z "$sessions" || "$sessions" =~ ^[1-9][0-9]*$ ]] || die "--sessions must be a positive integer: $sessions"
+
+# proxymock rejects --stage alongside --vus/--sessions/--for/--times, so catch
+# the combination here with a message naming our flags rather than letting the
+# replay fail after the mock side is already under load.
+if [[ ${#stages[@]} -gt 0 ]]; then
+  [[ "$vus_set" == "0" ]] || die "--stage carries its own vus= per leg; drop --vus"
+  [[ -z "$sessions" ]] || die "--stage carries its own sessions= per leg; drop --sessions"
+  [[ -z "$for_dur" ]] || die "--stage carries its own for= per leg; drop --for"
+  [[ -z "$times" ]] || die "--stage sets the load shape; drop --times"
+elif [[ -z "$for_dur" && -z "$times" ]]; then
+  # Default to a short duration-based load if the caller picked no shape knob.
   for_dur="10s"
 fi
 
@@ -123,12 +158,23 @@ if [[ "$performance" == "1" ]]; then
   done
 fi
 
-replay_args=(replay --in "$in_dir" --test-against "$target" --vus "$vus" --output json --no-out)
+replay_args=(replay --in "$in_dir" --test-against "$target" --output json --no-out)
+if [[ ${#stages[@]} -gt 0 ]]; then
+  # --stage is self-contained: it carries the VU/session target and duration of
+  # every leg, and proxymock refuses it next to --vus/--sessions/--for/--times
+  for stage in "${stages[@]}"; do
+    replay_args+=(--stage "$stage")
+  done
+elif [[ -n "$sessions" ]]; then
+  # --sessions overrides --vus upstream; pass only one so the intent is explicit
+  replay_args+=(--sessions "$sessions")
+else
+  replay_args+=(--vus "$vus")
+fi
 if [[ "$performance" == "1" ]]; then
-  # released proxymock calls this flag --performance; newer builds rename it
-  # --load-test but keep --performance as a deprecated alias, so passing
-  # --performance works on both (a deprecation notice may land in replay.log)
-  replay_args+=(--performance)
+  # proxymock renamed this flag --load-test in v2.5.805; --performance still
+  # works but prints a deprecation notice on every run
+  replay_args+=(--load-test)
 fi
 if [[ -n "$for_dur" ]]; then
   replay_args+=(--for "$for_dur")
@@ -144,7 +190,14 @@ perf_note=""
 if [[ "$performance" == "1" ]]; then
   perf_note=" [--performance: match scoring off]"
 fi
-echo "load test: vus=${vus} ${for_dur:+for=${for_dur} }${times:+times=${times} }-> ${target}${perf_note}"
+if [[ ${#stages[@]} -gt 0 ]]; then
+  shape="stages=$(IFS='|'; echo "${stages[*]}")"
+elif [[ -n "$sessions" ]]; then
+  shape="sessions=${sessions}"
+else
+  shape="vus=${vus}"
+fi
+echo "load test: ${shape} ${for_dur:+for=${for_dur} }${times:+times=${times} }-> ${target}${perf_note}"
 replay_rc=0
 "$proxymock_bin" "${replay_args[@]}" >"$result_json" 2>"$work_dir/replay.log" || replay_rc=$?
 
@@ -197,11 +250,12 @@ summary = {
     "resultJson": sys.argv[1],
 }
 
-# In --performance mode match scoring is skipped; whatever the metric key
-# holds (older binaries report a meaningless 100), the honest value is null.
+# --load-test omits requests.result-match-pct entirely because responses are
+# not scored, so .get() already yields None; null it explicitly anyway to stay
+# honest against any build that reports a meaningless 100 for the key.
 if performance:
     summary["matchPct"] = None
-    summary["matchPctNote"] = "n/a (--performance skips match scoring)"
+    summary["matchPctNote"] = "n/a (--load-test skips match scoring)"
     for e in summary["perEndpoint"]:
         e["matchPct"] = None
 

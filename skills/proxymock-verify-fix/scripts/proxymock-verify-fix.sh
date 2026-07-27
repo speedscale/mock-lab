@@ -23,10 +23,13 @@ status change still completes the HTTP exchange, so the fix appears only in
 the per-RRPair verdict. The partition and its exit codes come from replay
 --verify-fix, read back from <out>/replay-verdict.json.
 
-That verdict is STATUS-ONLY (measured on v2.5.805: a body-only collateral
-regression alongside a real fix still scores "fix-confirmed" and exits 0). It
-is necessary but NOT sufficient: diff bodies with the proxymock MCP tool
-response_diff, against the noise allowlist, before accepting the fix.
+That verdict scores response BODIES as well as status codes (v2.5.812 and
+later), so a body-only collateral regression alongside a real fix is caught as
+collateral instead of passing as "fix-confirmed"; each pair carries bodyMatch
+and bodyChanges. No separate body-diff step is needed. Caveat: with --baseline,
+masking is per-PAIR, so "known-mismatch" means the pair also failed against the
+buggy build, not that it fails the same way; the script prints an advisory when
+a masked pair's failure differs from the baseline's.
 
 Required:
   --in DIR              Incident recording directory (RRPair files captured
@@ -195,8 +198,11 @@ run_replay() {
   ql_run_replay "$proxymock_bin" "$in_dir" "$target" "$out" "$result" "$log" 4 \
     --verify-fix "$@"
   ql_echo_replay_verdict_lines "$log"
-  # The console blueprint line lies (see ql_smart_replace_file_count); only
-  # smart_replace events in the replay output prove a blueprint applied.
+  # baseline masking is per-pair: flag pairs whose failure changed while staying
+  # classified known-mismatch (advisory, never a gate)
+  ql_advise_masked_different "$out/replay-verdict.json" "$baseline_dir"
+  # smart_replace events in the replay output are the direct evidence a
+  # blueprint ran; "Loaded blueprint ..." only reports loading (see common.sh).
   if [[ "$bp_count" -gt 0 ]]; then
     local sr_files
     sr_files="$(ql_smart_replace_file_count "$out")"
@@ -246,11 +252,15 @@ for run_dir in run_dirs:
     reproduced = [p for p in pairs if p.get("classification") == "bug-reproduced"]
     fixed = [p for p in pairs if p.get("classification") == "fix-confirmed"]
     other = [p for p in pairs
-             if p.get("match") != "pass"
+             if (p.get("match") != "pass" or p.get("bodyMatch", "pass") != "pass")
              and p.get("classification") not in ("bug-reproduced", "fix-confirmed")]
     incident_counts.append(len(reproduced) + len(fixed))
-    # stability is judged on the whole scored set, not just the incident pairs
-    outcome_maps.append({p.get("refUuid"): (p.get("match"), p.get("classification"))
+    # stability is judged on the whole scored set, not just the incident pairs,
+    # and on the body verdict as well as the status one. The bodyChanges
+    # THEMSELVES are deliberately not compared: a rotating id changes every run
+    # and would make every recording look non-deterministic.
+    outcome_maps.append({p.get("refUuid"): (p.get("match"), p.get("bodyMatch"),
+                                            p.get("classification"))
                          for p in pairs})
     runs.append({
         "replayDir": run_dir,
@@ -326,6 +336,8 @@ def rows(classification):
         "uri": p.get("endpoint"),
         "recordedStatus": p.get("recordedStatus"),
         "observedStatus": p.get("observedStatus"),
+        "bodyMatch": p.get("bodyMatch"),
+        "bodyChanges": p.get("bodyChanges") or [],
         "sourceFile": p.get("sourceFile"),
         "replayFile": p.get("replayFile"),
     } for p in pairs if p.get("classification") == classification]
@@ -384,16 +396,17 @@ for r in collateral_known:
     print(f"  known noise: {r['method']} {r['uri']} "
           f"recorded {r['recordedStatus']} -> observed {r['observedStatus']}"
           " (also failed in baseline)")
+for r in collateral_new:
+    for c in r.get("bodyChanges") or []:
+        print(f"  BODY {c.get('severity')}: {c.get('endpoint')} {c.get('location')}"
+              f" {c.get('baseline')!r} -> {c.get('candidate')!r}")
 if verdict_name == "fixed":
     print("fix confirmed: incident endpoints no longer return the recorded error")
 elif verdict_name == "not-fixed":
     print("bug reproduces; fix not present (incident endpoints still return "
           "the recorded error)")
 else:
-    print("collateral regression: a recorded-success pair changed behavior")
-print("STATUS-LEVEL GATING ONLY: a body-only regression scores 'fix-confirmed'")
-print("here. Body-level diffing with the MCP tool response_diff (against the")
-print("noise allowlist) is REQUIRED before accepting the fix.")
+    print("collateral regression: a recorded-success pair changed status or body")
 print(f"replay dir   : {replay_out}")
 print(f"verdict json : {replay_out}/replay-verdict.json")
 print(f"summary      : {summary_json}")

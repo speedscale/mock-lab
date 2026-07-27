@@ -7,6 +7,7 @@
 #   b) verify vs a fixed stub (recorded statuses everywhere)   -> exit 0
 #   c) verify vs the buggy stub (all pairs match)              -> exit 2
 #   d) verify vs a stub with a second, unrelated discrepancy   -> exit 3
+#   e) verify vs a stub whose collateral is BODY-only          -> exit 3
 set -euo pipefail
 
 # shared ql_* helpers; a copied skill needs skills/lib/common.sh too
@@ -75,54 +76,32 @@ PY
 incident="$tmp/incident/recording"
 
 # --- stub targets ------------------------------------------------------------
-# Each stub returns the recorded status for every endpoint so all HTTP
-# exchanges complete (requests.failed stays 0) and only the match tags carry
-# the signal. STATS_STATUS and CATEGORIES_STATUS parameterize the scenario.
-cat >"$tmp/stub.py" <<'PYEOF'
-import sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
+# Every stub answers with the incident recording's own status AND body for each
+# pair (see ql_write_recording_stub), so all HTTP exchanges complete
+# (requests.failed stays 0) and the only differences are the seeded ones. The
+# buggy stub needs no override: the incident recording already carries the 500.
+ql_write_recording_stub "$tmp/stub.py"
 
-port, stats_status, categories_status = (int(a) for a in sys.argv[1:4])
-
-class Handler(BaseHTTPRequestHandler):
-    def respond(self):
-        status = 200
-        if self.path.startswith("/api/stats"):
-            status = stats_status
-        elif self.path.startswith("/api/categories"):
-            status = categories_status
-        elif self.command == "POST" and self.path == "/api/orders":
-            status = 201  # recorded status
-        body = b"{}"
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    do_GET = respond
-    do_POST = respond
-
-    def log_message(self, *args):
-        pass
-
-HTTPServer(("127.0.0.1", port), Handler).serve_forever()
-PYEOF
-
-buggy_port="$(ql_pick_port)"       # stats 500: the bug, matching the incident recording
+buggy_port="$(ql_pick_port)"       # stats 500 as recorded: the bug still present
 fixed_port="$(ql_pick_port)"       # stats 200: the fix
 collateral_port="$(ql_pick_port)"  # stats 200 but categories 404: fix plus collateral
-ports=("$buggy_port" "$fixed_port" "$collateral_port")
+bodycol_port="$(ql_pick_port)"     # stats 200 and a categories BODY change only
+ports=("$buggy_port" "$fixed_port" "$collateral_port" "$bodycol_port")
 
-python3 "$tmp/stub.py" "$buggy_port" 500 200 &
+python3 "$tmp/stub.py" "$buggy_port" "$incident" &
 pids+=("$!")
-python3 "$tmp/stub.py" "$fixed_port" 200 200 &
+python3 "$tmp/stub.py" "$fixed_port" "$incident" \
+  '{"/api/stats": {"status": 200}}' &
 pids+=("$!")
-python3 "$tmp/stub.py" "$collateral_port" 200 404 &
+python3 "$tmp/stub.py" "$collateral_port" "$incident" \
+  '{"/api/stats": {"status": 200}, "/api/categories": {"status": 404}}' &
 pids+=("$!")
-ql_wait_url "http://127.0.0.1:${buggy_port}/" || die "buggy stub did not start"
-ql_wait_url "http://127.0.0.1:${fixed_port}/" || die "fixed stub did not start"
-ql_wait_url "http://127.0.0.1:${collateral_port}/" || die "collateral stub did not start"
+python3 "$tmp/stub.py" "$bodycol_port" "$incident" \
+  '{"/api/stats": {"status": 200}, "/api/categories": {"replace": ["Database", "Datastore"]}}' &
+pids+=("$!")
+for p in "$buggy_port" "$fixed_port" "$collateral_port" "$bodycol_port"; do
+  ql_wait_url "http://127.0.0.1:${p}/" || die "recorded-body stub on $p did not start"
+done
 
 # --- case a: --reproduce against the buggy build (expect exit 0) -------------
 echo "case a: --reproduce vs buggy stub (incident reproduces deterministically)"
@@ -198,4 +177,34 @@ assert any((r["uri"] or "").startswith("/api/stats") for r in s["fixed"]), s["fi
 print("PASS: collateral on /api/categories caught, fix signal still reported")
 PY
 
-echo "PASS: reproduce deterministic (0), fix confirmed (0), bug-still-present (2), collateral (3)"
+# --- case e: collateral that is BODY-only (expect exit 3) --------------------
+# /api/categories keeps its recorded 200 and changes one field. Before native
+# body scoring this run reported 'fix-confirmed' and exited 0.
+echo "case e: verify vs body-collateral stub (categories 200 but a changed field)"
+rc=0
+"$verify_script" \
+  --in "$incident" \
+  --test-against "http://127.0.0.1:${bodycol_port}" \
+  --work-dir "$tmp/bodycollateral" >"$tmp/bodycollateral.out" 2>&1 || rc=$?
+cat "$tmp/bodycollateral.out"
+[[ "$rc" -eq 3 ]] || die "case e: expected exit 3 (body-only collateral), got $rc"
+python3 - "$tmp/bodycollateral/summary.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+assert s["verdict"] == "collateral", s["verdict"]
+cats = [r for r in s["collateral"]["new"]
+        if (r["uri"] or "").startswith("/api/categories")]
+assert cats, s["collateral"]["new"]
+r = cats[0]
+assert r["recordedStatus"] == r["observedStatus"], r
+assert r["bodyMatch"] == "fail", r
+changed = [c for c in r["bodyChanges"]
+           if c.get("kind") == "value_changed" and c.get("candidate") == "Datastore"]
+assert changed, r["bodyChanges"]
+# the fix signal survives alongside the body-only collateral
+assert any((f["uri"] or "").startswith("/api/stats") for f in s["fixed"]), s["fixed"]
+assert s["requestsFailed"] == 0, s["requestsFailed"]
+print("PASS: body-only collateral caught with the status unchanged, fix still reported")
+PY
+
+echo "PASS: reproduce deterministic (0), fix confirmed (0), bug-still-present (2), status collateral (3), body-only collateral (3)"

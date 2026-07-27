@@ -1,6 +1,6 @@
 ---
 name: proxymock-regression-test
-description: Replay a recorded proxymock session against a target and gate on per-RRPair result-match tags and budget flips rather than transport failures, catching status-code and behavior regressions that a clean requests.failed hides. Use when users ask to regression-test a service against recorded traffic, verify a code change did not break replay behavior, or gate CI on a proxymock replay.
+description: Replay a recorded proxymock session against a target and gate on the per-RRPair replay verdict (response status AND body) plus budget flips rather than transport failures, catching status-code, field-level and behavior regressions that a clean requests.failed hides. Use when users ask to regression-test a service against recorded traffic, verify a code change did not break replay behavior, or gate CI on a proxymock replay.
 argument-hint: --in <recording-dir> --test-against <url> [--baseline <replay-dir>] [--fail-on-regression]
 ---
 
@@ -11,17 +11,48 @@ Turn a recording into a regression gate. `proxymock replay --baseline
 target and gates on new mismatches natively (exit 3); this skill wraps that
 with the preconditions it does not check and adds the budget-flip gate.
 `requests.failed` is not the gate: a status-code regression (a 201 that becomes
-a 200) still completes the HTTP exchange, so `requests.failed` stays 0 while
-the pair is scored a mismatch. Empirically verified.
+a 200), or a changed field behind an unchanged 200, still completes the HTTP
+exchange, so `requests.failed` stays 0 while the pair is scored a mismatch.
+Empirically verified.
 
-## The native verdict is STATUS-ONLY: the body diff is mandatory
+## The verdict scores bodies too (native, default)
 
-`replay-verdict.json` scores status codes and nothing else. Measured on
-v2.5.805: an endpoint whose response body changed (`/api/stats` total 24 -> 25)
-with an unchanged 200 scores verdict `pass`, `mismatches: 0`, exit 0. A green
-run from this skill is **necessary but not sufficient**. Do not call a build
-clean until the body-level diff below has also run against the noise
-allowlist. The script prints this reminder on every run.
+`replay-verdict.json` scores response bodies alongside status codes. Measured
+on v2.5.812: `/api/stats` returning `total: 25` where the recording says `24`,
+with an unchanged 200, scores `match: pass` but `bodyMatch: fail` with
+`{severity: regression, kind: value_changed, location:
+http.res.bodyBase64.total, baseline: "24", candidate: "25"}` and trips the gate
+(exit 3, verdict `new-mismatch`). `kind` is one of `value_changed`,
+`field_added`, `field_removed`; the summary adds `bodyMismatches`. To score
+status only, replay takes `--ignore-body-changes` (this skill does not).
+
+Two measured caveats decide how you use it:
+
+**Baseline masking is per-pair, so a known-mismatch can be hiding a different
+failure.** `known-mismatch` / `newMismatch: false` means "this pair also failed
+in the baseline", not "this pair fails the same way it did". Measured on
+v2.5.812, the common shape changes ARE caught: an already-401 pair that starts
+returning 500 scores `newMismatch: true`, and so does a pair that picks up a
+body change at a location the baseline did not fail at. What is not counted is a
+delta the volatile heuristic owns -- and that heuristic is not stable: the same
+`order_id` value change was scored a `value_changed` regression in one run and
+suppressed entirely in another. So do not read `known-mismatch` as "nothing
+changed here". The script compares each masked pair's current `observedStatus`
+and `bodyChanges` against the baseline verdict's and prints `ADVISORY: masked
+but different` when they diverge; it does not fail the build, so read those
+lines.
+
+**Volatile suppression is a heuristic, and it is undocumented.** It decides
+which churn is noise, by field rather than by value. Measured on v2.5.812
+against the committed recording: `Date` headers, bare 64-hex tokens, the
+`order_id` field (suppressed whatever the replacement value looks like -- hex,
+non-hex, shorter, even renaming the field) and the ISO-8601 `created` timestamp
+are all suppressed, while `status`, `project`, `total` and `expires_in` changes
+on the same pairs are scored. Round 2 of experiment 08 measured the opposite
+for a live `order-<16hex>`, so do not assume any particular rotating value is
+covered. Treat a raw `bodyMismatches: 0` as luck: establish a `--baseline` and
+gate on NEW mismatches, which is what keeps the gate green on a recording whose
+app mints fresh values every run.
 
 This workflow uses local files and the `proxymock` CLI. It does not require
 Speedscale Cloud access.
@@ -68,10 +99,13 @@ scripts source shared helpers from `skills/lib/common.sh` (resolved as
   dir is missing or empty the script warns loudly: auth and moving-ID
   endpoints will be unreplayable (401s), and a regression on their success
   paths is UNDETECTABLE because they fail before and after the change.
-- **Blueprint application.** Do not trust the console line
-  `Applied N active blueprint(s)`: it reflects snapshot-scoped state, not the
-  workspace. The script verifies by grepping the replay output RRPairs for
-  `smart_replace` events and warns when a blueprint exists but none appear.
+- **Blueprint application.** Loading a blueprint is not running it, and the
+  `Loaded blueprint ...` console lines only report loading. The script verifies
+  application by grepping the replay output RRPairs for `smart_replace` events
+  and warns when a blueprint exists but none appear. It deliberately does not
+  use replay's `--require-blueprint`: measured broken on v2.5.812, where it
+  exits 1 with "loaded but none of its transform chains ran" against a
+  blueprint that demonstrably ran.
 - **Mock reminder.** When the recording contains outbound pairs, the script
   reminds you that `proxymock mock` requires an explicit `--in`; it does not
   discover the recording from cwd.
@@ -87,14 +121,17 @@ budget flips, paths) read from `replay-verdict.json`.
 
 `summary.json` keys are unchanged, with one sharpened meaning:
 `match.baselineFailures` now counts THIS run's mismatches that were already
-failing in the baseline, not the baseline's total failure count.
+failing in the baseline, not the baseline's total failure count. Two additions
+carry the body verdict: `match.bodyFailures` (the summary's `bodyMismatches`)
+and a `bodyMatch` plus `bodyChanges` on every `newFailures` entry.
 
 Exit codes:
 
 - `0`: no regression, or findings present without `--fail-on-regression`.
 - `2`: precondition failure (bad args, missing dirs, replay did not run).
-- `3`: status-level regressions: pairs mismatching now that passed in the
-  baseline. Delegated to `replay --fail-on-new-mismatch`, which exits 3 itself.
+- `3`: regressions: pairs mismatching now, on status or body, that passed in
+  the baseline. Delegated to `replay --fail-on-new-mismatch`, which exits 3
+  itself.
 - `4`: budget flips: a budget that passed in the baseline now fails, e.g.
   `reliability.match >= 99` starting to fail. Gated on flips, not raw
   regressed-finding counts, because rotating values (order ids) churn security
@@ -102,41 +139,25 @@ Exit codes:
 
 When both fire, the status-level code (3) wins.
 
-## Body-level diff (MCP step, mandatory)
-
-The native verdict catches status-code changes but tolerates body changes, so a
-field-level regression needs a response diff between the new `replayed/` dir
-and the baseline replay dir. This step is not optional: without it a build with
-a changed response body passes the gate. The CLI has no equivalent: `proxymock
-files compare` pairs files by `refUuid` reference (recording to replay only;
-two replay dirs yield "Total comparisons: 0"). Use the proxymock MCP tool
-`response_diff` instead:
-
-- Findings are classed `value_changed` / `field_added` / `field_removed` /
-  `type_change`, with regressions ranked first.
-- It detects renames as removed+added pairs, catches off-by-ones exactly, and
-  classes additive fields as `field_added` (non-breaking).
-- It also diffs `http.res.statusCode`; the tool docs understate this.
-- Allowlist the deterministic noise floor before judging: `Date` response
-  headers, rotating `access_token` / `order_id` values, and their
-  `Content-Length` side effects.
-
 ## Interpretation
 
 - **`NEW MISMATCH` line, `requests.failed` 0**: the classic silent regression;
   a status or contract change the transport layer cannot see. replay prints
-  it as `NEW MISMATCH: POST /api/orders recorded 201 -> observed 200`.
-- **Verdict `pass`, exit 0**: status-level only. Nothing has been said about
-  response bodies yet; run the `response_diff` step before believing it.
-- **Failures present but none new**: the known noise floor (moving-ID
-  endpoints without an applied blueprint). Fix the blueprint to shrink it, or
-  keep gating baseline-relative.
+  it as `NEW MISMATCH: POST /api/orders recorded 201 -> observed 200`, and
+  body-only findings as `... status 200, body total removed (was 24)`.
+- **Verdict `pass`, exit 0**: status and body both matched. This is now a real
+  clean bill of health, not a status-only one.
+- **`match: pass` with `bodyMatch: fail`**: the status is right and a field is
+  not. The script prints each `bodyChanges` entry as a `BODY <severity>` line.
+- **Failures present but none new**: the known noise floor (moving-ID endpoints
+  without an applied blueprint, and the recording's own rotating ids). Fix the
+  blueprint to shrink it, or keep gating baseline-relative.
+- **`ADVISORY: masked but different`**: a pair the gate is masking is failing
+  differently than it did in the baseline. The gate cannot see this; read the
+  pair by hand.
 - **Budget flip without match failures**: an aggregate drifted past its
   budget (match percentage, p95, 5xx count) even though no single pair
   regressed; check `report.prompt.md` for which finding moved it.
-- **mismatch on bodies that look right**: rotating values in the response;
-  candidates for the noise allowlist, confirmed with the MCP `response_diff`
-  classes above.
 
 ## Related
 
@@ -154,7 +175,12 @@ two replay dirs yield "Total comparisons: 0"). Use the proxymock MCP tool
 ```
 
 The proof starts the mock-lab Go app with its downstream mocked from the
-committed recording, establishes a baseline replay, verifies a gated rerun
-against the unchanged target passes (the noise floor does not false-positive),
-then points the same gate at a stub that turns one endpoint's 200 into a 404
-and verifies the run exits 3 with `requests.failed` still 0.
+committed recording, establishes a baseline replay, and verifies a gated rerun
+against the unchanged target passes (the noise floor does not false-positive).
+It then points the same gate at stubs that replay the recording's own statuses
+and bodies with one seeded change each: turning an endpoint's 200 into a 404
+exits 3 with `requests.failed` still 0; changing only `/api/stats` `total` from
+24 to 25 also exits 3, with the status identical to the recording and a
+`value_changed` on `total` in the summary (the case that scored `pass` before
+body scoring); and making a baseline-failing pair fail DIFFERENTLY keeps the
+gate green while printing the masked-but-different advisory.

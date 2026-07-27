@@ -20,10 +20,12 @@ Compare report. requests.failed is NOT the gate: a status-code regression
 (201 -> 200) completes the HTTP exchange cleanly and leaves requests.failed
 at 0; only the verdict catches it.
 
-The native verdict is STATUS-ONLY (measured on v2.5.805: a changed response
-body scores verdict "pass" with mismatches 0). It is necessary but NOT
-sufficient: diff bodies with the proxymock MCP tool response_diff, against
-the noise allowlist, before calling a build clean.
+replay scores response BODIES as well as status codes (v2.5.812 and later), so
+a changed field is a mismatch on its own: the verdict reports bodyMatch and
+per-pair bodyChanges, and the summary counts bodyMismatches. No separate
+body-diff step is needed. Volatile-value suppression is heuristic and
+undocumented, so it decides for you which churn is noise: pass a --baseline and
+gate on new mismatches rather than trusting a raw zero.
 
 Required:
   --in DIR              Recording directory to replay (RRPair files)
@@ -43,7 +45,7 @@ Options:
 Exit codes:
   0  no regression (or findings present without --fail-on-regression)
   2  precondition failure (bad args, missing dirs, replay did not run)
-  3  status-level regressions (with --fail-on-regression)
+  3  status or body regressions (with --fail-on-regression)
   4  budget flips (with --fail-on-regression; requires --baseline)
 
 Output files (in --work-dir):
@@ -154,15 +156,19 @@ ql_run_replay "$proxymock_bin" "$in_dir" "$target" "$replay_out" \
 replay_rc="$ql_replay_rc"
 ql_echo_replay_verdict_lines "$replay_log"
 
-# The console blueprint line lies (see ql_smart_replace_file_count); the only
-# trustworthy signal is smart_replace events in the replay output RRPairs.
+# baseline masking is per-pair: flag pairs whose failure changed while staying
+# classified known-mismatch (advisory, never a gate)
+ql_advise_masked_different "$replay_out/replay-verdict.json" "$baseline_dir"
+
+# smart_replace events in the replay output are the direct evidence a blueprint
+# ran; "Loaded blueprint ..." only reports loading (see common.sh).
 if [[ "$bp_count" -gt 0 ]]; then
   sr_files="$(ql_smart_replace_file_count "$replay_out")"
   if [[ "$sr_files" -eq 0 ]]; then
     echo "WARNING: blueprint(s) present but no smart_replace events found in the" >&2
-    echo "WARNING: replay output; the blueprint did not demonstrably apply. Do not" >&2
-    echo "WARNING: trust the 'Applied N active blueprint(s)' console line. Moving-ID" >&2
-    echo "WARNING: endpoints may 401 and mask regressions on their success paths." >&2
+    echo "WARNING: replay output; the blueprint did not demonstrably apply." >&2
+    echo "WARNING: Moving-ID endpoints may 401 and mask regressions on their" >&2
+    echo "WARNING: success paths." >&2
   else
     echo "blueprint applied: smart_replace events in $sr_files replay RRPair file(s)"
   fi
@@ -182,7 +188,7 @@ for fmt in json html prompt; do
   "$proxymock_bin" "${base_args[@]}" --format "$fmt" --out "$out" --exit-zero
 done
 
-# --- gate: native verdict + budget flips --------------------------------------
+# --- gate: native verdict (status + body) + budget flips ----------------------
 rc=0
 python3 - "$replay_out" "$baseline_dir" "$work_dir/report.json" "$result_json" \
   "$summary_json" "$fail_on_regression" "$replay_rc" <<'PY' || rc=$?
@@ -194,7 +200,8 @@ gate = gate == "1"
 replay_rc = int(replay_rc)
 
 # proxymock writes this on every non-load-test replay; it carries the recorded
-# and observed status, the baseline comparison and the gate decision per pair
+# and observed status, the body scoring (bodyMatch / bodyChanges), the baseline
+# comparison and the gate decision per pair
 verdict = json.load(open(pathlib.Path(replay_out) / "replay-verdict.json"))
 pairs = verdict.get("pairs") or []
 if not pairs:
@@ -208,11 +215,18 @@ def row(p):
         "uri": p.get("endpoint"),
         "recordedStatus": p.get("recordedStatus"),
         "observedStatus": p.get("observedStatus"),
+        "bodyMatch": p.get("bodyMatch"),
+        "bodyChanges": p.get("bodyChanges") or [],
         "sourceFile": p.get("sourceFile"),
         "replayFile": p.get("replayFile"),
     }
 
-fails = [p for p in pairs if p.get("match") != "pass"]
+# a pair fails when its status OR its body changed; bodyMatch is absent on
+# pairs with no body to score, so a missing value is not a failure
+def failed(p):
+    return p.get("match") != "pass" or p.get("bodyMatch", "pass") != "pass"
+
+fails = [p for p in pairs if failed(p)]
 if baseline_dir:
     new_failures = [p for p in fails if p.get("newMismatch")]
 else:
@@ -255,6 +269,7 @@ summary = {
     "match": {
         "pairs": vsummary.get("pairs", len(pairs)),
         "failures": vsummary.get("mismatches", len(fails)),
+        "bodyFailures": vsummary.get("bodyMismatches", 0),
         "baselineFailures": vsummary.get("baselineMismatches", 0) if baseline_dir else None,
         "newFailures": [row(p) for p in new_failures],
     },
@@ -276,15 +291,21 @@ print("")
 print("=== regression verdict ===")
 print(f"requests    : {summary['requestsTotal']} total, {summary['requestsFailed']} transport-failed")
 print(f"verdict     : {verdict.get('verdict')} -- {m['pairs']} pairs, {m['failures']} mismatch"
-      + (f" ({m['baselineFailures']} baseline-known)" if baseline_dir else " (no baseline: all count)"))
+      f" ({m['bodyFailures']} with body changes)"
+      + (f", {m['baselineFailures']} baseline-known" if baseline_dir else " (no baseline: all count)"))
+for p in new_failures:
+    for c in p.get("bodyChanges") or []:
+        print(f"  BODY {c.get('severity')}: {c.get('endpoint')} {c.get('location')}"
+              f" {c.get('baseline')!r} -> {c.get('candidate')!r}")
 for f_ in flips:
     print(f"  BUDGET FLIP: {f_['metric']} {f_['op']} {f_['value']}{f_['unit'] or ''} "
           f"(baseline {f_['baselineObserved']} pass -> current {f_['currentObserved']} fail)")
 if not new_failures and not flips:
-    print("no status-level regressions detected")
-print("STATUS-LEVEL GATING ONLY: a body-only regression scores 'pass' here.")
-print("Body-level diffing with the MCP tool response_diff (against the noise")
-print("allowlist) is REQUIRED before calling this build clean.")
+    print("no status or body regressions detected")
+if not baseline_dir and m["bodyFailures"]:
+    print("NOTE: without a --baseline every scored body change counts, including")
+    print("NOTE: whatever churn the volatile heuristic does not cover. Establish")
+    print("NOTE: a baseline replay and gate against it.")
 print(f"replay dir  : {replay_out}")
 print(f"verdict json: {replay_out}/replay-verdict.json")
 print(f"summary     : {summary_json}")
@@ -293,7 +314,7 @@ sys.exit(exit_code)
 PY
 
 if [[ "$rc" -eq 3 ]]; then
-  echo "FAIL: status-level regression(s) detected" >&2
+  echo "FAIL: regression(s) detected (status or body)" >&2
 elif [[ "$rc" -eq 4 ]]; then
   echo "FAIL: budget flip(s) detected" >&2
 fi

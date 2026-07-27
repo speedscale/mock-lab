@@ -1,6 +1,6 @@
 ---
 name: proxymock-verify-fix
-description: Verify a bug fix by replaying the incident traffic capture against the fixed build, reading match failures of the form "recorded 500 -> observed 200" as the fix signal while treating any other new mismatch as collateral regression. Use when users ask to verify a bug fix with recorded traffic, prove a production incident no longer reproduces, or turn an incident capture into the fix's regression test.
+description: Verify a bug fix by replaying the incident traffic capture against the fixed build, reading match failures of the form "recorded 500 -> observed 200" as the fix signal while treating any other new mismatch, on status or response body, as collateral regression. Use when users ask to verify a bug fix with recorded traffic, prove a production incident no longer reproduces, or turn an incident capture into the fix's regression test.
 argument-hint: --in <incident-recording-dir> --test-against <url> [--expect <pattern>] [--baseline <buggy-replay-dir>] [--fail-on-collateral]
 ---
 
@@ -25,14 +25,36 @@ natively: it prints `FIX CONFIRMED` / `BUG REPRODUCED` / `COLLATERAL`, writes
 3 to match this skill's contract. The script delegates the partition and those
 exit codes to it and adds the checks replay does not make.
 
-## The native verdict is STATUS-ONLY: the body diff is mandatory
+## The verdict scores bodies too (native, default)
 
-`--verify-fix` scores status codes and nothing else. Measured on v2.5.805: a
-body-only collateral regression alongside a real fix still scores
-`fix-confirmed` with exit 0 while the regression is live in the build. A green
-run is **necessary but not sufficient**. Diff the bodies with the MCP tool
-`response_diff` (noise allowlist in proxymock-regression-test) before accepting
-the fix. The script prints this reminder on every run.
+`--verify-fix` scores response bodies alongside status codes, so a body-only
+collateral regression alongside a real fix is now caught as collateral (exit 3)
+instead of passing as `fix-confirmed`. Each pair carries `bodyMatch` and a
+`bodyChanges` list of `{severity, kind, endpoint, location, baseline,
+candidate}` entries, `kind` being `value_changed` / `field_added` /
+`field_removed`. There is no separate body-diff step to run.
+
+**Baseline masking is per-pair, so a `known-mismatch` can be hiding a different
+failure.** The classification means "this pair also failed against the buggy
+build", not "this pair fails the same way it did". Measured on v2.5.812, the
+common shape changes ARE caught (an already-401 pair that starts returning 500
+scores `newMismatch: true`, as does a body change at a location the baseline did
+not fail at), but a delta the volatile heuristic owns is not counted, and that
+heuristic is not stable run to run. This matters more here than in the
+regression twin, because the natural `--baseline` for a fix run is a replay
+against the BUGGY build, where the incident's neighbors are already failing. The
+script compares each masked pair's current `observedStatus` and `bodyChanges`
+against the baseline verdict's and prints `ADVISORY: masked but different` when
+they diverge; it does not fail the build, so read those lines.
+
+**Volatile suppression is a heuristic, and it is undocumented.** It suppresses
+by field, not by value: measured on v2.5.812, an `order_id` change is ignored
+whatever the new value looks like, and so is the ISO-8601 `created` timestamp,
+while `status` / `project` / `total` changes on the same pairs are scored. Round
+2 of experiment 08 measured the opposite for a live `order-<16hex>`. So a
+body-clean run is not guaranteed on a recording whose app mints fresh values,
+and the collateral list is only as trustworthy as the baseline you gate it
+against. See proxymock-regression-test for the full measurement.
 
 This workflow uses local files and the `proxymock` CLI. It does not require
 Speedscale Cloud access.
@@ -86,10 +108,11 @@ source shared helpers from `skills/lib/common.sh` (resolved as
   proxymock directory's `blueprints/` subdir, not from cwd and not from the
   output workspace. The script warns when that dir is missing or empty, and
   warns again when a blueprint exists but no `smart_replace` events appear in
-  the replay output (the console line `Applied N active blueprint(s)` is
-  snapshot-scoped and not trustworthy). Unapplied blueprints make moving-ID
-  endpoints fail for reasons unrelated to the fix and pollute the collateral
-  list.
+  the replay output, since loading a blueprint is not running it. Unapplied
+  blueprints make moving-ID endpoints fail for reasons unrelated to the fix and
+  pollute the collateral list. Replay's own `--require-blueprint` is not used:
+  measured broken on v2.5.812, where it exits 1 with "loaded but none of its
+  transform chains ran" against a blueprint that demonstrably ran.
 - **The incident capture's downstream gap.** An incident capture
   systematically LACKS the fixed code path's downstream traffic: the buggy
   handler usually errored BEFORE calling its dependencies, so no outbound
@@ -120,7 +143,8 @@ prints absolute paths.
 empty: the native verdict scores only pairs that were actually replayed, so an
 incident pair with no replay outcome is not reported. A nonzero
 `requests.failed` is the signal that one went missing, and the script warns on
-it.
+it. Every `fixed` / `reproduced` / `collateral` entry additionally carries
+`bodyMatch` and its `bodyChanges`.
 
 Exit codes:
 
@@ -142,28 +166,28 @@ Exit codes:
 ## Interpretation
 
 - **`FIX CONFIRMED` lines, exit 0**: each incident endpoint's mismatch is the
-  fix signal: recorded error, observed success. Save the `--reproduce` replay
-  dir and this run's `replayed/` dir; together they document before and after.
-  Status-level only: run the `response_diff` step before believing it.
+  fix signal: recorded error, observed success, and no neighbor changed its
+  status or its body. Save the `--reproduce` replay dir and this run's
+  `replayed/` dir; together they document before and after.
 - **"bug reproduces; fix not present" (exit 2)**: the replay matched the
   recording, including the errors. The fix is not in the build under test
   (wrong binary, stale deploy, or the fix does not cover the recorded case).
 - **`BUG REPRODUCED` with a different error (exit 2)**: recorded 500, observed
   404 or similar. The behavior changed but did not become a success; the bug
   morphed rather than fixed.
-- **`COLLATERAL` lines (exit 3)**: a recorded-success pair now returns
-  something different. The fix broke a neighbor; the summary still reports
-  any fix signal seen alongside. With `--baseline`, a mismatch that also
-  failed against the buggy build is classified `known-mismatch` (environment
-  noise, printed as `known noise`) and does not fail the run unless
+- **`COLLATERAL` lines (exit 3)**: a recorded-success pair now returns a
+  different status or a different body. The fix broke a neighbor; the summary
+  still reports any fix signal seen alongside, and each body finding prints as
+  a `BODY <severity>` line. With `--baseline`, a mismatch that also failed
+  against the buggy build is classified `known-mismatch` (environment noise,
+  printed as `known noise`) and does not fail the run unless
   `--fail-on-collateral` is set.
+- **`ADVISORY: masked but different`**: one of those `known noise` pairs is not
+  failing the way it failed against the buggy build. Read it by hand; the
+  classification will not.
 - **`requests.failed` above 0**: an incident pair may never have replayed.
   The verdict scores only what it replayed, so check the replay log and the
   downstream-gap warning before concluding anything about the fix.
-- **Body-level confidence (required)**: the verdict catches status changes but
-  tolerates body changes. Diff this run's `replayed/` dir against the buggy
-  baseline with the proxymock MCP `response_diff` tool (see
-  proxymock-regression-test for the noise allowlist) before accepting the fix.
 
 ## Related
 
@@ -182,11 +206,14 @@ Exit codes:
 ```
 
 The proof is hermetic (no cloud, no live downstream, no app build). It
-fabricates an incident recording by flipping one GET pair's recorded status
-to 500 in a copy of the committed recording, then drives the verify script
-through four sub-cases against local stubs: `--reproduce` against a buggy
-stub exits 0 (deterministic reproduction), verify against a fixed stub exits
-0 with the recorded-500-to-observed-200 flip reported and `requests.failed`
-still 0, verify against the buggy stub exits 2 with "bug reproduces; fix not
-present", and verify against a stub with a second unrelated discrepancy
-exits 3 with the collateral pair identified.
+fabricates an incident recording by flipping one GET pair's recorded status to
+500 in a copy of the committed recording, then drives the verify script through
+five sub-cases against local stubs that replay the recording's own statuses and
+bodies, so each seeded change is the only difference: `--reproduce` against a
+buggy stub exits 0 (deterministic reproduction), verify against a fixed stub
+exits 0 with the recorded-500-to-observed-200 flip reported and
+`requests.failed` still 0, verify against the buggy stub exits 2 with "bug
+reproduces; fix not present", verify against a stub with a second unrelated
+status discrepancy exits 3 with the collateral pair identified, and verify
+against a stub whose only collateral is a CHANGED FIELD on an unchanged 200
+also exits 3 -- the case that scored `fix-confirmed` before body scoring.

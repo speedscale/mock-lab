@@ -1,7 +1,7 @@
 ---
 name: quality-loop
 description: Route a development intent to the right native proxymock command (regression gate, incident fix verification, load, chaos resilience, contract conformance) or to the repo's analysis skills (comparison, summarization, match-rate tuning, load), and get a repo into the traffic quality loop with one recording. Includes a doctor that checks the proxymock version, recordings, blueprints, runtime proxy support, and ports. Use when users ask how to test a change with recorded traffic, which proxymock command applies to a task, to set up the quality loop in a repo, or to check whether the environment is ready.
-argument-hint: <doctor|regression|verify-fix|perf|chaos|contract|compare|summarize|tune|load> [args...]
+argument-hint: <doctor|regression|verify-fix|load|chaos|contract|compare|summarize|tune|load-test> [args...]
 ---
 
 # proxymock Quality Loop
@@ -44,18 +44,19 @@ knowing, and how to read the result. Start there, not with the script.
 | --- | --- | --- |
 | "Did my change break anything?", pre-ship check, CI gate | `regression` | **proxymock-regression-test** |
 | "Prod incident: reproduce it and prove the fix" | `verify-fix` | **proxymock-verify-fix** |
-| "What can this service sustain?", load numbers | `perf` | **proxymock-perf-container** |
+| "What can this service sustain?", load numbers | `load` | **proxymock-perf-container** |
 | "How does it behave when the downstream misbehaves?" | `chaos` | **proxymock-chaos-mock** |
 | "Does my dependency match its spec?" | `contract` | **proxymock-contract-test** |
 | "What changed between these two runs?" | `compare` | **proxymock-compare-results** |
 | "What is in this recording?" | `summarize` | **proxymock-summarize-recording** |
 | "Replay misses the mock", match-rate tuning | `tune` | **proxymock-replay-tuning** |
-| "Flat load run with SLO gates" | `load` | **proxymock-load-test** |
+| "Flat load run with SLO gates and a summary file" | `load-test` | **proxymock-load-test** |
 
 The first five routes build and exec a native command. The last four dispatch
-the repo's own analysis skill scripts unchanged, which is why `load` and `perf`
-both exist: `load` runs the `proxymock-load-test` script, `perf` builds the
-native load command directly.
+the repo's own analysis skill scripts unchanged. `load` and `load-test` are
+both here on purpose: `load` builds the native load command, `load-test` runs
+the `proxymock-load-test` script, which adds its own SLO gating and summary
+file on top.
 
 Tie-breakers:
 
@@ -166,6 +167,16 @@ preconditions / 2 usage.
 - **A malformed RRPair is skipped silently.** The rest of the directory still
   serves, but the warning only appears at `-v -v`, so a bad edit degrades to a
   mysteriously missing endpoint rather than a loud failure.
+- **Two concurrent proxymock runs corrupt each other.** Every command ingests
+  its `--in` into `<speedscale-home>/data/snapshots/` under one fixed local
+  snapshot id, so a second process with a different `--in` overwrites the
+  first's `raw.jsonl` and the loser replays the WINNER's recording. It surfaces
+  loudly as `references refUuid <uuid> not found in --in` with **no verdict
+  file written**, and quietly as a verdict scored against the wrong recording.
+  Give each run its own home when anything else on the machine might be running
+  proxymock — copy `~/.speedscale/config.yaml` (and `certs/`, or the run mints
+  a CA nothing trusts) into a private dir and pass
+  `--config <that>/config.yaml`. Global `transforms/` blueprints still load.
 - **MCP parity.** `mock_server_start` exposes `fault`, `mock-timing`,
   `mock-reload-interval` and `response-selection`. Still absent:
   `proxy-out-port`, `health-port`, `app-health-endpoint`. `edit_rrpair` is

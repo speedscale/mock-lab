@@ -104,8 +104,9 @@ fail before and after the change.
   different names** — measured: a byte-identical copy of a recording, under a
   different directory name in the same workspace beside the same
   `blueprints/`, did not pick it up. If a workspace blueprint does not load,
-  put a copy inside `--in`. That is why this repo's blueprint lives at
-  `lab/proxymock/recording/blueprints/`.
+  a copy inside `--in` is a local workaround, but do not relocate a shared,
+  committed blueprint to work around it. This repo's blueprint ships at
+  `lab/proxymock/blueprints/`, beside the recording it serves.
 - **Confirm it loaded** with the `Loaded blueprint "<name>" from <path>` line
   in the replay output. Never move a blueprint the log says is loading.
 - **The hostname trap (this one costs you the whole run).** Replay rewrites the

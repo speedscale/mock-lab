@@ -99,9 +99,10 @@ preconditions / 2 usage.
   `blueprints/`, did not pick it up (checked repeatedly, and with the recording
   renamed and renamed back). Whatever scopes the workspace lookup is narrower
   than "the parent of `--in`". If a workspace blueprint does not load, put a
-  copy inside `--in`; that location loaded in every layout measured. This
-  repo's blueprint lives at `lab/proxymock/recording/blueprints/` for exactly
-  that reason.
+  copy inside `--in`; that location loaded in every layout measured. Use that
+  as a local workaround only: this repo's blueprint ships at
+  `lab/proxymock/blueprints/`, the workspace dir beside the recording, and a
+  shared committed blueprint should not be relocated to dodge the quirk.
 - **Confirm, do not assume**, with the `Loaded blueprint "<name>" from <path>`
   line in the replay output. Never move a blueprint the log says is loading.
   Blueprints in `~/.speedscale/data/transforms/` load globally on top of

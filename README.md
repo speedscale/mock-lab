@@ -205,6 +205,9 @@ release, and older builds differ on connection faults, native body scoring,
 # check the environment, then route any intent through the quality loop
 ./skills/quality-loop/scripts/quality-loop.sh doctor
 
+# one shared proof covers all five loop skills' exit-code contracts
+./skills/quality-loop/scripts/prove-quality-loop.sh
+
 # the five loop skills are one native command each -- run them directly, no bash needed
 # regression gate: 0 pass, 3 new mismatch
 proxymock replay --in lab/proxymock/recording --test-against http://localhost:8080 \

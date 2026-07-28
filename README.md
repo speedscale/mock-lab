@@ -172,29 +172,106 @@ measure the misses, replay against the tuned mock set, and verify the hit rate i
 
 ## More proxymock skills
 
-The same recordings power three more agent skills in [`skills/`](skills/). Each ships a script and
-a `prove-*.sh`, runs against the committed `lab/proxymock/recording`, and needs no Speedscale Cloud
-account.
+The same recordings power nine more agent skills in [`skills/`](skills/). All of them run against
+the committed `lab/proxymock/recording` and need no Speedscale Cloud account. Not sure which one
+applies? Start with [`quality-loop`](skills/quality-loop/SKILL.md): it routes an intent to the
+right command and its `doctor` checks the environment.
+
+**The five loop skills are documentation over native commands.** `proxymock` does the work
+itself now, so each of those SKILL.md files shows the raw CLI line and its exit codes, and the
+single [`quality-loop.sh`](skills/quality-loop/scripts/quality-loop.sh) dispatcher just builds
+that line, execs it, and passes the exit code through. Nothing re-derives a verdict. The four
+analysis skills (load-test, compare-results, summarize-recording, replay-tuning) keep their own
+scripts and proofs.
+
+**These skills assume proxymock v2.5.814 or newer.** Their guidance was measured on that
+release, and older builds differ on connection faults, native body scoring,
+`--require-blueprint`, `proxymock validate`, and process teardown.
+`./skills/quality-loop/scripts/quality-loop.sh doctor` warns if the installed CLI is older.
 
 | Skill | What it does | Wraps |
 | --- | --- | --- |
 | [`proxymock-load-test`](skills/proxymock-load-test/SKILL.md) | Replay recorded traffic at a target with parallel virtual users; report latency percentiles, throughput, and match rate, with `--fail-if` SLO gates | `proxymock replay --vus --for --fail-if` |
 | [`proxymock-compare-results`](skills/proxymock-compare-results/SKILL.md) | Deep before/after comparison of two replay/recording sets — what regressed, improved, or persisted across performance/reliability/security; writes JSON, HTML, and an LLM digest | `proxymock report --baseline` + `proxymock drift` |
 | [`proxymock-summarize-recording`](skills/proxymock-summarize-recording/SKILL.md) | Summarize a recording: hosts, inbound/outbound endpoints, methods, status mix, volume, plus the report digest | `proxymock report --format prompt` |
+| [`proxymock-regression-test`](skills/proxymock-regression-test/SKILL.md) | Replay a recording at a target and gate on the per-RRPair verdict (status **and** body) against a known-good baseline, not on transport failures; catches status-code and field-level regressions that `requests.failed` misses | `proxymock replay --baseline --fail-on-new-mismatch` |
+| [`proxymock-verify-fix`](skills/proxymock-verify-fix/SKILL.md) | Prove a bug fix by replaying the incident capture at the fixed build; "recorded 500 -> observed 200" is the fix signal, any other new mismatch is collateral, and an all-match run means the bug still reproduces | `proxymock replay --verify-fix` |
+| [`proxymock-perf-container`](skills/proxymock-perf-container/SKILL.md) | Load-test one service with its downstream mocked, and judge the number honestly: when a level is harness-bound rather than app-bound, why cross-run rps comparison on a shared host is meaningless, and which figure survives a move to a sized container | `proxymock replay --vus --for --load-test` |
+| [`proxymock-chaos-mock`](skills/proxymock-chaos-mock/SKILL.md) | Inject faults into a mock with native fault flags so the downstream lies on demand: 503s, 429s with `Retry-After`, corrupt or truncated bodies, per-endpoint latency, socket-level connection faults, and exact deterministic ratios via `rate=F/N` | `proxymock mock --fault` |
+| [`proxymock-contract-test`](skills/proxymock-contract-test/SKILL.md) | Contract-test with traffic + OpenAPI: check recorded or replayed traffic against the dependency's spec with exact JSON-path violations, and mock a dependency straight from its spec before any recording exists | `proxymock validate` (plus `proxymock generate` for mock-from-spec) |
+| [`quality-loop`](skills/quality-loop/SKILL.md) | The entry point: route an intent to the right native command or analysis skill, with the one-time setup playbook, the blueprint rules, the shared gotcha catalog, and a `doctor` that checks the proxymock version, recordings, blueprints, and ports | builds and execs the native commands |
 
 ```shell
-# quick load test against the mocked app (run `cd go && proxymock mock --in ../lab/proxymock/recording -- go run .` first)
+# check the environment, then route any intent through the quality loop
+./skills/quality-loop/scripts/quality-loop.sh doctor
+
+# one shared proof covers all five loop skills' exit-code contracts
+./skills/quality-loop/scripts/prove-quality-loop.sh
+
+# the five loop skills are one native command each -- run them directly, no bash needed
+# regression gate: 0 pass, 3 new mismatch
+proxymock replay --in lab/proxymock/recording --test-against http://localhost:8080 \
+  --out ./regress-run --baseline ./regress-base --fail-on-new-mismatch
+
+# prove a fix: 0 fixed, 2 bug still reproduces, 3 collateral
+proxymock replay --in ./incident/recording --test-against http://localhost:8080 \
+  --verify-fix --expect '^/api/stats'
+
+# spec conformance: 0 conformant, 2 violations, 3 no spec route
+proxymock validate --spec lab/openapi.yaml \
+  --in lab/proxymock/recording/demo-api.trafficreplay.com
+
+# make the mocked downstream fail exactly 1 request in 3
+proxymock mock --in lab/proxymock/recording --fault '/v1/projects:status=503,rate=1/3'
+
+# load: 0, or 1 when a --fail-if threshold trips
+proxymock replay --in lab/proxymock/recording/localhost \
+  --test-against http://localhost:8080 --vus 16 --for 30s --load-test
+
+# the four analysis skills keep their own scripts
 ./skills/proxymock-load-test/scripts/proxymock-load-test.sh \
   --in lab/proxymock/recording/localhost --test-against http://localhost:8080 --vus 8 --for 20s
-
-# deep comparison of two replay outputs
 ./skills/proxymock-compare-results/scripts/proxymock-compare-results.sh \
   --in ./after --baseline ./before --drift --fail-on-regression
-
-# summarize what a recording contains
 ./skills/proxymock-summarize-recording/scripts/proxymock-summarize-recording.sh \
   --in lab/proxymock/recording --out recording-brief.md
+./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh --in lab/proxymock/recording
 ```
+
+## Works with your stack
+
+The loop consumes recordings, not test frameworks, so most of your existing stack plugs in
+as-is:
+
+- **No bash required.** Each of the five loop skills is **one native `proxymock` command**
+  taking a directory of RRPair files and a URL, and its exit code is the CI contract:
+  `replay --fail-on-new-mismatch` exits 0/3, `replay --verify-fix` exits 0/2/3, `validate`
+  exits 0/2/3, `replay --load-test --fail-if` exits 0/1. A k6, bruno, postman-cli, pytest,
+  JUnit, or plain-Makefile user runs that line and gets the identical result. The
+  `quality-loop.sh` dispatcher is optional convenience that builds the same line and passes
+  the exit code through — the native command is the contract, and every SKILL.md leads with
+  it.
+- **Any test driver.** Whatever pushes traffic through the record proxy becomes the capture
+  source: this repo's curl harness, your integration tests, Postman collections via
+  [newman](https://www.npmjs.com/package/newman), k6 scripts, a staging soak, or live
+  production capture with the Speedscale operator. Record once with
+  `proxymock record -- <your app>` while your driver runs, and every command above works on
+  the result.
+- **Traffic captured elsewhere imports directly.** `proxymock import` converts GoReplay
+  captures, HAR documents, raw HTTP wire dumps, Postman collections, and WireMock projects
+  into RRPairs, so the loop does not require re-recording what you already have.
+- **Any downstream mock, for the replay-based commands.** Regression, verify-fix, and load
+  only need proxymock for record, replay, and diff; the thing mocking your dependencies is
+  just an HTTP endpoint. If you already run WireMock or similar for downstreams, keep it.
+- **proxymock-specific, by design:** `proxymock mock --fault` drives proxymock's own mock
+  engine (timing control, deterministic `rate=F/N` rotation), and the replay verdict's
+  per-pair body-change findings read RRPair data. The fault taxonomy and interpretation
+  guidance in `proxymock-chaos-mock`'s SKILL.md port to any mock system; the mechanics do
+  not.
+- **Your traffic stays portable.** RRPairs are plain markdown files you can read, diff, and
+  check in, and `proxymock export` converts recordings to WireMock stub mappings, Postman
+  collections, k6 scripts, Gatling simulations, or Datadog Synthetics bundles if you need
+  them elsewhere.
 
 ## The downstream API
 

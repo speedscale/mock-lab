@@ -146,24 +146,23 @@ work_dir="$(ql_abs_path "$work_dir")"
 summary_json="$work_dir/summary.json"
 
 # --- precondition: blueprint anchoring ---------------------------------------
-# Blueprints load from INSIDE the --in tree (replay reads --in recursively), not
-# from cwd and not from a sibling of --in. Without a blueprint, endpoints that
+# Blueprints load from a blueprints/ inside --in (replay reads --in
+# recursively) and from the workspace's own blueprints/ beside the recording.
+# Not from cwd. Either counts as staged; confirm which one actually loaded from
+# the "Loaded blueprint" line in the replay log. Without a blueprint, endpoints that
 # chain moving IDs replay with stale recorded values and fail for reasons
 # unrelated to the fix, polluting the collateral list.
 bp_dir="$(ql_blueprint_dir "$in_dir")"
+inner_bp_dir="$(ql_inner_blueprint_dir "$in_dir")"
 bp_count="$(ql_blueprint_count "$bp_dir")"
-if [[ "$bp_count" -eq 0 ]]; then
-  echo "WARNING: no blueprints found at $bp_dir" >&2
-  stray_dir="$(ql_stray_blueprint_dir "$in_dir")"
-  if [[ "$(ql_blueprint_count "$stray_dir")" -gt 0 ]]; then
-    echo "WARNING: but $stray_dir has blueprint(s). That is OUTSIDE the --in" >&2
-    echo "WARNING: tree, so proxymock never loads them. Move them under" >&2
-    echo "WARNING: $bp_dir, or point --in at the workspace root." >&2
-  fi
+inner_bp_count="$(ql_blueprint_count "$inner_bp_dir")"
+if [[ $(( bp_count + inner_bp_count )) -eq 0 ]]; then
+  echo "WARNING: no blueprints found at $bp_dir or $inner_bp_dir" >&2
   echo "WARNING: moving-ID endpoints (auth tokens, created ids) may fail replay" >&2
   echo "WARNING: for reasons unrelated to the fix and show up as collateral." >&2
 else
-  echo "blueprints: $bp_count file(s) in $bp_dir"
+  if [[ "$bp_count" -gt 0 ]]; then echo "blueprints: $bp_count file(s) in $bp_dir"; fi
+  if [[ "$inner_bp_count" -gt 0 ]]; then echo "blueprints: $inner_bp_count file(s) in $inner_bp_dir"; fi
 fi
 
 # --- precondition: the incident capture's downstream gap ---------------------

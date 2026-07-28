@@ -119,28 +119,33 @@ cmd_doctor() {
     done
   fi
 
-  # blueprint staging: blueprints load from INSIDE the --in tree. These skills
-  # replay with --in <recording dir>, so a blueprint is only loaded from
-  # <recording>/blueprints/. One parked in the recording's PARENT is never read
-  # on that invocation, so report it as a misplacement rather than as staged.
-  local bp found_bp found_stray
+  # blueprint staging: blueprints load from a blueprints/ inside the recording
+  # (replay reads --in recursively) and from the workspace's own blueprints/
+  # beside it. Both were measured to load on v2.5.814. Accept either and warn
+  # only when neither holds a blueprint -- reporting a staged blueprint as
+  # misplaced sends people to move a file that is already working.
+  # Sibling recordings share a workspace (results/ alone holds one dir per
+  # replay), so both the ok lines and the warning are deduped -- otherwise one
+  # unstaged workspace prints a dozen identical warnings.
+  local bp q ws_dir found_bp seen shown seen_bp=() seen_ws=()
   for d in "${rec_dirs[@]+"${rec_dirs[@]}"}"; do
+    ws_dir="$(dirname "$d")"
     found_bp=0
-    for bp in "$d"/blueprints/*.json; do
+    for bp in "$ws_dir"/blueprints/*.json "$d"/blueprints/*.json; do
       [[ -f "$bp" ]] || continue
       found_bp=1
+      shown=0
+      for q in "${seen_bp[@]+"${seen_bp[@]}"}"; do [[ "$q" == "$bp" ]] && shown=1; done
+      [[ $shown -eq 1 ]] && continue
+      seen_bp+=("$bp")
       echo "ok   blueprint: $bp"
     done
     [[ $found_bp -eq 1 ]] && continue
-    found_stray=0
-    for bp in "$(dirname "$d")"/blueprints/*.json; do
-      [[ -f "$bp" ]] || continue
-      found_stray=1
-      warns+=("blueprint $bp sits beside the recording, outside the --in tree these skills replay ($d), so proxymock never loads it; move it to $d/blueprints/")
-    done
-    if [[ $found_stray -eq 0 ]]; then
-      warns+=("no blueprints staged at $d/blueprints/ (needed only if the app has moving IDs like rotating tokens or order ids)")
-    fi
+    seen=0
+    for q in "${seen_ws[@]+"${seen_ws[@]}"}"; do [[ "$q" == "$ws_dir" ]] && seen=1; done
+    [[ $seen -eq 1 ]] && continue
+    seen_ws+=("$ws_dir")
+    warns+=("no blueprints staged at $ws_dir/blueprints/ or <recording>/blueprints/ (needed only if the app has moving IDs like rotating tokens or order ids)")
   done
 
   # runtime proxy support: Node fetch ignores proxy env vars before

@@ -44,8 +44,10 @@ mkdir -p "$tmp"
 # --- fabricate the incident recording ----------------------------------------
 # Copy the committed recording into its own workspace and flip GET /api/stats
 # from 200 to 500: the incident capture stores the FAILING response as recorded
-# truth. The blueprint is staged INSIDE the recording dir, which is where replay
-# loads it from when --in is that dir; a copy beside the recording never loads.
+# truth. The blueprint is staged INSIDE the recording dir: replay reads --in
+# recursively, so that location loads in a fabricated workspace like this one.
+# A blueprints/ beside the recording also loads in a real proxymock workspace,
+# but did not in scratch trees built here, so this proof does not rely on it.
 echo "fabricating incident recording (GET /api/stats recorded 500)"
 mkdir -p "$tmp/incident"
 cp -R "$recording" "$tmp/incident/recording"

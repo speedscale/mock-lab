@@ -174,26 +174,38 @@ ql_prove_cleanup() {
 }
 
 ql_blueprint_dir() {
-  # Blueprints load from INSIDE the --in tree, never from cwd and never from a
-  # sibling of --in. replay reads --in recursively, so it picks up
-  # <--in>/blueprints/ -- and, when --in is a workspace root, that root's own
-  # blueprints/ next to recording/.
+  # The workspace blueprints/ dir: the one beside the recording dir these skills
+  # pass as --in, e.g. proxymock/blueprints/ next to proxymock/<recording>/.
+  # Blueprints here DO load -- measured on v2.5.814 against the mock-lab go
+  # workspace, with a no-blueprint control run first. With
+  # proxymock/blueprints/mocklab-smart-replace.json staged and
+  # --in ./proxymock/recorded-go-baseline, replay logs
+  #   Loaded blueprint "mock-lab smart replace (token + order_id)" \
+  #     from proxymock/blueprints/mocklab-smart-replace.json
+  # 2 replayed RRPairs carry smart_replace, and the verdict is pass. The control
+  # (nothing staged) loads only the global blueprints, carries 0 smart_replace,
+  # and fails /api/orders 201->401 and /api/orders/{id} 200->401.
   #
-  # Measured on v2.5.814 by staging one blueprint under eight candidate paths
-  # (<ws>/blueprints, <ws>/transforms, <--in>/blueprints, <--in>/transforms,
-  # <ws>/data/transforms, <ws>/.speedscale/data/transforms,
-  # <ws>/proxymock/blueprints, <ws>/proxymock/transforms) each with a distinct
-  # name, then replaying once: only the copy inside --in produced a "Loaded
-  # blueprint" line. The global ~/.speedscale/data/transforms/ blueprints load
-  # unconditionally on top of that and are not workspace state.
-  echo "$1/blueprints"
+  # It is not universal, though: a byte-identical copy of that same recording,
+  # under a different directory name in the SAME workspace beside the SAME
+  # blueprints/, did not pick it up (checked repeatedly, and with the recording
+  # renamed and renamed back). Whatever scopes the workspace lookup is narrower
+  # than "the parent of --in". So treat this dir as a real staging location that
+  # has to be CONFIRMED by the "Loaded blueprint" line, never as one to rule out
+  # -- and never tell anyone to move a blueprint the log says is loading.
+  #
+  # The global ~/.speedscale/data/transforms/ blueprints load unconditionally on
+  # top of either location and are not workspace state.
+  echo "$(dirname "$1")/blueprints"
 }
 
-ql_stray_blueprint_dir() {
-  # The parent's blueprints/ -- the usual misplacement when --in points at the
-  # recording dir rather than the workspace root. proxymock never reads it from
-  # there, so a blueprint parked here is silently inert.
-  echo "$(dirname "$1")/blueprints"
+ql_inner_blueprint_dir() {
+  # blueprints/ INSIDE the recording dir. This is the location that loaded in
+  # every layout measured -- inside a workspace, in a renamed copy the workspace
+  # lookup missed, and in a recording outside any proxymock/ workspace at all --
+  # because replay reads --in recursively and finds it there. Same "Loaded
+  # blueprint" line, same firing chains.
+  echo "$1/blueprints"
 }
 
 ql_blueprint_count() {
@@ -211,17 +223,19 @@ ql_smart_replace_file_count() {
   # "Loaded blueprint ..." console lines do not tell you (they report loading,
   # not application).
   #
-  # Why this and not replay's --require-blueprint: the flag is ACCURATE on
-  # v2.5.814. Both of its failure modes were re-measured with controls -- a
-  # name that never loaded exits 1 "was not loaded from the --in workspace",
-  # and a blueprint that loaded without firing exits 1 "loaded but none of its
-  # transform chains ran", which agrees with this grep returning 0.
+  # Why this and not replay's --require-blueprint: the flag works on v2.5.814,
+  # but its failure path costs the run. Measured with controls: with the
+  # blueprint loaded, --require-blueprint "<name>" exits 0 and
+  # <out>/replay-verdict.json IS written; with an unresolvable name it exits 1
+  # on "required blueprint ... was not loaded from the --in workspace" and
+  # writes NO verdict file.
   #
-  # It is still not the gate, because it aborts the replay BEFORE writing
-  # <out>/replay-verdict.json (measured: no verdict file on either exit-1
-  # path). That verdict is the entire regression signal, so gating on the flag
-  # trades a warning about the blueprint for the loss of every status and body
-  # comparison in the run. Warn on an inert blueprint; still measure.
+  # That asymmetry is why the flag is not the gate: the verdict is the entire
+  # regression signal, so an inert blueprint would cost every status and body
+  # comparison in the run rather than just flagging itself. This grep is free
+  # and never costs the verdict. Callers who want proxymock to enforce the
+  # blueprint itself can add --require-blueprint on top, accepting that a
+  # failure aborts before the verdict exists.
   (grep -ril 'smart_replace' "$1" 2>/dev/null || true) | wc -l | tr -d ' '
 }
 

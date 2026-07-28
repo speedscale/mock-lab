@@ -92,26 +92,38 @@ scripts source shared helpers from `skills/lib/common.sh` (resolved as
 
 ## Preconditions the script checks
 
-- **Blueprint anchoring.** Blueprints load from INSIDE the `--in` tree: replay
-  reads `--in` recursively, so it finds `<--in>/blueprints/`, and a workspace
-  root passed as `--in` picks up its own `blueprints/` beside `recording/`. A
-  `blueprints/` dir that is a SIBLING of `--in` is never read, which is the
-  usual misplacement; the script names that case explicitly when it sees it.
-  If no blueprint is loadable the script warns loudly: auth and moving-ID
-  endpoints will be unreplayable (401s), and a regression on their success
-  paths is UNDETECTABLE because they fail before and after the change.
+- **Blueprint anchoring.** Two locations load, and the script accepts either.
+  A `blueprints/` INSIDE `--in` always loads, because replay reads `--in`
+  recursively — measured in every layout tried. The workspace's own
+  `blueprints/` BESIDE the recording (`proxymock/blueprints/` next to
+  `proxymock/<recording>/`) also loads: measured on v2.5.814 against a
+  no-blueprint control, it logs `Loaded blueprint "…" from
+  proxymock/blueprints/…`, two replayed RRPairs carry `smart_replace`, and the
+  verdict is `pass` where the control failed `/api/orders` 201→401. That second
+  path is not universal — a byte-identical copy of the same recording under a
+  different directory name in the same workspace did not pick it up — so
+  confirm it with the `Loaded blueprint` line rather than assuming it either
+  way, and never move a blueprint the log says is loading. Not cwd. If no
+  blueprint is loadable the script warns loudly: auth and moving-ID endpoints
+  will be unreplayable (401s), and a regression on their success paths is
+  UNDETECTABLE because they fail before and after the change.
 - **Blueprint application.** Loading a blueprint is not running it, and the
   `Loaded blueprint ...` console lines only report loading. The script verifies
   application by grepping the replay output RRPairs for `smart_replace` events
-  and warns when a blueprint exists but none appear. Replay's own
-  `--require-blueprint` is accurate on v2.5.814 — re-measured with controls, it
-  exits 1 both for a name that never loaded ("was not loaded from the `--in`
-  workspace") and for one that loaded without firing ("loaded but none of its
-  transform chains ran"), the latter agreeing with the grep. It is still not
-  the gate, because it aborts the replay BEFORE `<out>/replay-verdict.json` is
-  written, and that verdict is the entire regression signal. Gating on it would
-  trade a blueprint warning for the loss of every status and body comparison in
-  the run, so the script warns and still measures.
+  and warns when a blueprint exists but none appear. A common cause of that
+  warning is the blueprint's own filters, not staging: mock-lab's filters on
+  `network_address CONTAINS "localhost"`, and replay rewrites the address to
+  the `--test-against` target, so the same run against `http://127.0.0.1:PORT`
+  loads it and fires nothing while `http://localhost:PORT` fires both chains.
+  Replay's own `--require-blueprint` works on v2.5.814: with the blueprint
+  loaded it exits 0 and `<out>/replay-verdict.json` is still written; with an
+  unresolvable name it exits 1 ("was not loaded from the `--in` workspace") and
+  writes NO verdict.
+  That failure path is why it is not the gate here — the verdict is the entire
+  regression signal, so an inert blueprint would cost every status and body
+  comparison in the run. Add `--require-blueprint` yourself if you want
+  proxymock to enforce the blueprint; the grep costs nothing and never costs
+  the verdict.
 - **Mock reminder.** When the recording contains outbound pairs, the script
   reminds you that `proxymock mock` requires an explicit `--in`; it does not
   discover the recording from cwd.

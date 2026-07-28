@@ -25,7 +25,10 @@ Scenarios (--scenario) and the fault they build:
   garbage    body=corrupt (or --body-fault truncate[:BYTES])
   slow       latency=<duration>, or the GLOBAL --mock-timing multiplier when
              --latency is 'Nx' (every endpoint, --target advisory only)
-  connection connection=refuse|reset|stall|drop (--connection, default reset)
+  connection connection=refuse|reset|stall|drop (--connection, default reset).
+             Fires on HTTP/1.1 and HTTP/2 recordings alike. refuse and reset
+             are indistinguishable to most clients; stall needs a client
+             timeout; drop returns a 200 with a truncated body.
   flaky      status=503,rate=F/N
 
 --ratio F/N composes with ANY scenario, so `--scenario ratelimit --ratio 1/3`
@@ -51,9 +54,6 @@ Options:
                         an RRPair edit (body= only does corrupt/truncate), so
                         this and only this makes a writable copy of the
                         recording in <work-dir>/recording.
-  --allow-http2-connection-fault
-                        Proceed with a connection= fault on HTTP/2 pairs
-                        (see exit 5)
   --work-dir DIR        Where serve state and any copy land (default: a
                         timestamped dir)
   --serve               Start the faulted mock in the background, un-wrapped
@@ -77,9 +77,6 @@ Exit codes:
      is a SILENT no-op, so this is a correctness gate, not a nicety)
   3  the mock did not come up
   4  precondition or usage failure
-  5  connection= fault requested against HTTP/2 pairs: proxymock silently
-     ignores it (no warning at any verbosity, the app gets a clean 200).
-     Override with --allow-http2-connection-fault.
 
 Output files (in --work-dir, only with --serve):
   serve.json   pid, ports, and the exact fault specs in use
@@ -114,7 +111,6 @@ body_fault="corrupt"
 connection="reset"
 custom_body=""
 flip_body=""
-allow_h2="0"
 work_dir=""
 serve="0"
 restore="0"
@@ -135,7 +131,6 @@ while [[ $# -gt 0 ]]; do
     --connection) [[ $# -ge 2 ]] || die "--connection requires a value"; connection="$2"; shift 2 ;;
     --custom-body) [[ $# -ge 2 ]] || die "--custom-body requires a value"; custom_body="$2"; shift 2 ;;
     --flip-body) [[ $# -ge 2 ]] || die "--flip-body requires a value"; flip_body="$2"; shift 2 ;;
-    --allow-http2-connection-fault) allow_h2="1"; shift ;;
     --work-dir) [[ $# -ge 2 ]] || die "--work-dir requires a value"; work_dir="$2"; shift 2 ;;
     --serve) serve="1"; shift ;;
     --restore) restore="1"; shift ;;
@@ -353,20 +348,21 @@ if [[ -n "$ratio" ]]; then
   if [[ -n "$actions" ]]; then actions="$actions,rate=$ratio"; else actions="rate=$ratio"; fi
 fi
 
-# --- pre-check: the pattern must match, and connection faults must not be h2 --
-want_conn="0"
-if [[ "$scenario" == "connection" ]]; then want_conn="1"; fi
-python3 - "$in_dir" "$target" "$want_conn" "$allow_h2" <<'PY' || exit $?
+# --- pre-check: a fault pattern that matches nothing is a silent no-op --------
+# proxymock warns about a no-match pattern itself, but only on its own stdout:
+# when it WRAPS an app (`-- your-app`) that output is redirected to
+# proxymock.log and never reaches the terminal, so this check stays.
+python3 - "$in_dir" "$target" <<'PY' || exit $?
 import json, pathlib, re, sys
 
-rec, target, want_conn, allow_h2 = sys.argv[1:5]
+rec, target = sys.argv[1:3]
 try:
     pat = re.compile(target)
 except re.error as e:
     print(f"error: --target is not a valid regexp: {e}", file=sys.stderr)
     sys.exit(4)
 
-matched, catalog = [], set()
+matched, catalog = set(), set()
 for path in sorted(pathlib.Path(rec).rglob("*.md")):
     text = path.read_text(errors="ignore")
     m = re.search(r"json:\s*(\{.*\})", text, re.S)
@@ -381,17 +377,10 @@ for path in sorted(pathlib.Path(rec).rglob("*.md")):
     req = rr.get("http", {}).get("req", {})
     uri = req.get("uri") or ""
     host = (req.get("host") or "").split(":")[0]
-    catalog.add(f'{req.get("method")} {host}{uri}')
-    if not any(pat.search(c) for c in (uri, host + uri)):
-        continue
-    # the mocked response protocol, which is what connection faults are gated on
-    ver = ""
-    idx = text.find("### RESPONSE ###")
-    if idx >= 0:
-        sl = re.search(r"(?m)^HTTP/([0-9.]+) \d{3}", text[idx:])
-        if sl:
-            ver = sl.group(1)
-    matched.append((f'{req.get("method")} {host}{uri}', ver or req.get("version") or "?"))
+    label = f'{req.get("method")} {host}{uri}'
+    catalog.add(label)
+    if any(pat.search(c) for c in (uri, host + uri)):
+        matched.add(label)
 
 if not matched:
     print(f"error: --target {target!r} matched no loaded outbound pair; the "
@@ -403,30 +392,8 @@ if not matched:
         print(f"  {c}", file=sys.stderr)
     sys.exit(2)
 
-for label, ver in sorted(set(matched)):
-    print(f"  matches: {label} (HTTP/{ver})")
-
-if want_conn == "1":
-    h2 = sorted({label for label, ver in matched if ver.startswith("2")})
-    if h2:
-        refuse = allow_h2 != "1"
-        head = "error" if refuse else "WARNING"
-        lines = [
-            "connection= faults are SILENTLY IGNORED when the mocked response is",
-            "HTTP/2: no warning at any verbosity, the app gets a clean 200.",
-            "HTTP/2 pairs matched by this pattern:",
-        ] + [f"  {label}" for label in h2] + [
-            "proxymock replays the recorded protocol, so exercise the h1 path:",
-            "  - recapture the dependency over HTTP/1.1, or",
-            "  - drive the mock with an h1 client (curl --http1.1 -x ...), or",
-            "  - use status= / body= faults, which fire on both protocols.",
-        ]
-        if refuse:
-            lines.append("rerun with --allow-http2-connection-fault to proceed anyway.")
-        for line in lines:
-            print(f"{head}: {line}", file=sys.stderr if refuse else sys.stdout)
-        if refuse:
-            sys.exit(5)
+for label in sorted(matched):
+    print(f"  matches: {label}")
 PY
 
 # --- work dir and optional writable copy --------------------------------------

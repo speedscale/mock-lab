@@ -1,6 +1,6 @@
 ---
 name: proxymock-contract-test
-description: Contract-test with traffic plus an OpenAPI spec, in two directions. Mode mock-from-spec wraps proxymock generate so a consumer can mock a dependency straight from its spec before any recording exists; mode conformance validates recorded or replayed RRPair response bodies against the spec with a bundled checker (proxymock has no native traffic-vs-spec path), reporting exact JSON-path violations. Use when users ask whether a dependency's behavior matches its spec, to validate recorded traffic against an OpenAPI contract, or to mock an API from its spec alone.
+description: Contract-test with traffic plus an OpenAPI spec, in two directions. Mode mock-from-spec wraps proxymock generate so a consumer can mock a dependency straight from its spec before any recording exists; mode conformance wraps proxymock validate to check recorded or replayed RRPair response bodies against the spec, reporting exact JSON-path violations. Use when users ask whether a dependency's behavior matches its spec, to validate recorded traffic against an OpenAPI contract, or to mock an API from its spec alone.
 argument-hint: <mock-from-spec|conformance> --spec <openapi.(json|yaml)> [--in <rrpair-dir>] [--paths <regex>] [--fail-on-undocumented] [--include-optional] [--serve]
 ---
 
@@ -14,18 +14,16 @@ contract:
   the spec into RRPairs and `proxymock mock --in <generated>` serves them, so
   a consumer can develop against a dependency's contract before any
   recording exists.
-- **conformance**: the traffic is judged by the spec. A bundled checker
-  validates recorded (or replayed) RRPair response bodies against the spec's
+- **conformance**: the traffic is judged by the spec. `proxymock validate`
+  checks recorded (or replayed) RRPair response bodies against the spec's
   schemas and reports violations with exact JSON-path attribution.
 
-proxymock has NO native traffic-vs-spec path today: nothing in
-`generate`/`report`/`replay`/`files compare`/`drift` accepts a spec, and
-`--fail-if` is metrics-only. That is why conformance mode ships its own
-checker (`scripts/check_conformance.py`, stdlib python3): type, required,
-enum, and undocumented-field checks with `$ref` resolution. YAML specs are
-converted via PyYAML when importable, else `ruby -ryaml`, else the script
-asks for a `.json` spec; the fallback chain exists because system pythons
-routinely lack PyYAML.
+Conformance is native: `proxymock validate --spec <openapi.(json|yaml|yml)>
+--in <rrpair-dir>` does the type, required, enum, and undocumented-field
+checks with `$ref` resolution and path-template route matching, and it parses
+YAML itself (no PyYAML or `ruby -ryaml` dependency). The skill script is a
+thin wrapper that adds `--paths` filtering, the undocumented-fields policy,
+and `summary.json`; it does not do any schema checking of its own.
 
 This workflow uses local files and the `proxymock` CLI. It does not require
 Speedscale Cloud access.
@@ -49,7 +47,7 @@ Mode is the first positional argument (or `--mode`).
 
 Shared:
 
-- `--spec`: the OpenAPI 3.0+ spec, `.json` or `.yaml`.
+- `--spec`: the OpenAPI 3.0+ spec, `.json`, `.yaml`, or `.yml`.
 - `--work-dir`: output directory (default: timestamped dir).
 
 `mock-from-spec` (flags mirror `proxymock generate`):
@@ -64,15 +62,21 @@ Shared:
 - `--include-paths` / `--exclude-paths`: comma-separated path patterns.
 - `--serve`: start the mock on the generated RRPairs after generating.
 
-`conformance` (forwarded to the bundled checker):
+`conformance`:
 
-- `--in`: the RRPair directory to check. Point it at the recording's
-  dependency host subdir (e.g. `recording/demo-api.trafficreplay.com`), a
-  whole recording, or a replay output dir.
-- `--paths`: regex; only pairs whose request path matches are checked.
+- `--in`: the RRPair directory to check, passed to `proxymock validate --in`.
+  Point it at the recording's dependency host subdir (e.g.
+  `recording/demo-api.trafficreplay.com`), a whole recording, or a replay
+  output dir.
+- `--paths`: regex; only pairs whose request path matches are reported.
   Scope this to the routes the spec covers when the directory mixes hosts.
+  `validate` has no such flag, so this is applied as a filter over its
+  output: the counts and the exit code describe the kept pairs.
 - `--fail-on-undocumented`: response fields absent from the spec's
-  `properties` become violations instead of notes.
+  `properties` become violations instead of notes. **Native `validate`
+  always treats them as violations**; without this flag the wrapper
+  downgrades those findings to notes, which keeps additive response fields
+  non-breaking. Nothing else in the verdict is rewritten.
 
 Run the bundled script:
 
@@ -87,9 +91,8 @@ Run the bundled script:
 ```
 
 If this skill has been copied outside `mock-lab`, replace
-`./skills/proxymock-contract-test` with the copied skill directory; the
-script finds `check_conformance.py` relative to its own location. The
-scripts also source shared helpers from `skills/lib/common.sh` (resolved as
+`./skills/proxymock-contract-test` with the copied skill directory. The
+scripts source shared helpers from `skills/lib/common.sh` (resolved as
 `../../lib/common.sh` relative to the scripts), so copy that file alongside.
 
 ## Measured limits of generated mocks
@@ -102,15 +105,10 @@ exercising client code paths. It is not logic-grade data. All measured:
   pass `--include-optional` for fuller payloads.
 - **Arrays are 2 identical stub items.** An app aggregating over them sees
   degenerate distributions.
-- **Example-less enum fields get the literal `"example_value"`, which
-  violates the spec's own enum.** Apps that branch on enum values will see
-  impossible data (the lab app's `/api/stats` aggregated the stubs into
-  `by_maturity: {example_value: 2}`). The script warns in its output when
-  the spec has enums without examples, naming each location; fix by adding
-  `example:` next to each enum.
-- **The spec's https servers are emitted as `http://:80` in the
-  artifacts.** Signature matching still works, so the mock serves fine;
-  just do not read the artifact URLs as the real scheme.
+- **Example-less fields get the literal `"example_value"`.** Enum fields are
+  the exception: they now get a real member of their enum, so generated
+  bodies pass `proxymock validate` against the spec they came from. Add
+  `example:` values where a plausible string matters.
 - **One response per status.** No response variety within a status code.
 - **Path params become match-any templates** (`${{param:id}}` matches any
   concrete id), including params the spec constrains with an enum.
@@ -120,9 +118,10 @@ exercising client code paths. It is not logic-grade data. All measured:
 Written to `--work-dir`:
 
 - `conformance`: `summary.json` (per-pair verdicts, violation strings,
-  counts, exit code); per-pair verdict lines on stdout, violations with
-  exact JSON path, field, expected type, and actual value, e.g.
-  `$[0].stars: type mismatch, expected integer, got str ('many')`.
+  counts, exit code) and `validate.out` (raw `proxymock validate` output);
+  per-pair verdict lines on stdout, violations with exact JSON path, field,
+  expected type, and actual value, e.g.
+  `$[0].stars: type mismatch, expected integer, got string ("many")`.
 - `mock-from-spec`: the generated RRPairs (`generated/` unless `--out`),
   `generate.log`, `summary.json` (pair count, mock command), and with
   `--serve`: `serve.json` (pid, ports) and `mock.log`.
@@ -134,8 +133,15 @@ Exit codes:
 - `2`: conformance violations found.
 - `3`: no violations, but the spec has no route for at least one checked
   pair (partial coverage; each `NO_ROUTE` pair is named).
-- `4`: precondition/usage error (bad args, unreadable spec, generate
-  produced nothing, `--serve` mock failed to load).
+- `4`: precondition/usage error (bad args, unreadable spec, no pairs left
+  after `--paths`, generate produced nothing, `--serve` mock failed to
+  load). `proxymock validate`'s own precondition failures (exit 1: missing
+  spec or directory, no HTTP pairs) surface as 4 too.
+
+Those are the wrapper's codes, and `validate` already uses the same 0/2/3
+scheme, so an unfiltered run passes its verdict straight through. The
+wrapper cross-checks that on every run and fails with 4 if its reading of
+`validate`'s output disagrees with `validate`'s own exit code.
 
 When violations and route gaps both occur, violations win the exit code
 (2); the `NO_ROUTE` pairs are still listed and counted in `summary.json`.
@@ -156,10 +162,8 @@ When violations and route gaps both occur, violations win the exit code
 - **`undocumented field` notes**: the response carries fields the spec does
   not declare. Additive fields are usually non-breaking; escalate them to
   failures with `--fail-on-undocumented` when the spec is meant to be
-  exhaustive.
-- **enum warning from mock-from-spec**: the generated mock will serve
-  `"example_value"` for those fields; either add `example:` values to the
-  spec or treat affected flows as plumbing-only.
+  exhaustive. Running `proxymock validate` directly gives you the escalated
+  behavior with no flag.
 - **Green conformance is not a behavior gate.** Schema conformance checks
   shape, not values or ordering; a wrong-but-well-typed response passes.
   Pair with proxymock-regression-test for behavior.
@@ -183,7 +187,9 @@ The proof is hermetic (no app build, no network, no cloud). It checks the
 committed recording's outbound pairs against the committed `lab/openapi.yaml`
 and verifies 5/5 conformant (exit 0); seeds `stars: "many"` into a copied
 pair and verifies exit 2 with the exact violation string; checks a pair
-whose route the spec lacks and verifies exit 3 with the pair named;
-generates mocks from the committed spec, verifies non-empty 200 bodies, the
-enum-without-example warning, and a clean mock load via `--serve` (then
-tears it down); and verifies a missing `--spec` exits 4.
+whose route the spec lacks and verifies exit 3 with the pair named; seeds an
+undocumented field and verifies it is a note by default (exit 0) and a
+violation under `--fail-on-undocumented` (exit 2); generates mocks from the
+committed spec, verifies non-empty 200 bodies, that the generated pairs
+validate against the spec they came from, and a clean mock load via
+`--serve` (then tears it down); and verifies a missing `--spec` exits 4.

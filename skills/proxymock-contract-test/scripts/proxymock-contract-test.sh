@@ -23,20 +23,20 @@ Tier 1 contract testing from traffic plus OpenAPI, in two directions:
                   --in <generated>` command, or starts it with --serve.
                   Generated payloads are skeleton-grade (smoke/plumbing
                   tier): required-only fields by default, 2 identical stub
-                  items per array, and example-less enum fields get the
-                  literal "example_value" (violates the spec's own enum;
-                  warned about in the output).
+                  items per array, and example-less string fields get the
+                  literal "example_value" (enum fields get a real member of
+                  their enum).
 
   conformance     validate recorded/replayed RRPair response bodies against
-                  an OpenAPI spec via the bundled check_conformance.py.
-                  proxymock has NO native path for this (nothing in
-                  generate/report/replay/files-compare/drift accepts a
-                  spec; --fail-if is metrics-only). Checks type, required,
-                  enum, and undocumented fields, with $ref resolution.
+                  an OpenAPI spec. This is a thin wrapper over the native
+                  `proxymock validate --spec ... --in ...`, which checks
+                  type, required, enum, and undocumented fields with $ref
+                  resolution. The wrapper adds --paths filtering, the
+                  undocumented-fields policy, and summary.json.
 
 Shared options:
-  --spec FILE           OpenAPI 3.0+ spec, .json or .yaml (YAML needs
-                        PyYAML or ruby; else convert to .json first)
+  --spec FILE           OpenAPI 3.0+ spec, .json, .yaml, or .yml (parsed by
+                        proxymock; no python YAML dependency)
   --work-dir DIR        Where to write outputs (default: timestamped dir)
   --proxymock PATH      proxymock binary (default: proxymock from PATH)
   -h, --help            Show this help
@@ -56,11 +56,19 @@ mock-from-spec options (mirroring `proxymock generate`):
   --serve               Start `proxymock mock --in <generated>` after
                         generating (writes serve.json and mock.log)
 
-conformance options (forwarded to check_conformance.py):
+conformance options:
   --in DIR              RRPair directory to check (a recording, one host
-                        subdir of it, or a replay output dir)
-  --paths REGEX         Only check pairs whose request path matches
-  --fail-on-undocumented  Treat undocumented response fields as violations
+                        subdir of it, or a replay output dir). Passed to
+                        `proxymock validate --in`.
+  --paths REGEX         Only report pairs whose request path matches. No
+                        native equivalent; applied as a filter over the
+                        validate output, so the counts and the exit code
+                        describe the kept pairs.
+  --fail-on-undocumented  Treat undocumented response fields as violations.
+                        Native validate ALWAYS does; without this flag the
+                        wrapper downgrades undocumented-field findings to
+                        notes, which keeps additive response fields
+                        non-breaking.
 
 Exit codes:
   0  mock-from-spec: generated (and, with --serve, the mock loaded)
@@ -73,7 +81,8 @@ Exit codes:
      produced nothing, --serve mock failed to load)
 
 Output files (in --work-dir):
-  conformance:    summary.json (per-pair verdicts and counts)
+  conformance:    summary.json (per-pair verdicts and counts), validate.out
+                  (raw `proxymock validate` output)
   mock-from-spec: generated/ (unless --out), generate.log, summary.json,
                   and with --serve: serve.json, mock.log
 
@@ -91,9 +100,6 @@ USAGE
 # precondition/usage failures are exit 4 per the output contract
 die() { ql_die 4 "$@"; }
 need_cmd() { ql_need_cmd "$1" 4; }
-
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-checker="$script_dir/check_conformance.py"
 
 mode=""
 spec=""
@@ -150,7 +156,7 @@ case "$mode" in
 esac
 
 need_cmd python3
-[[ -f "$checker" ]] || die "bundled checker missing: $checker"
+ql_check_proxymock_bin "$proxymock_bin" 4
 [[ -n "$spec" ]] || die "--spec is required"
 [[ -f "$spec" ]] || die "spec not found: $spec"
 spec="$(ql_abs_path "$spec")"
@@ -166,18 +172,140 @@ summary_json="$work_dir/summary.json"
 if [[ "$mode" == "conformance" ]]; then
   [[ -n "$in_dir" ]] || die "conformance mode requires --in <rrpair dir>"
   [[ -d "$in_dir" ]] || die "--in is not a directory: $in_dir"
-  args=(--spec "$spec" --in "$in_dir" --summary "$summary_json")
-  [[ -n "$paths_regex" ]] && args+=(--paths "$paths_regex")
-  [[ "$fail_on_undocumented" == "1" ]] && args+=(--fail-on-undocumented)
+  in_dir="$(ql_abs_path "$in_dir")"
+  raw="$work_dir/validate.out"
+
+  # no pipe: a pipeline reports the LAST command's status, which would hide
+  # validate's 0/2/3 verdict codes
+  native_rc=0
+  "$proxymock_bin" validate --spec "$spec" --in "$in_dir" >"$raw" 2>&1 || native_rc=$?
+  case "$native_rc" in
+    0|2|3) ;;
+    *) cat "$raw" >&2; die "proxymock validate failed (exit $native_rc)" ;;
+  esac
+
   rc=0
-  python3 "$checker" "${args[@]}" || rc=$?
-  echo "summary: $summary_json"
+  python3 - "$raw" "$summary_json" "$native_rc" "$paths_regex" \
+    "$fail_on_undocumented" "$spec" "$in_dir" <<'PY' || rc=$?
+import json, re, sys
+
+raw, summary_path, native_rc, paths_regex, strict_arg, spec, in_dir = sys.argv[1:8]
+native_rc = int(native_rc)
+strict = strict_arg == "1"
+
+# `proxymock validate` line shapes:
+#   VERDICT METHOD PATH (STATUS)  [FILE]
+#     <finding>            <- indented, belongs to the pair above
+#   checked N pair(s): A conformant, B violating, C without a spec route
+PAIR_RE = re.compile(r"^(CONFORMANT|VIOLATION|NO_ROUTE)\s+(\S+)\s+(\S+)\s+\((\d+|\?)\)\s+\[(.*)\]$")
+TOTAL_RE = re.compile(r"^checked (\d+) pair")
+UNDOC_RE = re.compile(r":\s+undocumented field\b")
+
+pairs, total = [], None
+for line in open(raw).read().splitlines():
+    m = PAIR_RE.match(line)
+    if m:
+        verdict, method, path, status, f = m.groups()
+        pairs.append({"file": f, "method": method, "path": path,
+                      "status": int(status) if status.isdigit() else None,
+                      "nativeVerdict": verdict, "findings": []})
+        continue
+    m = TOTAL_RE.match(line)
+    if m:
+        total = int(m.group(1))
+        continue
+    if line.startswith("  ") and line.strip() and pairs:
+        pairs[-1]["findings"].append(line.strip())
+
+# this wrapper reads validate's text output, so a format change must be loud
+# rather than silently mis-summarized
+if total is None or total != len(pairs):
+    print("error: could not parse `proxymock validate` output (parsed %d pair(s), "
+          "it reported %s). proxymock version skew? raw output: %s"
+          % (len(pairs), total, raw), file=sys.stderr)
+    sys.exit(4)
+
+
+def judge(pair, strict):
+    """Verdict, violations, notes. Native counts undocumented fields as
+    violations unconditionally; we downgrade them unless --fail-on-undocumented."""
+    if pair["nativeVerdict"] == "NO_ROUTE":
+        return "NO_ROUTE", [], []
+    violations, notes = [], []
+    for f in pair["findings"]:
+        (violations if strict or not UNDOC_RE.search(f) else notes).append(f)
+    return ("VIOLATION" if violations else "CONFORMANT"), violations, notes
+
+
+def exit_code(results):
+    if any(r["verdict"] == "VIOLATION" for r in results):
+        return 2
+    if any(r["verdict"] == "NO_ROUTE" for r in results):
+        return 3
+    return 0
+
+
+def build(keep, strict):
+    out = []
+    for p in keep:
+        verdict, violations, notes = judge(p, strict)
+        out.append({"file": p["file"], "method": p["method"], "path": p["path"],
+                    "status": p["status"], "verdict": verdict,
+                    "violations": violations, "undocumented": notes})
+    return out
+
+
+# unfiltered + strict reproduces native exactly: a mismatch means the parse
+# drifted from what validate actually reported
+if exit_code(build(pairs, True)) != native_rc:
+    print("error: parsed verdicts disagree with `proxymock validate` exit %d; see %s"
+          % (native_rc, raw), file=sys.stderr)
+    sys.exit(4)
+
+path_filter = re.compile(paths_regex) if paths_regex else None
+kept = [p for p in pairs if not path_filter or path_filter.search(p["path"])]
+if not kept:
+    print("error: no RRPairs left to check under %s after the --paths filter %r"
+          % (in_dir, paths_regex), file=sys.stderr)
+    sys.exit(4)
+
+results = build(kept, strict)
+n_conf = sum(1 for r in results if r["verdict"] == "CONFORMANT")
+n_viol = sum(1 for r in results if r["verdict"] == "VIOLATION")
+n_none = sum(1 for r in results if r["verdict"] == "NO_ROUTE")
+rc = exit_code(results)
+
+for r in results:
+    print("%-10s %s %s (%s)  [%s]" % (r["verdict"], r["method"], r["path"],
+                                      r["status"] if r["status"] is not None else "?",
+                                      r["file"]))
+    for v in r["violations"]:
+        print("  " + v)
+    for u in r["undocumented"]:
+        print("  note: " + u)
+print()
+print("checked %d pair(s): %d conformant, %d violating, %d without a spec route"
+      % (len(results), n_conf, n_viol, n_none))
+if n_none:
+    print("partial coverage: the spec has no route for the NO_ROUTE pair(s) above;")
+    print("if that side is your own app, its contract is the recording, not this")
+    print("spec (use proxymock-regression-test for that direction)")
+
+with open(summary_path, "w") as f:
+    json.dump({"spec": spec, "inDir": in_dir, "pathsFilter": paths_regex or None,
+               "failOnUndocumented": strict, "engine": "proxymock validate",
+               "checked": len(results), "conformant": n_conf, "violating": n_viol,
+               "noRoute": n_none, "results": results, "exitCode": rc},
+              f, indent=2, sort_keys=True)
+    f.write("\n")
+sys.exit(rc)
+PY
+  if [[ -s "$summary_json" ]]; then echo "summary: $summary_json"; fi
+  echo "raw validate output: $raw"
   exit "$rc"
 fi
 
 # --- mode: mock-from-spec -----------------------------------------------------
-ql_check_proxymock_bin "$proxymock_bin" 4
-
 [[ -n "$out_dir" ]] || out_dir="$work_dir/generated"
 mkdir -p "$out_dir"
 out_dir="$(ql_abs_path "$out_dir")"
@@ -209,22 +337,10 @@ echo "generated: $pair_count RRPair(s) in $out_dir (log: $gen_log)"
 # Measured limits of generated payloads; keep expectations at smoke tier.
 echo "note: generated bodies are skeleton-grade: required-only fields by"
 echo "note: default (pass --include-optional for fuller bodies), arrays are"
-echo "note: 2 identical stub items, one response per status, path params are"
-echo "note: match-any templates, and https spec servers are emitted as"
-echo "note: http://:80 in the artifacts (signature matching still works)."
-
-# Enum fields without an example generate the literal "example_value",
-# which violates the spec's own enum: apps that branch on those values will
-# see impossible data. Warn whenever the spec has such fields.
-enum_gaps="$(python3 "$checker" --spec "$spec" --enum-gaps)"
-if [[ -n "$enum_gaps" ]]; then
-  echo "WARNING: this spec has enum fields without examples; generated bodies" >&2
-  echo "WARNING: will contain the literal \"example_value\" there, which violates" >&2
-  echo "WARNING: the spec's own enum. Affected locations:" >&2
-  while IFS= read -r line; do
-    echo "WARNING:   ${line#enum-without-example: }" >&2
-  done <<<"$enum_gaps"
-fi
+echo "note: 2 identical stub items, one response per status, and path params"
+echo "note: are match-any templates - including params the spec constrains"
+echo "note: with an enum. Example-less string fields get the literal"
+echo "note: \"example_value\"; enum fields get a real member of their enum."
 
 mock_cmd="$proxymock_bin mock --in $out_dir"
 

@@ -14,8 +14,9 @@ intermittently failing. The faults live in the mock, not the app: what you
 observe is your service's resilience behavior, which is the point.
 
 Faults are process flags, not data. The recording is served AS IS: no copy,
-no RRPair edits, no variant to validate, nothing to roll back. Responses that
-carry an injected fault are tagged with `x-speedscale-chaos: proxymock fault`.
+no RRPair edits, no variant to validate, nothing to roll back. Every mocked
+response carries `x-speedscale-chaos`, valued `proxymock fault` when a fault
+fired and `none` when it did not, so match on the value, not on presence.
 
 This workflow uses local files and the `proxymock` CLI. It does not require
 Speedscale Cloud access.
@@ -35,7 +36,9 @@ Speedscale Cloud access.
     multiplier, which slows every mocked endpoint and makes `--target`
     advisory.
   - `connection`: `connection=refuse|reset|stall|drop` (`--connection`,
-    default `reset`). Read the HTTP/2 trap below before using this.
+    default `reset`). Read "what each connection fault looks like" below:
+    the four are not interchangeable, and `drop` needs a different
+    assertion than the rest.
   - `flaky`: `status=503,rate=F/N` (`--ratio`, default `1/2`).
 - `--target`: the fault regexp (RE2), and the single most common source of
   faults that do nothing. It is **unanchored** and matched against the
@@ -44,6 +47,12 @@ Speedscale Cloud access.
   parses fine, starts fine, and matches nothing. Use a plain path substring
   like `'/v1/projects'`. The script pre-checks the pattern against the
   loaded outbound pairs and exits 2 rather than serving a silent no-op.
+  proxymock warns about this itself now (`Warning: --fault pattern ...
+  matches no mock data, so it will never fire`), but only where its own
+  output goes: a mock that WRAPS your app (`-- go run .`) redirects that
+  output to `proxymock.log`, so the warning never reaches the terminal.
+  Standalone mocks print it. The pre-check is the signal that always shows
+  up.
 - `--ratio F/N`: composes with any scenario, so
   `--scenario ratelimit --ratio 1/3` is a 429 on the first request of every
   three. Only the `F/N` form is accepted by proxymock: `0.5` and `50%` are
@@ -81,30 +90,38 @@ If this skill has been copied outside `mock-lab`, replace
 source shared helpers from `skills/lib/common.sh` (resolved as
 `../../lib/common.sh` relative to the scripts), so copy that file alongside.
 
-## The HTTP/2 trap (read before using connection faults)
+## What each connection fault looks like
 
-`connection=` faults are **silently ignored when the mocked response is
-HTTP/2**. There is no warning and no log line at any verbosity: the app just
-gets a clean 200 and you conclude your service handles socket failures fine.
-The gate is the protocol, not TLS, and proxymock replays the protocol version
-that was recorded, so a recording captured over h2 makes every connection
-fault invisible.
+All four fire regardless of the recorded protocol, HTTP/2 included, and only
+on the endpoints `--target` matches: measured against the committed h2
+recording, `/v1/projects` failed under every action while an untargeted
+`/v1/categories` kept returning its full 200 body.
 
-The script refuses this combination: when the pairs matched by `--target`
-carry an HTTP/2 response line it prints which endpoints are affected and
-**exits 5** instead of starting a mock that would prove nothing. To exercise
-the socket path anyway:
+What differs is how the failure reaches you, which decides what a test can
+assert:
 
-- recapture the dependency over HTTP/1.1, or
-- drive the mock with an h1 client (`curl --http1.1 -x http://127.0.0.1:PORT`),
-  or
-- use `status=` / `body=` faults, which fire on both protocols.
+- **`refuse` and `reset` are the same finding.** Both cut the connection
+  before a complete response arrives, and a Go HTTP client reports both as
+  `unexpected EOF` (the lab app turns that into a 502). At the socket level
+  they are distinguishable (`curl` exits 52 vs 56), but nothing above the
+  transport can tell you which one was injected, so do not write an
+  assertion that claims to.
+- **`stall` only fails if the client has a timeout.** The mock accepts the
+  request and never answers; without a client deadline the call hangs
+  forever. Measured with `curl -m 8`: exit 28 at 8s. An app with no timeout
+  hangs with it, which is itself the finding.
+- **`drop` is the sharp one.** It truncates mid-stream, so the status line
+  and headers are already on the wire: a pass-through handler returns
+  **HTTP 200 with a silently short body**. Through the mock's proxy port the
+  response advertises `Content-Length: 17` and delivers 7 bytes (`curl` exit
+  18); through an app that copies the body onward, clients get a
+  syntactically plausible fragment with no error anywhere in the chain.
+  **Assert on body length or content, not on status.** A handler that
+  JSON-decodes the body surfaces the truncation as a 5xx instead.
 
-`--allow-http2-connection-fault` downgrades the refusal to a loud warning
-when you know your client negotiates h1.
-
-On the h1 path all four connection actions work: `refuse` is an EOF, `reset`
-an RST, `stall` an unbounded hang, and `drop` cuts the stream mid-response.
+`x-speedscale-chaos: proxymock fault` tags responses carrying a `status=`,
+`header=`, `body=`, or `latency=` fault. Connection faults have no complete
+response to tag, so do not look for the header there.
 
 ## What still needs file edits
 
@@ -149,8 +166,8 @@ cannot run this skill; shell out to the CLI.
 
 ## Output contract
 
-Without `--serve` the script prints the matched endpoints (with their
-recorded HTTP version) and the exact `proxymock mock --fault` command. With
+Without `--serve` the script prints the matched endpoints and the exact
+`proxymock mock --fault` command. With
 `--serve` it writes `serve.json` (pid, ports, the fault specs in use, the
 served and source recordings) and `mock.log` to `--work-dir`, plus
 `recording/` when `--custom-body` forced a copy.
@@ -165,7 +182,6 @@ Exit codes:
 - `4`: precondition or usage failure, including fault specs proxymock would
   reject (`--latency` without a unit, `--ratio 50%`, an unknown
   `--connection` action).
-- `5`: a `connection=` fault was requested against HTTP/2 pairs.
 
 ## Interpretation
 
@@ -191,11 +207,12 @@ What the app under test does with each lie is the finding:
   instead (5xx, hang, fallback) is the finding. A `stall` connection fault
   finds the same bug harder: the lab app has no client timeout at all and
   hangs forever.
-- **connection=drop**: the new defect class, and one no file edit could ever
-  surface. The response advertises `Content-Length: 17` and writes 7 bytes.
-  An app that ignores the `io.ReadAll` error returns 200 with a truncated
-  body, so its clients get a short, syntactically plausible payload with no
-  error anywhere in the chain.
+- **connection=drop**: the defect class no file edit could ever surface. The
+  response advertises `Content-Length: 17` and writes 7 bytes. An app that
+  ignores the `io.ReadAll` error returns 200 with a truncated body, so its
+  clients get a short, syntactically plausible payload with no error
+  anywhere in the chain. A gate built on this scenario has to compare body
+  length or content; status alone reports success.
 
 ## Related
 
@@ -218,8 +235,10 @@ natively and verifies proxy-observed behavior: a 503 on the target with the
 untargeted endpoint still healthy and the `x-speedscale-chaos` header
 present; a 429 carrying `Retry-After: 30`; `rate=1/3` producing exactly
 `503 200 200 503 200 200`; a `latency=500ms` fault delaying only the target;
-and a fault-free downstream after `--restore` on the same port. It also
-proves both silent traps are gated: the scheme+port form of a plausible
-pattern exits 2 with the matching rules explained, and a `connection=reset`
-fault against the recording's HTTP/2 pairs exits 5 (and warns loudly under
-`--allow-http2-connection-fault`).
+and a fault-free downstream after `--restore` on the same port. It then
+proves connection faults fire on the committed recording, which is HTTP/2:
+against a same-port fault-free control, `connection=reset` breaks the target
+request at the transport while the untargeted endpoint keeps its full body,
+and `connection=drop` returns a 200 whose body is shorter than the control's.
+The silent no-op is still gated: the scheme+port form of a plausible pattern
+exits 2 with the matching rules explained.

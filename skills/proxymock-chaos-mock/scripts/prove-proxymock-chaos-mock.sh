@@ -2,9 +2,10 @@
 # Proves: native --fault injection serves the documented behavior straight off
 # the UNMODIFIED committed recording - status faults, a Retry-After header, an
 # exact deterministic rate=F/N ratio, per-endpoint latency, the chaos response
-# header, and a fault-free downstream after --restore - and that both silent
-# traps are gated: a pattern matching nothing exits 2, and a connection= fault
-# against HTTP/2 pairs exits 5 instead of being silently ignored.
+# header, and a fault-free downstream after --restore; that connection faults
+# fire on that recording, which is HTTP/2, with reset breaking the target and
+# drop truncating its body against a same-port fault-free control; and that a
+# --target matching nothing exits 2 instead of serving a silent no-op.
 set -euo pipefail
 
 # shared ql_* helpers; a copied skill needs skills/lib/common.sh too
@@ -49,6 +50,16 @@ proxy_curl() {
   # proxy_curl PATH -> status code
   curl -s -o /dev/null -m 10 -w '%{http_code}' \
     -x "http://127.0.0.1:$port" "${downstream}$1"
+}
+
+proxy_fetch() {
+  # proxy_fetch PATH OUTFILE -> "CURL_RC HTTP_CODE BYTES". Connection faults
+  # fail at the transport, where a status code alone says nothing.
+  local p="$1" out="$2" code="" rc=0
+  : >"$out"
+  code="$(curl -s -m 10 -o "$out" -w '%{http_code}' \
+    -x "http://127.0.0.1:$port" "${downstream}$p")" || rc=$?
+  echo "$rc ${code:-000} $(wc -c <"$out" | tr -d ' ')"
 }
 
 serve_chaos() {
@@ -133,21 +144,44 @@ grep -q 'no scheme, no port, no method' "$tmp/nomatch.out" \
   || die "exit 2 without the matching-rule explanation"
 echo "  exit 2: the scheme+port form matches nothing, as documented"
 
-echo "step 7: connection fault against HTTP/2 pairs is refused with exit 5"
-rc=0
-"$chaos_script" --in "$recording" --scenario connection --connection reset \
-  --target '/v1/projects' --work-dir "$tmp/h2" >"$tmp/h2.out" 2>&1 || rc=$?
-[[ "$rc" -eq 5 ]] || { cat "$tmp/h2.out" >&2; die "expected exit 5, got $rc"; }
-grep -q 'SILENTLY IGNORED' "$tmp/h2.out" || die "exit 5 without the HTTP/2 explanation"
-grep -q 'http1.1' "$tmp/h2.out" || die "exit 5 without the h1 workaround"
-rc=0
-"$chaos_script" --in "$recording" --scenario connection --connection reset \
-  --target '/v1/projects' --allow-http2-connection-fault \
-  --work-dir "$tmp/h2-override" >"$tmp/h2-override.out" 2>&1 || rc=$?
-[[ "$rc" -eq 0 ]] || { cat "$tmp/h2-override.out" >&2; die "override should exit 0, got $rc"; }
-grep -q 'WARNING: connection= faults are SILENTLY IGNORED' "$tmp/h2-override.out" \
-  || die "override did not warn"
-echo "  exit 5 by default, loud WARNING with --allow-http2-connection-fault"
+echo "step 7: connection=reset fires on the HTTP/2 recording, target-only"
+# every response in the committed recording is HTTP/2, which used to make
+# connection faults invisible; the control is the same mock on the same port
+# after --restore
+grep -q '^HTTP/2' "$recording/demo-api.trafficreplay.com/2026-06-25_18-56-36.852193Z.md" \
+  || die "the committed recording is no longer HTTP/2; this step proves nothing"
+serve_chaos reset --scenario connection --connection reset --target '/v1/projects'
+read -r f_rc f_code _ < <(proxy_fetch /v1/projects "$tmp/reset-target.body")
+[[ "$f_rc" -ne 0 && "$f_code" == "000" ]] \
+  || die "reset: target answered normally (curl rc $f_rc, status $f_code)"
+read -r u_rc u_code u_bytes < <(proxy_fetch /v1/categories "$tmp/reset-other.body")
+[[ "$u_rc" -eq 0 && "$u_code" == "200" ]] \
+  || die "reset: untargeted endpoint broke too (curl rc $u_rc, status $u_code)"
+"$chaos_script" --restore --work-dir "$tmp/reset" >"$tmp/reset-restore.out" 2>&1 || {
+  cat "$tmp/reset-restore.out" >&2
+  die "reset: --restore failed"
+}
+read -r c_rc c_code c_bytes < <(proxy_fetch /v1/projects "$tmp/control.body")
+read -r _ _ c_other < <(proxy_fetch /v1/categories "$tmp/control-other.body")
+[[ "$c_rc" -eq 0 && "$c_code" == "200" && "$c_bytes" -gt 0 ]] \
+  || die "reset: control run did not serve the target (curl rc $c_rc, status $c_code)"
+[[ "$u_bytes" -eq "$c_other" ]] \
+  || die "reset: untargeted body changed under the fault ($u_bytes vs $c_other bytes)"
+echo "  target broken at the transport (curl rc $f_rc), untargeted intact at $u_bytes bytes,"
+echo "  same port fault-free after restore: $c_bytes bytes"
+ql_sweep_port "$port"
+
+echo "step 8: connection=drop returns 200 with a silently truncated body"
+serve_chaos drop --scenario connection --connection drop --target '/v1/projects'
+read -r d_rc d_code d_bytes < <(proxy_fetch /v1/projects "$tmp/drop-target.body")
+[[ "$d_code" == "200" ]] || die "drop: expected a 200 status, got $d_code"
+[[ "$d_bytes" -lt "$c_bytes" ]] \
+  || die "drop: body was not truncated ($d_bytes of $c_bytes control bytes)"
+read -r _ o_code o_bytes < <(proxy_fetch /v1/categories "$tmp/drop-other.body")
+[[ "$o_code" == "200" && "$o_bytes" -eq "$c_other" ]] \
+  || die "drop: untargeted endpoint was not intact ($o_code, $o_bytes bytes)"
+echo "  200 with $d_bytes of $c_bytes bytes (curl rc $d_rc): status alone would pass"
+ql_sweep_port "$port"
 
 # the recording is served as is: nothing in this proof may have touched it
 if command -v git >/dev/null 2>&1 && git -C "$repo_root" rev-parse >/dev/null 2>&1; then
@@ -156,4 +190,6 @@ if command -v git >/dev/null 2>&1 && git -C "$repo_root" rev-parse >/dev/null 2>
 fi
 echo "  source recording untouched"
 
-echo "PASS: native faults observed (status, header, exact ratio, latency, chaos header), restore clean, exits 2 and 5 proven"
+echo "PASS: native faults observed (status, header, exact ratio, latency, chaos header),"
+echo "PASS: connection faults fire on the HTTP/2 recording (reset breaks the target, drop"
+echo "PASS: truncates it) with untargeted traffic intact, restore clean, exit 2 proven"

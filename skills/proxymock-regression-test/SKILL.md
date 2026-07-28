@@ -101,20 +101,27 @@ scripts source shared helpers from `skills/lib/common.sh` (resolved as
   proxymock/blueprints/…`, two replayed RRPairs carry `smart_replace`, and the
   verdict is `pass` where the control failed `/api/orders` 201→401. That second
   path is not universal — a byte-identical copy of the same recording under a
-  different directory name in the same workspace did not pick it up — so
-  confirm it with the `Loaded blueprint` line rather than assuming it either
-  way, and never move a blueprint the log says is loading. Not cwd. If no
-  blueprint is loadable the script warns loudly: auth and moving-ID endpoints
-  will be unreplayable (401s), and a regression on their success paths is
-  UNDETECTABLE because they fail before and after the change.
+  different directory name in the same workspace did not pick it up, and
+  `lab/proxymock/blueprints/` never loaded for `--in lab/proxymock/recording`,
+  which is why mock-lab's blueprint lives at
+  `lab/proxymock/recording/blueprints/`. Confirm with the `Loaded blueprint`
+  line rather than assuming it either way, and never move a blueprint the log
+  says is loading. Not cwd. If no blueprint is loadable the script warns
+  loudly: auth and moving-ID endpoints will be unreplayable (401s), and a
+  regression on their success paths is UNDETECTABLE because they fail before
+  and after the change.
 - **Blueprint application.** Loading a blueprint is not running it, and the
   `Loaded blueprint ...` console lines only report loading. The script verifies
   application by grepping the replay output RRPairs for `smart_replace` events
   and warns when a blueprint exists but none appear. A common cause of that
-  warning is the blueprint's own filters, not staging: mock-lab's filters on
-  `network_address CONTAINS "localhost"`, and replay rewrites the address to
-  the `--test-against` target, so the same run against `http://127.0.0.1:PORT`
-  loads it and fires nothing while `http://localhost:PORT` fires both chains.
+  warning is the blueprint's own filters, not staging — specifically
+  `network_address`. Replay rewrites the network address to the
+  `--test-against` target, so such a filter binds the blueprint to one spelling
+  of that target: mock-lab's blueprint used to filter on
+  `CONTAINS "localhost"` and fired both chains against `http://localhost:PORT`
+  while the same run against `http://127.0.0.1:PORT` loaded it and fired
+  nothing. It now filters on `detectedLocation` / `detectedCommand` only and
+  fires against either. Scope by `services`, never by network address.
   Replay's own `--require-blueprint` works on v2.5.814: with the blueprint
   loaded it exits 0 and `<out>/replay-verdict.json` is still written; with an
   unresolvable name it exits 1 ("was not loaded from the `--in` workspace") and
@@ -169,7 +176,10 @@ When both fire, the status-level code (3) wins.
   not. The script prints each `bodyChanges` entry as a `BODY <severity>` line.
 - **Failures present but none new**: the known noise floor (moving-ID endpoints
   without an applied blueprint, and the recording's own rotating ids). Fix the
-  blueprint to shrink it, or keep gating baseline-relative.
+  blueprint to shrink it, or keep gating baseline-relative. mock-lab's own
+  `lab/proxymock/recording` has no noise floor left: with its blueprint
+  chaining both moving IDs, all 8 pairs match on status and body, so any
+  failure there is real.
 - **`ADVISORY: masked but different`**: a pair the gate is masking is failing
   differently than it did in the baseline. The gate cannot see this; read the
   pair by hand.

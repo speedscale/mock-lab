@@ -104,16 +104,22 @@ A repo enters the loop once; after this every route reads the same files.
    `proxymock/<recording>/` — also loads and fires, measured against a
    no-blueprint control, but not for every recording: a byte-identical copy of
    the same recording under a different directory name in the same workspace
-   did not pick it up. In this repo both cases are visible:
-   `go/proxymock/blueprints/` loads for `--in ./proxymock/recorded-go-baseline`,
-   while `lab/proxymock/blueprints/` does not load for
-   `--in lab/proxymock/recording` — which is why `/api/orders` 401s in the lab
-   baseline. Either way, confirm with the `Loaded blueprint …` line in the
-   replay output before concluding a blueprint is inert, and stage inside the
-   recording when you need it to load unconditionally. Blueprints in
-   `~/.speedscale/data/transforms/` load globally on top of either. Without an
-   applied blueprint, moving-ID endpoints 401/404 on every replay and
-   regressions on those paths are undetectable.
+   did not pick it up — `lab/proxymock/blueprints/` never loaded for
+   `--in lab/proxymock/recording`, which is why the lab blueprint now lives at
+   `lab/proxymock/recording/blueprints/` instead. Either way, confirm with the
+   `Loaded blueprint …` line in the replay output before concluding a blueprint
+   is inert, and stage inside the recording when you need it to load
+   unconditionally. Blueprints in `~/.speedscale/data/transforms/` load globally
+   on top of either. Without an applied blueprint, moving-ID endpoints 401/404
+   on every replay and regressions on those paths are undetectable.
+5. **Keep blueprint filters off the network address.** Replay rewrites the
+   network address to the `--test-against` target, so a `network_address`
+   filter binds the blueprint to one spelling of that target and silently goes
+   inert against any other. The lab blueprint used to filter on
+   `CONTAINS "localhost"`: it fired both chains against `http://localhost:PORT`
+   and nothing against `http://127.0.0.1:PORT`, logging `Loaded blueprint` both
+   times. Filter on `detectedLocation` / `detectedCommand` and scope by
+   `services` instead.
 
 `quality-loop.sh doctor` verifies all of this.
 
@@ -133,6 +139,10 @@ because every flow eventually hits them.
   skills warn on an inert blueprint and still measure, using `smart_replace`
   events in the replay output as the evidence that a chain really ran. Pass
   `--require-blueprint` yourself if you would rather proxymock enforce it.
+- **Loaded but inert**: the usual cause is the blueprint's own filters, not
+  staging. A `network_address` filter is the common trap — replay rewrites the
+  address to the `--test-against` target, so the filter matches one spelling of
+  it and nothing else (see setup step 5).
 - **A blueprint's own filters can be host-scoped**: mock-lab's blueprint filters
   on `network_address CONTAINS "localhost"`, and replay rewrites the address to
   the `--test-against` target. Replaying against `http://localhost:PORT` fires

@@ -110,12 +110,16 @@ source shared helpers from `skills/lib/common.sh` (resolved as
   recording, e.g. `proxymock/blueprints/` next to `proxymock/<recording>/`. The
   second was measured loading and firing on v2.5.814 against a no-blueprint
   control, but is not universal — a byte-identical copy of the same recording
-  under a different directory name in the same workspace did not pick it up.
+  under a different directory name in the same workspace did not pick it up,
+  and `lab/proxymock/blueprints/` never loaded for the lab recording, which is
+  why mock-lab's blueprint sits at `lab/proxymock/recording/blueprints/`.
   Confirm with the `Loaded blueprint` line; never move a blueprint the log says
   is loading. Not cwd. The script warns when no blueprint is loadable, and
   warns again when a blueprint exists but no `smart_replace` events appear in
-  the replay output,
-  since loading a blueprint is not running it. Unapplied blueprints make
+  the replay output, since loading a blueprint is not running it. When that
+  second warning fires, suspect the blueprint's `network_address` filter first:
+  replay rewrites the address to the `--test-against` target, so the filter
+  matches one spelling of it and nothing else. Unapplied blueprints make
   moving-ID endpoints fail for reasons unrelated to the fix and pollute the
   collateral list. Replay's own `--require-blueprint` works on v2.5.814 (exit 0
   and a verdict when the blueprint loaded, exit 1 and no verdict when it did

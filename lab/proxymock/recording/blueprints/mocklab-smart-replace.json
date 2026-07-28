@@ -1,7 +1,7 @@
 {
   "id": "11111111-2222-3333-4444-555555555555",
   "name": "mock-lab smart replace (token + order_id)",
-  "description": "Chains the two moving IDs on replay: access_token from POST /oauth/token into the Authorization header, and order_id from POST /api/orders into the GET /api/orders/{id} path.",
+  "description": "Chains the two moving IDs on replay: access_token from POST /oauth/token into the Authorization header, and order_id from POST /api/orders into the GET /api/orders/{id} path. Filters deliberately omit network_address: replay rewrites the address to the --test-against target, so a network_address filter binds the blueprint to one spelling of the target and fires nothing against any other (measured: 'localhost' fires, '127.0.0.1' loads and fires nothing). detectedLocation alone is unambiguous here -- these paths exist only in the inbound localhost traffic.",
   "services": ["localhost"],
   "iterationCount": 0,
   "finalMatchRate": 0,
@@ -12,7 +12,6 @@
       {
         "filters": {
           "filters": [
-            { "include": true, "operator": "CONTAINS", "network_address": "localhost" },
             { "include": true, "detectedLocation": "/oauth/token" },
             { "include": true, "detectedCommand": "POST" }
           ]
@@ -27,7 +26,6 @@
       {
         "filters": {
           "filters": [
-            { "include": true, "operator": "CONTAINS", "network_address": "localhost" },
             { "include": true, "detectedLocation": "/api/orders" },
             { "include": true, "detectedCommand": "POST" }
           ]

@@ -8,7 +8,9 @@
 # DIFFERENTLY stays masked (exit 0) with the masked-but-different advisory.
 # Also pins the blueprint precondition: a blueprint in <recording>/blueprints/
 # loads and its chains fire, --require-blueprint keeps the verdict on success
-# and writes none on failure, and that raw exit 1 maps onto exit 2.
+# and writes none on failure, that raw exit 1 maps onto exit 2, and the
+# committed blueprint chains both moving IDs against either spelling of the
+# loopback target.
 set -euo pipefail
 
 # shared ql_* helpers; a copied skill needs skills/lib/common.sh too
@@ -47,9 +49,10 @@ out_port="$(ql_pick_port)"
 health_port="$(ql_pick_port)"
 status_port="$(ql_pick_port)"
 body_port="$(ql_pick_port)"
+masked_base_port="$(ql_pick_port)"
 masked_port="$(ql_pick_port)"
 ports=("$app_port" "$out_port" "$health_port" "$status_port" "$body_port"
-       "$masked_port")
+       "$masked_base_port" "$masked_port")
 
 echo "starting mock-lab Go app with downstream mocked from the recording"
 ( cd "$repo_root/go" && PORT="$app_port" \
@@ -100,10 +103,13 @@ pids+=("$!")
 python3 "$tmp/stub.py" "$body_port" "$recording" \
   '{"/api/stats": {"replace": ["\"total\": 24", "\"total\": 25"]}}' &
 pids+=("$!")
-python3 "$tmp/stub.py" "$masked_port" "$recording" \
-  '{"/api/orders": {"status": 500}}' &
+python3 "$tmp/stub.py" "$masked_base_port" "$recording" \
+  '{"/api/categories": {"status": 503}}' &
 pids+=("$!")
-for p in "$status_port" "$body_port" "$masked_port"; do
+python3 "$tmp/stub.py" "$masked_port" "$recording" \
+  '{"/api/categories": {"status": 500}}' &
+pids+=("$!")
+for p in "$status_port" "$body_port" "$masked_base_port" "$masked_port"; do
   ql_wait_url "http://127.0.0.1:${p}/" || die "recorded-body stub on $p did not start"
 done
 
@@ -172,16 +178,40 @@ if s.get("requestsFailed") != 0:
 print("PASS: body-only change caught with the status unchanged, requests.failed=0")
 PY
 
-echo "step 5: already-failing pair fails DIFFERENTLY (401 -> 500; expect exit 3)"
-# /api/orders 401s in the baseline (no blueprint applied). This stub answers 500
-# on the same pair: the pair was already a mismatch, so the question is whether
-# baseline masking swallows the change. It does not -- measured on v2.5.812, a
-# different observed status on an already-failing pair scores newMismatch true.
+echo "step 5: already-failing pair fails DIFFERENTLY (503 -> 500; expect exit 3)"
+# Needs a pair that is ALREADY a mismatch in the baseline, so the question is
+# whether baseline masking swallows a later change to how it fails. It does not
+# -- measured on v2.5.812, a different observed status on an already-failing
+# pair scores newMismatch true.
+#
+# The already-failing pair is seeded here rather than borrowed from the run's
+# noise floor. The recording's blueprint chains both moving IDs, so a baseline
+# against a correct target has NO failing pair to borrow -- and tying this step
+# to a noise floor that a blueprint fix is supposed to shrink made it a fixture
+# that breaks whenever the blueprint improves. Two stubs, one pair, two
+# different wrong statuses: the fixture now states its own precondition.
+masked_base_rc=0
+"$regress_script" \
+  --in "$recording" \
+  --test-against "http://127.0.0.1:${masked_base_port}" \
+  --work-dir "$tmp/masked-base" >"$tmp/masked-base.out" 2>&1 || masked_base_rc=$?
+[[ "$masked_base_rc" -eq 0 ]] || die "step 5: seeding baseline exited $masked_base_rc"
+python3 - "$tmp/masked-base/replayed/replay-verdict.json" <<'PY'
+import json, sys
+pairs = json.load(open(sys.argv[1]))["pairs"]
+cat = [p for p in pairs if (p.get("endpoint") or "").startswith("/api/categories")]
+if not cat:
+    raise SystemExit("no /api/categories pair in the seeded baseline verdict")
+if cat[0].get("match") != "fail" or cat[0].get("observedStatus") != 503:
+    raise SystemExit(f"seeded baseline pair is not failing 503: {cat[0]}")
+print("ok: /api/categories already fails 503 in the baseline")
+PY
+
 masked_rc=0
 "$regress_script" \
   --in "$recording" \
   --test-against "http://127.0.0.1:${masked_port}" \
-  --baseline "$tmp/base/replayed" \
+  --baseline "$tmp/masked-base/replayed" \
   --fail-on-regression \
   --work-dir "$tmp/masked" >"$tmp/masked.out" 2>&1 || masked_rc=$?
 cat "$tmp/masked.out"
@@ -189,12 +219,12 @@ cat "$tmp/masked.out"
 python3 - "$tmp/masked/summary.json" <<'PY'
 import json, sys
 s = json.load(open(sys.argv[1]))
-orders = [p for p in s["match"]["newFailures"]
-          if (p.get("uri") or "").startswith("/api/orders")]
-if not orders:
-    raise SystemExit(f"/api/orders not among new failures: {s['match']['newFailures']}")
-if orders[0]["observedStatus"] != 500:
-    raise SystemExit(f"expected observed 500: {orders[0]}")
+cat = [p for p in s["match"]["newFailures"]
+       if (p.get("uri") or "").startswith("/api/categories")]
+if not cat:
+    raise SystemExit(f"/api/categories not among new failures: {s['match']['newFailures']}")
+if cat[0]["observedStatus"] != 500:
+    raise SystemExit(f"expected observed 500: {cat[0]}")
 print("PASS: a changed failure on a baseline-failing pair is not masked")
 PY
 
@@ -239,18 +269,23 @@ echo "step 7: blueprint loading and --require-blueprint exit mapping"
 #      flag is used, ql_run_replay maps that raw 1 onto the caller's own
 #      precondition code (2 here), never leaking it as 1
 #
+#   3. the chains fire against BOTH spellings of the loopback target
+#
 # What is deliberately NOT pinned: whether a blueprint in the workspace dir
 # BESIDE the recording loads. It does in a real proxymock workspace (measured
 # on mock-lab's own go/proxymock: same "Loaded blueprint" line, smart_replace
 # present, orders 201->201), but not in scratch trees fabricated here, so
 # asserting either way from this proof would encode a rule that does not hold.
+# The committed blueprint no longer depends on it either way: it lives INSIDE
+# the recording, the one location that loaded in every layout measured.
 #
-# These replays target http://localhost:PORT, not 127.0.0.1 like the steps
-# above. The committed blueprint filters on network_address CONTAINS
-# "localhost", and replay rewrites the address to the target, so the same run
-# against 127.0.0.1 loads the blueprint and fires NOTHING (measured: 2
-# smart_replace files vs 0, everything else held constant).
-src_bp="$repo_root/lab/proxymock/blueprints/mocklab-smart-replace.json"
+# (d) is the regression guard for the target-address footgun. Replay rewrites
+# the network address to the --test-against target, so any network_address
+# filter binds the blueprint to one spelling of that target: the earlier
+# CONTAINS "localhost" version fired both chains against http://localhost:PORT
+# and NOTHING against http://127.0.0.1:PORT (measured: 2 smart_replace files vs
+# 0, everything else held constant) while still logging "Loaded blueprint".
+src_bp="$recording/blueprints/mocklab-smart-replace.json"
 [[ -s "$src_bp" ]] || die "step 7: missing committed blueprint: $src_bp"
 bp_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["name"])' "$src_bp")"
 
@@ -297,6 +332,47 @@ proxymock replay --in "$tmp/bp-inside/recording" \
 [[ -s "$tmp/bp-req-out/replay-verdict.json" ]] \
   || die "step 7c: --require-blueprint suppressed the verdict on success"
 echo "ok: --require-blueprint exits 0 and keeps the verdict when the blueprint ran"
+
+# (d) the committed blueprint is target-address agnostic: replayed IN PLACE
+# against both spellings of the loopback target, both chains fire and the two
+# moving-ID pairs match instead of 401ing.
+for host in localhost 127.0.0.1; do
+  host_rc=0
+  proxymock replay --in "$recording" \
+    --test-against "http://${host}:${app_port}" \
+    --out "$tmp/bp-$host-out" --output json \
+    --require-blueprint "$bp_name" \
+    >"$tmp/bp-$host.json" 2>"$tmp/bp-$host.log" || host_rc=$?
+  if [[ "$host_rc" -ne 0 ]]; then
+    # Say WHICH of the two --require-blueprint failure modes fired, and whether
+    # the run was transport-clean. A chain cannot run if the request that feeds
+    # it never got a response, so a nonzero requests.failed here means the app
+    # or the host, not the blueprint.
+    echo "step 7d diagnostics ($host):" >&2
+    grep -i blueprint "$tmp/bp-$host.log" | tail -3 >&2 || true
+    echo "  smart_replace files: $(ql_smart_replace_file_count "$tmp/bp-$host-out")" >&2
+    python3 -c 'import json,sys
+d=json.load(open(sys.argv[1])); r=d.get("requests",d)
+print("  requests: total=%s failed=%s succeeded=%s" % (
+    r.get("total"), r.get("failed"), r.get("succeeded")))' \
+      "$tmp/bp-$host.json" >&2 2>/dev/null || echo "  (no replay metrics)" >&2
+    die "step 7d: --require-blueprint exited $host_rc against $host; see $tmp/bp-$host.log"
+  fi
+  [[ "$(ql_smart_replace_file_count "$tmp/bp-$host-out")" -gt 0 ]] \
+    || die "step 7d: no smart_replace event fired against $host"
+  python3 - "$tmp/bp-$host-out/replay-verdict.json" "$host" <<'PY'
+import json, sys
+pairs = json.load(open(sys.argv[1]))["pairs"]
+moving = [p for p in pairs if (p.get("endpoint") or "").startswith("/api/orders")]
+if len(moving) != 2:
+    raise SystemExit(f"expected both /api/orders pairs, got {moving}")
+bad = [p for p in moving if p.get("match") != "pass"]
+if bad:
+    raise SystemExit(f"moving-ID pair did not match against {sys.argv[2]}: {bad}")
+print(f"ok: both moving-ID pairs match against {sys.argv[2]}")
+PY
+done
+echo "ok: committed blueprint fires and matches against both loopback spellings"
 
 # (d) --require-blueprint on a name that never loaded: exit 1, NO verdict
 bogus_rc=0

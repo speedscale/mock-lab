@@ -177,7 +177,10 @@ ql_blueprint_dir() {
   # The workspace blueprints/ dir: the one beside the recording dir these skills
   # pass as --in, e.g. proxymock/blueprints/ next to proxymock/<recording>/.
   # Blueprints here DO load -- measured on v2.5.814 against the mock-lab go
-  # workspace, with a no-blueprint control run first. With
+  # workspace, with a no-blueprint control run first. That measurement staged a
+  # blueprint under go/proxymock/blueprints/; the repo no longer commits one
+  # there, since the only committed blueprint moved INSIDE the lab recording
+  # (see ql_inner_blueprint_dir). With
   # proxymock/blueprints/mocklab-smart-replace.json staged and
   # --in ./proxymock/recorded-go-baseline, replay logs
   #   Loaded blueprint "mock-lab smart replace (token + order_id)" \

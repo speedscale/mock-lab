@@ -32,7 +32,6 @@ need_cmd lsof
 [[ -x "$verify_script" ]] || die "verify script is not executable: $verify_script"
 
 recording="$repo_root/lab/proxymock/recording"
-blueprints="$repo_root/lab/proxymock/blueprints"
 [[ -d "$recording" ]] || die "missing committed recording: $recording"
 
 tmp="${TMPDIR:-/tmp}/proxymock-verify-fix-proof.$$"
@@ -44,17 +43,14 @@ mkdir -p "$tmp"
 # --- fabricate the incident recording ----------------------------------------
 # Copy the committed recording into its own workspace and flip GET /api/stats
 # from 200 to 500: the incident capture stores the FAILING response as recorded
-# truth. The blueprint is staged INSIDE the recording dir: replay reads --in
-# recursively, so that location loads in a fabricated workspace like this one.
-# A blueprints/ beside the recording also loads in a real proxymock workspace,
-# but did not in scratch trees built here, so this proof does not rely on it.
+# truth. The copy carries the recording's own blueprints/ along with it, which
+# is the location replay loads from -- it reads --in recursively, so that path
+# works in a fabricated workspace like this one. A blueprints/ beside the
+# recording also loads in a real proxymock workspace, but did not in scratch
+# trees built here, so this proof does not rely on it.
 echo "fabricating incident recording (GET /api/stats recorded 500)"
 mkdir -p "$tmp/incident"
 cp -R "$recording" "$tmp/incident/recording"
-if [[ -d "$blueprints" ]]; then
-  mkdir -p "$tmp/incident/recording/blueprints"
-  cp "$blueprints"/*.json "$tmp/incident/recording/blueprints/"
-fi
 
 incident_file="$(grep -l '"uri":"/api/stats"' "$tmp/incident/recording/localhost"/*.md | head -1)"
 [[ -n "$incident_file" ]] || die "could not find the GET /api/stats pair in the recording"

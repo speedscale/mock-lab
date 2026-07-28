@@ -8,7 +8,10 @@
 #   d) PERF_FORCE_HARNESS_BOUND=1 + assertion -> exit 3 (harness-bound). The
 #      real gate needs a saturated host, which a hermetic proof cannot force,
 #      so the documented test hook stands in for it.
-# Cases a and b run with PERF_FORCE_HARNESS_CLEAN=1 for the mirror-image
+#   e) app wrapped by `proxymock mock`         -> the mock is attributed to the
+#      run and counted in harness CPU; cases a-d cover the fallback, where no
+#      mock is attributable and harness CPU is the generator alone.
+# Cases a, b and e run with PERF_FORCE_HARNESS_CLEAN=1 for the mirror-image
 # reason: the real gate reads actual host state, so on a host that is busy
 # with unrelated work it would (correctly) refuse and flip a/b to exit 3.
 # The gate's own verdict path is what case d covers.
@@ -102,10 +105,22 @@ assert [r["vus"] for r in ladder] == [1, 2], ladder
 for r in ladder:
     assert isinstance(r["rps"], (int, float)) and r["rps"] > 0, r
     cpu = r["cpu"]
-    for k in ("generatorMaxPct", "appMaxPct", "hostIdleMinPct", "samples"):
+    for k in ("generatorMaxPct", "appMaxPct", "mockMaxPct", "mockAttributed",
+              "harnessMaxPct", "hostIdleMinPct", "samples"):
         assert k in cpu, (r["vus"], cpu)
     assert cpu["samples"] >= 1, (r["vus"], cpu)
-    assert "matchPct" in r and "latencyMs" in r, r
+    assert "matchPct" in r and "latencyMs" in r and "rpsPerAppCore" in r, r
+    # harness CPU is generator + mock when the mock is attributable to this
+    # run, and falls back to generator alone when it is not -- an
+    # unattributable mock must not move the number in either direction
+    gen, mock, harn = (cpu["generatorMaxPct"], cpu["mockMaxPct"],
+                       cpu["harnessMaxPct"])
+    if cpu["mockAttributed"]:
+        assert isinstance(mock, (int, float)), cpu
+        assert harn is None or harn >= (gen or 0.0), cpu
+    else:
+        assert mock is None, cpu
+        assert harn == gen, cpu
 # attribution actually measured something, not just carried empty fields
 assert any(r["cpu"]["generatorMaxPct"] is not None for r in ladder), ladder
 assert any(r["cpu"]["hostIdleMinPct"] is not None for r in ladder), ladder
@@ -165,4 +180,47 @@ assert s["exitCode"] == 3, s["exitCode"]
 print("PASS: no app ceiling printed, harness-bound refusal exits 3")
 PY
 
-echo "PASS: report-only (0), assertion failure (2), precondition (4), harness-bound (3)"
+# --- case e: the mock server counts as harness CPU (expect exit 0) -----------
+# The documented workflow starts the mock separately, running the app as its
+# child, so the mock is NOT a descendant of the perf script:
+#
+#   proxymock mock --in <recording> -- <app>
+#     `-- <app>      <- what lsof finds on the target port
+#
+# Attribution therefore walks UP from the app's pid. Cases a-d cover the other
+# side of the same branch: no mock in the app's ancestry there, so harness CPU
+# falls back to the generator alone.
+echo "case e: a mock wrapping the app is attributed and counted as harness CPU"
+mock_stub_port="$(ql_pick_port)"
+ports+=("$mock_stub_port")
+proxymock mock --in "$repo_root/lab/proxymock/recording" --no-out \
+  -- python3 "$tmp/stub.py" "$mock_stub_port" >"$tmp/mock.out" 2>&1 &
+pids+=("$!")
+ql_wait_url "http://127.0.0.1:${mock_stub_port}/" || {
+  cat "$tmp/mock.out" >&2
+  die "case e: mock-wrapped stub did not start"
+}
+PERF_FORCE_HARNESS_CLEAN=1 "$perf_script" \
+  --in "$recording" \
+  --test-against "http://127.0.0.1:${mock_stub_port}" \
+  --vus-ladder "1" --for 3s --repeats 1 \
+  --work-dir "$tmp/mock-attrib" >"$tmp/mock-attrib.out" 2>&1 || {
+    cat "$tmp/mock-attrib.out" >&2
+    die "case e: report-only run against the mock-wrapped stub should exit 0"
+  }
+cat "$tmp/mock-attrib.out"
+python3 - "$tmp/mock-attrib/summary.json" <<'PY'
+import json, sys
+s = json.load(open(sys.argv[1]))
+cpu = s["ladder"][0]["cpu"]
+assert cpu["mockAttributed"] is True, cpu
+assert isinstance(cpu["mockMaxPct"], (int, float)), cpu
+gen, mock, harn = cpu["generatorMaxPct"], cpu["mockMaxPct"], cpu["harnessMaxPct"]
+assert isinstance(harn, (int, float)) and harn >= gen, cpu
+assert cpu["mockNote"] is None, cpu
+print(f"PASS: mock attributed via the app's ancestry; harness {harn:.0f}% "
+      f"(generator peaked {gen:.0f}%, mock peaked {mock:.0f}%) vs app "
+      f"{cpu['appMaxPct']:.0f}%")
+PY
+
+echo "PASS: report-only (0), assertion failure (2), precondition (4), harness-bound (3), mock attribution (harness CPU)"

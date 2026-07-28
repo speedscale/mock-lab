@@ -15,10 +15,10 @@ Usage:
 
 Answer "what can THIS container sustain, and is it within budget?" for a single
 service with its downstream mocked. Drives the proxymock-load-test skill's
-script once per virtual-user ladder level, samples generator/app/host CPU
+script once per virtual-user ladder level, samples generator/mock/app/host CPU
 during every run, detects the throughput knee, and evaluates rps/p99
 assertions at the knee with margins. Refuses to report a level where the load
-harness saturated the host as an app limit.
+harness (generator + mock server) saturated the host as an app limit.
 
 Required:
   --in DIR             Recording dir of RRPair files to replay (inbound traffic)
@@ -29,7 +29,9 @@ Options:
   --for DURATION       Duration per ladder level (default: 30s)
   --assert-rps N       Assert sustainable throughput >= N rps at the knee
   --assert-p99 N[ms]   Assert p99 latency <= N ms at the knee
-  --margin-pct N       Margin applied to assertions (default: 10)
+  --margin-pct N       Margin applied to assertions (default: 10). Covers
+                       within-run sample spread only; it cannot make a
+                       cross-run comparison on a contended host meaningful
   --repeats N          Total samples at the assertion level; the WORST sample
                        gates pass/fail (default: 2)
   --pin-vus N          Evaluate assertions at this ladder level instead of the
@@ -69,13 +71,19 @@ die() { ql_die 4 "$@"; }
 need_cmd() { ql_need_cmd "$1" 4; }
 
 # Honesty-gate constants (from the Tier 3 experiment):
-# - a level is harness-bound when host idle drops under 20%, or the generator
-#   burns at least a full core AND more than 2x the app's CPU (the full-core
+# - harness CPU = load generator + the mock server feeding the app's
+#   downstream. Both are test infrastructure sharing the host with the app.
+#   Measured at VU 4 on a level the generator-only gate called clean: app
+#   128%, generator 248%, mock 229% -- 248/128 = 1.9x passed the ratio test
+#   while test infrastructure actually burned 3.7x the app.
+# - a level is harness-bound when host idle drops under 20%, or harness CPU
+#   is at least a full core AND more than 2x the app's CPU (the full-core
 #   floor keeps near-idle low-VU levels from tripping the ratio test)
 # - the knee is the first level whose rps gain over the previous level is
 #   under 10%
-# - default assertion margin 10% covers the measured 4.8% rps spread across
-#   repeat runs at a fixed VU level
+# - the margin applies WITHIN one run's repeat samples, where measured spread
+#   is ~1%. It cannot rescue a cross-run comparison on a contended host: the
+#   same VU level measured 9,067 and 11,597 rps (27% apart) across runs.
 idle_threshold=20
 gen_factor=2
 gen_core_floor=100
@@ -233,20 +241,40 @@ cputime_of_pids() {
     END { if (NR > 0) printf "%.2f", total }' || true
 }
 
-# Generator pids = processes whose command line contains "proxymock replay"
-# AND that descend from this run's load-test script. The descendant filter
-# keeps concurrent proxymock sessions elsewhere on the host from polluting
-# attribution (observed in practice: another session's replay at 600% CPU).
-gen_pids_of_run() {
-  local root="$1"
-  { ps -eo pid=,ppid= 2>/dev/null; echo "---"; pgrep -f 'proxymock replay' 2>/dev/null; } \
+# Attributes this run's test infrastructure. Prints three lines: generator
+# pids, mock pids, and a count of mock processes that exist on the host but
+# could not be tied to this run.
+#
+# Generator = command line contains "proxymock replay" AND descends from this
+# run's load-test script.
+#
+# Mock = command line contains "proxymock mock" AND either descends from this
+# run too, or is an ANCESTOR of the app process. The ancestor path covers the
+# documented un-wrapped workflow, where the mock is started separately and
+# runs the app as its child:
+#
+#   proxymock mock --in ../lab/proxymock/recording -- go run .
+#     `-- go run .            <- app, found by lsof on the target port
+#
+# Anything matching neither belongs to another session and is reported as
+# foreign, never summed in. On a shared box a bare `pgrep -f proxymock` would
+# grab those (observed in practice: another session's replay at 600% CPU).
+run_pids() {
+  local root="$1" app_pids="$2"
+  { ps -eo pid=,ppid= 2>/dev/null
+    echo "---"
+    pgrep -f 'proxymock replay' 2>/dev/null
+    echo "---"
+    pgrep -f 'proxymock mock' 2>/dev/null; } \
     | python3 -c '
 import sys
 root = int(sys.argv[1])
+app_pids = {int(x) for x in sys.argv[2].split(",") if x.strip().isdigit()}
 lines = sys.stdin.read().splitlines()
-sep = lines.index("---")
-kids = {}
-for line in lines[:sep]:
+i1 = lines.index("---")
+i2 = lines.index("---", i1 + 1)
+kids, parent = {}, {}
+for line in lines[:i1]:
     parts = line.split()
     if len(parts) >= 2:
         try:
@@ -254,36 +282,55 @@ for line in lines[:sep]:
         except ValueError:
             continue
         kids.setdefault(ppid, []).append(pid)
-cand = {int(l.strip()) for l in lines[sep + 1:] if l.strip().isdigit()}
-desc = set()
-stack = [root]
+        parent[pid] = ppid
+desc, stack = set(), [root]
 while stack:
     for c in kids.get(stack.pop(), []):
         if c not in desc:
             desc.add(c)
             stack.append(c)
-print(",".join(str(p) for p in sorted(cand & desc)))
-' "$root" 2>/dev/null || true
+anc = set()
+for a in app_pids:
+    p, hops = a, 0
+    while p in parent and hops < 64:
+        p = parent[p]
+        if p <= 1 or p in anc:
+            break
+        anc.add(p)
+        hops += 1
+gen_cand = {int(l.strip()) for l in lines[i1 + 1:i2] if l.strip().isdigit()}
+mock_cand = {int(l.strip()) for l in lines[i2 + 1:] if l.strip().isdigit()}
+gen = sorted(gen_cand & desc)
+mock = sorted(mock_cand & (desc | anc))
+print(",".join(str(p) for p in gen))
+print(",".join(str(p) for p in mock))
+print(len(mock_cand) - len(mock))
+' "$root" "${app_pids:-}" 2>/dev/null || printf "\n\n0\n"
 }
 
-# Samples generator/app cputime roughly every 0.7s while a load run is in
-# flight. CSV line: epoch,gen_cputime_s,app_cputime_s (empty field =
-# unmeasurable at that instant). Host idle runs in its own loop because each
-# idle measurement blocks ~1s (top interval / /proc/stat delta) and would
-# starve the cputime cadence that short runs need for deltas.
+# Samples generator/app/mock cputime roughly every 0.7s while a load run is in
+# flight. CSV line: epoch,gen_cputime_s,app_cputime_s,mock_cputime_s,
+# foreign_mock_count (empty field = unmeasurable at that instant). App pids are
+# resolved first because they anchor the mock's ancestor attribution. Host idle
+# runs in its own loop because each idle measurement blocks ~1s (top interval /
+# /proc/stat delta) and would starve the cputime cadence that short runs need
+# for deltas.
 sample_cpu_loop() {
   local out="$1" load_pid="$2"
-  local ts gen_pids app_pids gen_t app_t
+  local ts gen_pids app_pids mock_pids foreign gen_t app_t mock_t attrib
   while :; do
     ts="$(python3 -c 'import time; print(f"{time.time():.2f}")' 2>/dev/null || true)"
-    gen_pids="$(gen_pids_of_run "$load_pid")"
-    gen_t="$(cputime_of_pids "$gen_pids")"
+    app_pids=""
     app_t=""
     if [[ "$app_local" == "1" ]]; then
       app_pids="$(lsof -nP -ti "tcp:${target_port}" -sTCP:LISTEN 2>/dev/null | sort -u | paste -sd, - || true)"
       app_t="$(cputime_of_pids "$app_pids")"
     fi
-    echo "${ts},${gen_t},${app_t}" >>"$out" || true
+    attrib="$(run_pids "$load_pid" "$app_pids")"
+    { IFS= read -r gen_pids; IFS= read -r mock_pids; IFS= read -r foreign; } <<<"$attrib"
+    gen_t="$(cputime_of_pids "$gen_pids")"
+    mock_t="$(cputime_of_pids "$mock_pids")"
+    echo "${ts},${gen_t},${app_t},${mock_t},${foreign:-0}" >>"$out" || true
     sleep 0.5
   done
 }
@@ -351,27 +398,38 @@ force_clean = os.environ.get("PERF_FORCE_HARNESS_CLEAN") == "1"
 
 
 def read_cpu(cpu_path, idle_path):
-    # cpu csv rows: epoch,gen_cputime_s,app_cputime_s; CPU rates are cputime
-    # deltas between consecutive samples (see cputime_of_pids). idle file:
-    # one host-idle percentage per line, sampled independently.
+    # cpu csv rows: epoch,gen_cputime_s,app_cputime_s,mock_cputime_s,
+    # foreign_mock_count; CPU rates are cputime deltas between consecutive
+    # samples (see cputime_of_pids). idle file: one host-idle percentage per
+    # line, sampled independently.
     rows = []
     try:
         lines = open(cpu_path).read().splitlines()
     except OSError:
         lines = []
     for line in lines:
-        ts, g, a = (line.split(",") + [""] * 3)[:3]
+        ts, g, a, m, f = (line.split(",") + [""] * 5)[:5]
         rows.append((float(ts) if ts else None, float(g) if g else None,
-                     float(a) if a else None))
-    gen_max = app_max = idle_min = None
-    for (t1, g1, a1), (t2, g2, a2) in zip(rows, rows[1:]):
+                     float(a) if a else None, float(m) if m else None,
+                     int(f) if f.strip().isdigit() else 0))
+    gen_max = app_max = mock_max = harness_max = idle_min = None
+    for (t1, g1, a1, m1, _), (t2, g2, a2, m2, _) in zip(rows, rows[1:]):
         if t1 is None or t2 is None or t2 <= t1:
             continue
         dt = t2 - t1
+        gen_rate = mock_rate = None
         if g1 is not None and g2 is not None and g2 >= g1:
-            gen_max = max(gen_max or 0.0, (g2 - g1) / dt * 100.0)
+            gen_rate = (g2 - g1) / dt * 100.0
+            gen_max = max(gen_max or 0.0, gen_rate)
         if a1 is not None and a2 is not None and a2 >= a1:
             app_max = max(app_max or 0.0, (a2 - a1) / dt * 100.0)
+        if m1 is not None and m2 is not None and m2 >= m1:
+            mock_rate = (m2 - m1) / dt * 100.0
+            mock_max = max(mock_max or 0.0, mock_rate)
+        # peak of the per-interval SUM, so the harness figure never adds a
+        # generator peak to a mock peak that happened seconds apart
+        if gen_rate is not None:
+            harness_max = max(harness_max or 0.0, gen_rate + (mock_rate or 0.0))
     try:
         idle_lines = open(idle_path).read().splitlines()
     except OSError:
@@ -381,7 +439,18 @@ def read_cpu(cpu_path, idle_path):
         if line:
             v = float(line)
             idle_min = v if idle_min is None else min(idle_min, v)
+    # An unattributable mock falls back to the generator-only comparison: a
+    # foreign process must not inflate the verdict, and guessing which one is
+    # ours is worse than saying we do not know.
+    attributed = mock_max is not None
+    note = None
+    if not attributed and max((r[4] for r in rows), default=0) > 0:
+        note = ("a proxymock mock process is running but could not be tied to "
+                "this run; harness CPU counts the generator only")
     return {"generatorMaxPct": gen_max, "appMaxPct": app_max,
+            "mockMaxPct": mock_max, "mockAttributed": attributed,
+            "harnessMaxPct": harness_max if attributed else gen_max,
+            "mockNote": note,
             "hostIdleMinPct": idle_min, "samples": len(rows)}
 
 
@@ -391,12 +460,18 @@ def harness(cpu):
     if force_clean:
         return False, ""
     reasons = []
-    idle, gen, app = cpu["hostIdleMinPct"], cpu["generatorMaxPct"], cpu["appMaxPct"]
+    idle, app = cpu["hostIdleMinPct"], cpu["appMaxPct"]
+    gen, mock, harn = (cpu["generatorMaxPct"], cpu["mockMaxPct"],
+                       cpu["harnessMaxPct"])
     if idle is not None and idle < idle_thr:
         reasons.append(f"host idle {idle:.0f}% < {idle_thr:.0f}%")
-    if (gen is not None and app is not None
-            and gen >= gen_floor and gen > gen_factor * app):
-        reasons.append(f"generator {gen:.0f}% CPU > {gen_factor:.0f}x app {app:.0f}%")
+    if (harn is not None and app is not None
+            and harn >= gen_floor and harn > gen_factor * app):
+        if cpu["mockAttributed"]:
+            what = f"harness {harn:.0f}% CPU (generator {gen:.0f}% + mock {mock:.0f}%)"
+        else:
+            what = f"generator {harn:.0f}% CPU"
+        reasons.append(f"{what} > {gen_factor:.0f}x app {app:.0f}%")
     return bool(reasons), "; ".join(reasons)
 
 
@@ -407,9 +482,17 @@ for v in levels:
     cpu = read_cpu(os.path.join(d, "cpu-samples.csv"),
                    os.path.join(d, "idle-samples.csv"))
     hb, why = harness(cpu)
+    # rps per app-core survives a move to a differently sized container, where
+    # a raw rps ceiling measured on this host does not
+    rps, app_pct = s.get("rps"), cpu["appMaxPct"]
+    eff = None
+    if (isinstance(rps, (int, float)) and isinstance(app_pct, (int, float))
+            and app_pct > 0):
+        eff = rps / (app_pct / 100.0)
     records.append({
         "vus": v,
         "rps": s.get("rps"),
+        "rpsPerAppCore": eff,
         "totalRequests": s.get("totalRequests"),
         "failed": s.get("failed"),
         "matchPct": s.get("matchPct"),
@@ -482,18 +565,28 @@ def read_cpu(cpu_path, idle_path):
     except OSError:
         lines = []
     for line in lines:
-        ts, g, a = (line.split(",") + [""] * 3)[:3]
+        ts, g, a, m, f = (line.split(",") + [""] * 5)[:5]
         rows.append((float(ts) if ts else None, float(g) if g else None,
-                     float(a) if a else None))
-    gen_max = app_max = idle_min = None
-    for (t1, g1, a1), (t2, g2, a2) in zip(rows, rows[1:]):
+                     float(a) if a else None, float(m) if m else None,
+                     int(f) if f.strip().isdigit() else 0))
+    gen_max = app_max = mock_max = harness_max = idle_min = None
+    for (t1, g1, a1, m1, _), (t2, g2, a2, m2, _) in zip(rows, rows[1:]):
         if t1 is None or t2 is None or t2 <= t1:
             continue
         dt = t2 - t1
+        gen_rate = mock_rate = None
         if g1 is not None and g2 is not None and g2 >= g1:
-            gen_max = max(gen_max or 0.0, (g2 - g1) / dt * 100.0)
+            gen_rate = (g2 - g1) / dt * 100.0
+            gen_max = max(gen_max or 0.0, gen_rate)
         if a1 is not None and a2 is not None and a2 >= a1:
             app_max = max(app_max or 0.0, (a2 - a1) / dt * 100.0)
+        if m1 is not None and m2 is not None and m2 >= m1:
+            mock_rate = (m2 - m1) / dt * 100.0
+            mock_max = max(mock_max or 0.0, mock_rate)
+        # peak of the per-interval SUM, so the harness figure never adds a
+        # generator peak to a mock peak that happened seconds apart
+        if gen_rate is not None:
+            harness_max = max(harness_max or 0.0, gen_rate + (mock_rate or 0.0))
     try:
         idle_lines = open(idle_path).read().splitlines()
     except OSError:
@@ -503,7 +596,18 @@ def read_cpu(cpu_path, idle_path):
         if line:
             v = float(line)
             idle_min = v if idle_min is None else min(idle_min, v)
+    # An unattributable mock falls back to the generator-only comparison: a
+    # foreign process must not inflate the verdict, and guessing which one is
+    # ours is worse than saying we do not know.
+    attributed = mock_max is not None
+    note = None
+    if not attributed and max((r[4] for r in rows), default=0) > 0:
+        note = ("a proxymock mock process is running but could not be tied to "
+                "this run; harness CPU counts the generator only")
     return {"generatorMaxPct": gen_max, "appMaxPct": app_max,
+            "mockMaxPct": mock_max, "mockAttributed": attributed,
+            "harnessMaxPct": harness_max if attributed else gen_max,
+            "mockNote": note,
             "hostIdleMinPct": idle_min, "samples": len(rows)}
 
 
@@ -513,12 +617,18 @@ def harness(cpu):
     if force_clean:
         return False, ""
     reasons = []
-    idle, gen, app = cpu["hostIdleMinPct"], cpu["generatorMaxPct"], cpu["appMaxPct"]
+    idle, app = cpu["hostIdleMinPct"], cpu["appMaxPct"]
+    gen, mock, harn = (cpu["generatorMaxPct"], cpu["mockMaxPct"],
+                       cpu["harnessMaxPct"])
     if idle is not None and idle < idle_thr:
         reasons.append(f"host idle {idle:.0f}% < {idle_thr:.0f}%")
-    if (gen is not None and app is not None
-            and gen >= gen_floor and gen > gen_factor * app):
-        reasons.append(f"generator {gen:.0f}% CPU > {gen_factor:.0f}x app {app:.0f}%")
+    if (harn is not None and app is not None
+            and harn >= gen_floor and harn > gen_factor * app):
+        if cpu["mockAttributed"]:
+            what = f"harness {harn:.0f}% CPU (generator {gen:.0f}% + mock {mock:.0f}%)"
+        else:
+            what = f"generator {harn:.0f}% CPU"
+        reasons.append(f"{what} > {gen_factor:.0f}x app {app:.0f}%")
     return bool(reasons), "; ".join(reasons)
 
 
@@ -595,6 +705,7 @@ knee = None
 if knee_vus is not None:
     k = by_vus[knee_vus]
     knee = {"vus": knee_vus, "rps": k["rps"], "p99Ms": k["latencyMs"].get("p99"),
+            "rpsPerAppCore": k.get("rpsPerAppCore"),
             "plateauObserved": ladder["plateauObserved"]}
 
 summary = {
@@ -628,6 +739,11 @@ def fnum(v, fmt="{:.1f}"):
     return fmt.format(v) if isinstance(v, (int, float)) else "n/a"
 
 
+def fpct(v):
+    # bare "n/a", never "n/a%": an unmeasured figure is not a percentage
+    return f"{v:.0f}%" if isinstance(v, (int, float)) else "n/a"
+
+
 print("\n=== perf-container summary ===")
 print(f"target     : {target}")
 print("ladder     :")
@@ -641,16 +757,24 @@ for r in levels:
     line = (f"  VU {r['vus']:<4}: {fnum(r['rps'])} rps  "
             f"p50={lat.get('p50')} p95={lat.get('p95')} p99={lat.get('p99')} ms  "
             f"failed={r['failed']}  match={match_s}  "
-            f"gen={fnum(cpu['generatorMaxPct'], '{:.0f}')}% "
-            f"app={fnum(cpu['appMaxPct'], '{:.0f}')}% "
-            f"idle={fnum(cpu['hostIdleMinPct'], '{:.0f}')}%")
+            f"gen={fpct(cpu['generatorMaxPct'])} "
+            f"mock={fpct(cpu['mockMaxPct'])} "
+            f"harness={fpct(cpu['harnessMaxPct'])} "
+            f"app={fpct(cpu['appMaxPct'])} "
+            f"idle={fpct(cpu['hostIdleMinPct'])}")
     if r["harnessBound"]:
         line += f"  [HARNESS-BOUND: {r['harnessReason']}]"
     print(line)
+mock_notes = [r["cpu"]["mockNote"] for r in levels if r["cpu"].get("mockNote")]
+if mock_notes:
+    print(f"mock       : {mock_notes[0]}")
 if knee:
     tag = "plateau observed" if knee["plateauObserved"] else "no plateau within ladder; true knee may be higher"
     print(f"knee       : VU {knee['vus']} ({tag})")
     print(f"sustainable: ~{fnum(knee['rps'])} rps at VU {knee['vus']} (p99 {knee['p99Ms']} ms)")
+    if isinstance(knee.get("rpsPerAppCore"), (int, float)):
+        print(f"efficiency : ~{fnum(knee['rpsPerAppCore'], '{:.0f}')} rps per app-core "
+              f"-- the figure that carries to a differently sized container")
 else:
     print("knee       : indeterminate")
     print("sustainable: no app-limit claim possible from this run")

@@ -1,214 +1,170 @@
 ---
 name: proxymock-regression-test
-description: Replay a recorded proxymock session against a target and gate on the per-RRPair replay verdict (response status AND body) plus budget flips rather than transport failures, catching status-code, field-level and behavior regressions that a clean requests.failed hides. Use when users ask to regression-test a service against recorded traffic, verify a code change did not break replay behavior, or gate CI on a proxymock replay.
-argument-hint: --in <recording-dir> --test-against <url> [--baseline <replay-dir>] [--fail-on-regression]
+description: Replay a recorded proxymock session against a target and gate on the per-RRPair replay verdict (response status AND body) plus baseline-relative new mismatches, catching status-code and field-level regressions that a clean requests.failed hides. Use when users ask to regression-test a service against recorded traffic, verify a code change did not break replay behavior, or gate CI on a proxymock replay.
+argument-hint: --in <recording-dir> --test-against <url> [--baseline <prior-replay-dir>]
 ---
 
 # proxymock Regression Test
 
-Turn a recording into a regression gate. `proxymock replay --baseline
-<prior replay dir> --fail-on-new-mismatch` drives the recorded requests at the
-target and gates on new mismatches natively (exit 3); this skill wraps that
-with the preconditions it does not check and adds the budget-flip gate.
-`requests.failed` is not the gate: a status-code regression (a 201 that becomes
-a 200), or a changed field behind an unchanged 200, still completes the HTTP
-exchange, so `requests.failed` stays 0 while the pair is scored a mismatch.
-Empirically verified.
-
-## The verdict scores bodies too (native, default)
-
-`replay-verdict.json` scores response bodies alongside status codes. Measured
-on v2.5.812: `/api/stats` returning `total: 25` where the recording says `24`,
-with an unchanged 200, scores `match: pass` but `bodyMatch: fail` with
-`{severity: regression, kind: value_changed, location:
-http.res.bodyBase64.total, baseline: "24", candidate: "25"}` and trips the gate
-(exit 3, verdict `new-mismatch`). `kind` is one of `value_changed`,
-`field_added`, `field_removed`; the summary adds `bodyMismatches`. To score
-status only, replay takes `--ignore-body-changes` (this skill does not).
-
-Two measured caveats decide how you use it:
-
-**Baseline masking is per-pair, so a known-mismatch can be hiding a different
-failure.** `known-mismatch` / `newMismatch: false` means "this pair also failed
-in the baseline", not "this pair fails the same way it did". Measured on
-v2.5.812, the common shape changes ARE caught: an already-401 pair that starts
-returning 500 scores `newMismatch: true`, and so does a pair that picks up a
-body change at a location the baseline did not fail at. What is not counted is a
-delta the volatile heuristic owns -- and that heuristic is not stable: the same
-`order_id` value change was scored a `value_changed` regression in one run and
-suppressed entirely in another. So do not read `known-mismatch` as "nothing
-changed here". The script compares each masked pair's current `observedStatus`
-and `bodyChanges` against the baseline verdict's and prints `ADVISORY: masked
-but different` when they diverge; it does not fail the build, so read those
-lines.
-
-**Volatile suppression is a heuristic, and it is undocumented.** It decides
-which churn is noise, by field rather than by value. Measured on v2.5.812
-against the committed recording: `Date` headers, bare 64-hex tokens, the
-`order_id` field (suppressed whatever the replacement value looks like -- hex,
-non-hex, shorter, even renaming the field) and the ISO-8601 `created` timestamp
-are all suppressed, while `status`, `project`, `total` and `expires_in` changes
-on the same pairs are scored. Round 2 of experiment 08 measured the opposite
-for a live `order-<16hex>`, so do not assume any particular rotating value is
-covered. Treat a raw `bodyMismatches: 0` as luck: establish a `--baseline` and
-gate on NEW mismatches, which is what keeps the gate green on a recording whose
-app mints fresh values every run.
-
-This workflow uses local files and the `proxymock` CLI. It does not require
-Speedscale Cloud access.
-
-## Inputs
-
-- `--in`: the recording directory to replay.
-- `--test-against`: the target to hit (e.g. `http://localhost:8080`).
-- `--baseline`: a prior known-good replay output directory (the `replayed/`
-  dir from an earlier run of this skill). Passed straight to `replay
-  --baseline`, which gates baseline-relative so only NEW mismatches count, and
-  enables the budget-flip gate. Without it, every mismatch counts, including
-  the known moving-ID noise floor, so always pass a baseline once you have one.
-  (`--fail-on-new-mismatch` is rejected by replay without `--baseline`, so the
-  no-baseline gate is applied by the script over the same verdict file.)
-- `--fail-on-regression`: exit nonzero on findings; without it the script
-  reports and exits 0.
-
-Run the bundled script:
+Turn a recording into a regression gate. One native command does it:
 
 ```bash
-# first run: establish a baseline replay
-./skills/proxymock-regression-test/scripts/proxymock-regression-test.sh \
-  --in ./proxymock/recording --test-against http://localhost:8080 \
-  --work-dir ./regress-base
-
-# after a code change: gate against the known-good replay
-./skills/proxymock-regression-test/scripts/proxymock-regression-test.sh \
-  --in ./proxymock/recording --test-against http://localhost:8080 \
-  --baseline ./regress-base/replayed --fail-on-regression
+proxymock replay \
+  --in ./proxymock/recording \
+  --test-against http://localhost:8080 \
+  --baseline ./regress-base \
+  --fail-on-new-mismatch
 ```
 
-If this skill has been copied outside `mock-lab`, replace
-`./skills/proxymock-regression-test` with the copied skill directory. The
-scripts source shared helpers from `skills/lib/common.sh` (resolved as
-`../../lib/common.sh` relative to the scripts), so copy that file alongside.
+That is the whole gate. `replay` drives every recorded request at the target,
+scores each response against the recording (status **and** body), writes
+`<out>/replay-verdict.json`, and exits on the verdict. Nothing in this repo
+re-derives that answer.
 
-## Preconditions the script checks
+**Requires proxymock v2.5.814 or newer.** Everything below was measured on that
+release.
 
-- **Blueprint anchoring.** Two locations load, and the script accepts either.
-  A `blueprints/` INSIDE `--in` always loads, because replay reads `--in`
-  recursively — measured in every layout tried. The workspace's own
-  `blueprints/` BESIDE the recording (`proxymock/blueprints/` next to
-  `proxymock/<recording>/`) also loads: measured on v2.5.814 against a
-  no-blueprint control, it logs `Loaded blueprint "…" from
-  proxymock/blueprints/…`, two replayed RRPairs carry `smart_replace`, and the
-  verdict is `pass` where the control failed `/api/orders` 201→401. That second
-  path is not universal — a byte-identical copy of the same recording under a
-  different directory name in the same workspace did not pick it up, and
-  `lab/proxymock/blueprints/` never loaded for `--in lab/proxymock/recording`,
-  which is why mock-lab's blueprint lives at
-  `lab/proxymock/recording/blueprints/`. Confirm with the `Loaded blueprint`
-  line rather than assuming it either way, and never move a blueprint the log
-  says is loading. Not cwd. If no blueprint is loadable the script warns
-  loudly: auth and moving-ID endpoints will be unreplayable (401s), and a
-  regression on their success paths is UNDETECTABLE because they fail before
-  and after the change.
-- **Blueprint application.** Loading a blueprint is not running it, and the
-  `Loaded blueprint ...` console lines only report loading. The script verifies
-  application by grepping the replay output RRPairs for `smart_replace` events
-  and warns when a blueprint exists but none appear. A common cause of that
-  warning is the blueprint's own filters, not staging — specifically
-  `network_address`. Replay rewrites the network address to the
-  `--test-against` target, so such a filter binds the blueprint to one spelling
-  of that target: mock-lab's blueprint used to filter on
-  `CONTAINS "localhost"` and fired both chains against `http://localhost:PORT`
-  while the same run against `http://127.0.0.1:PORT` loaded it and fired
-  nothing. It now filters on `detectedLocation` / `detectedCommand` only and
-  fires against either. Scope by `services`, never by network address.
-  Replay's own `--require-blueprint` works on v2.5.814: with the blueprint
-  loaded it exits 0 and `<out>/replay-verdict.json` is still written; with an
-  unresolvable name it exits 1 ("was not loaded from the `--in` workspace") and
-  writes NO verdict.
-  That failure path is why it is not the gate here — the verdict is the entire
-  regression signal, so an inert blueprint would cost every status and body
-  comparison in the run. Add `--require-blueprint` yourself if you want
-  proxymock to enforce the blueprint; the grep costs nothing and never costs
-  the verdict.
-- **Mock reminder.** When the recording contains outbound pairs, the script
-  reminds you that `proxymock mock` requires an explicit `--in`; it does not
-  discover the recording from cwd.
+## Works with your stack (no bash required)
 
-## Output contract
+The command above is the contract. It takes a directory of RRPair files and a
+URL, so it does not care what language your service is in, what test framework
+you use, or whether you own a shell script. A k6, bruno, postman-cli, pytest,
+JUnit, or plain-Makefile user runs exactly the same line in CI:
 
-Written to `--work-dir` (default a timestamped dir): `replayed/` (the replay
-output, your next `--baseline`, containing proxymock's own
-`replay-verdict.json`), `result.json` (metrics: the verdict file carries none),
-`report.json` / `report.html` / `report.prompt.md` (a Compare report when
-`--baseline` is set), and `summary.json` with the verdict (new mismatches,
-budget flips, paths) read from `replay-verdict.json`.
+```bash
+# first run, establish the baseline
+proxymock replay --in ./proxymock/recording --test-against http://localhost:8080 \
+  --out ./regress-base
 
-`summary.json` keys are unchanged, with one sharpened meaning:
-`match.baselineFailures` now counts THIS run's mismatches that were already
-failing in the baseline, not the baseline's total failure count. Two additions
-carry the body verdict: `match.bodyFailures` (the summary's `bodyMismatches`)
-and a `bodyMatch` plus `bodyChanges` on every `newFailures` entry.
+# every run after, gate against it
+proxymock replay --in ./proxymock/recording --test-against http://localhost:8080 \
+  --out ./regress-run --baseline ./regress-base --fail-on-new-mismatch
+```
 
-Exit codes:
+Exit codes are the CI contract:
 
-- `0`: no regression, or findings present without `--fail-on-regression`.
-- `2`: precondition failure (bad args, missing dirs, replay did not run).
-- `3`: regressions: pairs mismatching now, on status or body, that passed in
-  the baseline. Delegated to `replay --fail-on-new-mismatch`, which exits 3
-  itself.
-- `4`: budget flips: a budget that passed in the baseline now fails, e.g.
-  `reliability.match >= 99` starting to fail. Gated on flips, not raw
-  regressed-finding counts, because rotating values (order ids) churn security
-  findings and inflate counts between otherwise identical runs.
+| Exit | Meaning |
+| --- | --- |
+| `0` | verdict `pass` (or findings present but no `--fail-on-new-mismatch`) |
+| `3` | verdict `new-mismatch`: a pair fails now that did not fail in `--baseline` |
+| `1` | the run did not complete, or a `--fail-if` threshold tripped |
 
-When both fire, the status-level code (3) wins.
+`--fail-on-new-mismatch` is rejected without `--baseline`; establish a baseline
+first. The repo's `quality-loop.sh regression` is optional convenience that
+builds this exact line and passes the exit code through; the native command is
+what you should put in your pipeline.
+
+## Read the verdict, never the transport metrics
+
+`requests.failed` stays **0** for a status regression. A 201 that becomes a 200
+completes the HTTP exchange perfectly, so the transport counter is clean while
+the pair is scored a mismatch. Gate on the verdict file and the exit code.
+Empirically verified.
+
+**Body scoring is native and on by default.** Each pair in
+`replay-verdict.json` carries `bodyMatch` and a `bodyChanges[]` list of
+`{severity, kind, endpoint, location, baseline, candidate}`, `kind` being
+`value_changed` / `field_added` / `field_removed`. Measured: `/api/stats`
+returning `total: 25` where the recording says `24`, with an unchanged 200,
+scores `match: pass` but `bodyMatch: fail` at
+`http.res.bodyBase64.total` and trips the gate (exit 3). Pass
+`--ignore-body-changes` to go back to status-only scoring when status and
+headers really are the whole contract.
+
+## Two measured caveats on the gate
+
+**Baseline masking compares CHANGE SETS, not just pairs.** A pair that already
+failed in the baseline is exempt from *that same failure*, not from every later
+one. Verified both ways: an identical failure stays masked and the run exits 0;
+the same pair failing *differently* (401 that starts returning 500, or a body
+change at a location the baseline did not fail at) is caught as a new mismatch
+and exits 3.
+
+**Volatile suppression is by FIELD NAME, it is undocumented, and it is not
+stable.** Measured against the committed recording: `Date` headers, bare 64-hex
+tokens, the `order_id` field (suppressed whatever the replacement value looks
+like) and the ISO-8601 `created` timestamp are suppressed, while `status`,
+`project`, `total` and `expires_in` changes on the same pairs are scored. A
+later round measured the opposite for a live `order-<16hex>`. So treat a raw
+`bodyMismatches: 0` as luck: establish a `--baseline` and gate on NEW
+mismatches. That is what keeps the gate green on a recording whose app mints
+fresh values every run.
+
+## Blueprints: the part that silently costs you the signal
+
+An app with moving IDs (rotating tokens, generated order ids) needs a blueprint
+to chain them through the replay. Without one, the auth and moving-ID endpoints
+401, and **a regression on their success paths is undetectable** because they
+fail before and after the change.
+
+- **Where blueprints load from.** The workspace `proxymock/blueprints/`
+  directory (the parent of the recording dir) loads, and a `blueprints/` copy
+  *inside* `--in` loads too, because replay reads `--in` recursively.
+  Workspace discovery is **not reproducible across identical recordings under
+  different names** — measured: a byte-identical copy of a recording, under a
+  different directory name in the same workspace beside the same
+  `blueprints/`, did not pick it up. If a workspace blueprint does not load,
+  put a copy inside `--in`. That is why this repo's blueprint lives at
+  `lab/proxymock/recording/blueprints/`.
+- **Confirm it loaded** with the `Loaded blueprint "<name>" from <path>` line
+  in the replay output. Never move a blueprint the log says is loading.
+- **The hostname trap (this one costs you the whole run).** Replay rewrites the
+  recorded network address to the `--test-against` target, so a blueprint that
+  filters on `network_address` binds itself to one spelling of that target.
+  Measured on this lab's blueprint while it filtered
+  `network_address CONTAINS "localhost"`: `--test-against localhost:8080` fired
+  both chains (2 replayed RRPairs carrying `smart_replace`), while
+  `--test-against 127.0.0.1:8080` **loaded the blueprint and fired ZERO chains,
+  with no warning**. Same `Loaded blueprint` line either way. A loaded-but-inert
+  blueprint is usually this, not a staging problem. Filter on
+  `detectedLocation` / `detectedCommand` and scope with `services`; the
+  committed blueprint now does.
+- **`--require-blueprint <name>` works, and is opt-in for a reason.** On
+  v2.5.814 it exits 0 and still writes `replay-verdict.json` when the blueprint
+  loaded and its chains ran; on an unresolvable name it exits 1 and writes **no
+  verdict file at all**. Gating on it trades the entire regression signal for a
+  blueprint warning. Add it when a silently inert blueprint is the bigger risk;
+  otherwise check the `Loaded blueprint` line and grep the replay output for
+  `smart_replace`.
 
 ## Interpretation
 
-- **`NEW MISMATCH` line, `requests.failed` 0**: the classic silent regression;
-  a status or contract change the transport layer cannot see. replay prints
-  it as `NEW MISMATCH: POST /api/orders recorded 201 -> observed 200`, and
+- **`NEW MISMATCH` with `requests.failed` 0**: the classic silent regression.
+  Printed as `NEW MISMATCH: POST /api/orders recorded 201 -> observed 200`, and
   body-only findings as `... status 200, body total removed (was 24)`.
-- **Verdict `pass`, exit 0**: status and body both matched. This is now a real
-  clean bill of health, not a status-only one.
-- **`match: pass` with `bodyMatch: fail`**: the status is right and a field is
-  not. The script prints each `bodyChanges` entry as a `BODY <severity>` line.
-- **Failures present but none new**: the known noise floor (moving-ID endpoints
-  without an applied blueprint, and the recording's own rotating ids). Fix the
-  blueprint to shrink it, or keep gating baseline-relative. mock-lab's own
-  `lab/proxymock/recording` has no noise floor left: with its blueprint
-  chaining both moving IDs, all 8 pairs match on status and body, so any
-  failure there is real.
-- **`ADVISORY: masked but different`**: a pair the gate is masking is failing
-  differently than it did in the baseline. The gate cannot see this; read the
-  pair by hand.
-- **Budget flip without match failures**: an aggregate drifted past its
-  budget (match percentage, p95, 5xx count) even though no single pair
-  regressed; check `report.prompt.md` for which finding moved it.
+- **Verdict `pass`, exit 0**: status and body both matched. A real clean bill of
+  health now that bodies are scored, not a status-only one.
+- **`match: pass` with `bodyMatch: fail`**: right status, wrong field. Read
+  `bodyChanges[]` for the JSON location.
+- **Failures present but none new**: the known noise floor. This repo's
+  `lab/proxymock/recording` has none left — with its blueprint chaining both
+  moving IDs, all 8 pairs match on status and body, so any failure there is
+  real.
+- **Known-mismatch pairs**: masked only against the failure they showed in the
+  baseline. Read them anyway when the baseline was noisy; a pair can be failing
+  in a way the volatile heuristic owns.
+- **This app's own inbound API has no spec**, so its contract IS the recording.
+  Route spec conformance for your *dependencies* to
+  proxymock-contract-test; route your own API's behavior here.
 
 ## Related
 
-- **proxymock-compare-results**: deep report/drift comparison of the two
-  replay dirs this skill produces and consumes.
-- **proxymock-load-test**: same replay under parallel virtual users for
-  latency and throughput SLOs.
-- **proxymock-replay-tuning**: when misses come from the mock set rather than
-  the app, tune signatures and transforms until the replay matches.
+- **proxymock-verify-fix**: the inverted twin, over an incident capture.
+- **proxymock-compare-results**: deep report and drift comparison of two replay
+  output dirs.
+- **proxymock-perf-container**: the same replay under load.
 
 ## Proof
 
 ```bash
-./skills/proxymock-regression-test/scripts/prove-proxymock-regression-test.sh
+./skills/quality-loop/scripts/prove-quality-loop.sh
 ```
 
-The proof starts the mock-lab Go app with its downstream mocked from the
-committed recording, establishes a baseline replay, and verifies a gated rerun
-against the unchanged target passes (the noise floor does not false-positive).
-It then points the same gate at stubs that replay the recording's own statuses
-and bodies with one seeded change each: turning an endpoint's 200 into a 404
-exits 3 with `requests.failed` still 0; changing only `/api/stats` `total` from
-24 to 25 also exits 3, with the status identical to the recording and a
-`value_changed` on `total` in the summary (the case that scored `pass` before
-body scoring); and making a baseline-failing pair fail DIFFERENTLY keeps the
-gate green while printing the masked-but-different advisory.
+One shared proof covers this whole pack — a documented deviation from the
+repo's one-prove-per-skill convention, because every skill now runs the same
+native binary and a proof per skill would be five copies of the same
+assertions. The cases covering this skill: a replay against a faithful stub of
+the committed recording exits 0 with verdict `pass`; the same replay with
+`--baseline` against a stub that turns one endpoint's 200 into a 404 exits 3
+with `NEW MISMATCH` and `requests.failed` still 0; and a body-only change
+(`total` 24 -> 25 behind an unchanged 200) also exits 3.

@@ -179,6 +179,11 @@ account. Shared bash helpers for the skill scripts live in
 [`quality-loop`](skills/quality-loop/SKILL.md): it routes an intent to the right skill and its
 `doctor` checks the environment.
 
+**These skills assume proxymock v2.5.814 or newer.** Their guidance was measured on that
+release, and older builds differ on connection faults, native body scoring,
+`--require-blueprint`, `proxymock validate`, and process teardown.
+`./skills/quality-loop/scripts/quality-loop.sh doctor` warns if the installed CLI is older.
+
 | Skill | What it does | Wraps |
 | --- | --- | --- |
 | [`proxymock-load-test`](skills/proxymock-load-test/SKILL.md) | Replay recorded traffic at a target with parallel virtual users; report latency percentiles, throughput, and match rate, with `--fail-if` SLO gates | `proxymock replay --vus --for --fail-if` |
@@ -188,8 +193,8 @@ account. Shared bash helpers for the skill scripts live in
 | [`proxymock-verify-fix`](skills/proxymock-verify-fix/SKILL.md) | Prove a bug fix by replaying the incident capture at the fixed build; "recorded 500 -> observed 200" is the fix signal, any other new mismatch is collateral, and an all-match run means the bug still reproduces | `proxymock replay` |
 | [`proxymock-perf-container`](skills/proxymock-perf-container/SKILL.md) | Load-test one service with its downstream mocked: walk a VU ladder to the throughput knee, gate rps/p99 budgets there with margins, and refuse to report harness saturation as an app limit (per-level CPU attribution) | `proxymock replay --vus` via `proxymock-load-test` |
 | [`proxymock-chaos-mock`](skills/proxymock-chaos-mock/SKILL.md) | Inject faults into a mock with native fault flags so the downstream lies on demand: 503s, 429s with `Retry-After`, corrupt or truncated bodies, per-endpoint latency, socket-level connection faults, and exact deterministic ratios via `rate=F/N` | `proxymock mock --fault` |
-| [`proxymock-contract-test`](skills/proxymock-contract-test/SKILL.md) | Contract-test with traffic + OpenAPI: mock a dependency straight from its spec before any recording exists, and validate recorded/replayed responses against the spec with exact JSON-path violations (proxymock has no native traffic-vs-spec check, so the skill bundles one) | `proxymock generate` + `proxymock mock` + bundled schema checker |
-| [`quality-loop`](skills/quality-loop/SKILL.md) | The entry point: route an intent (regression gate, fix verification, capacity, chaos, contract, comparison, summary, tuning, load) to the right skill above, with the one-time setup playbook, the shared gotcha catalog, and a `doctor` that checks proxymock, recordings, blueprints, and ports | dispatches the sibling skill scripts |
+| [`proxymock-contract-test`](skills/proxymock-contract-test/SKILL.md) | Contract-test with traffic + OpenAPI: mock a dependency straight from its spec before any recording exists, and check recorded/replayed traffic against the spec with proxymock's native validator | `proxymock validate` (plus `proxymock generate` + `proxymock mock` for mock-from-spec) |
+| [`quality-loop`](skills/quality-loop/SKILL.md) | The entry point: route an intent (regression gate, fix verification, capacity, chaos, contract, comparison, summary, tuning, load) to the right skill above, with the one-time setup playbook, the shared gotcha catalog, and a `doctor` that checks the proxymock version, recordings, blueprints, and ports | dispatches the sibling skill scripts |
 
 ```shell
 # check the environment, then route any intent through the quality loop
@@ -254,7 +259,7 @@ as-is:
   already run WireMock or similar for downstreams, keep it.
 - **proxymock-specific, by design:** `proxymock-chaos-mock` drives proxymock's mock engine
   directly (timing control, deterministic duplicate-signature rotation), and the replay
-  match tags and `response_diff` verdicts all read RRPair data. The fault scenarios and
+  match tags and per-pair body-change verdicts all read RRPair data. The fault scenarios and
   interpretation guidance in its SKILL.md port to any mock system; the mechanics do not.
 - **Your traffic stays portable.** RRPairs are plain markdown files you can read, diff, and
   check in, and `proxymock export` converts recordings to WireMock stub mappings, Postman

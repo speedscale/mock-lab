@@ -1,6 +1,6 @@
 ---
 name: quality-loop
-description: Route a development intent to the right validated proxymock skill (regression gate, incident fix verification, capacity budget, chaos resilience, contract conformance, comparison, summarization, match-rate tuning, load) and get a repo into the traffic quality loop with one recording. Includes a doctor that checks proxymock, recordings, blueprints, runtime proxy support, and ports. Use when users ask how to test a change with recorded traffic, which proxymock skill applies to a task, to set up the quality loop in a repo, or to check whether the environment is ready.
+description: Route a development intent to the right validated proxymock skill (regression gate, incident fix verification, capacity budget, chaos resilience, contract conformance, comparison, summarization, match-rate tuning, load) and get a repo into the traffic quality loop with one recording. Includes a doctor that checks the proxymock version, recordings, blueprints, runtime proxy support, and ports. Use when users ask how to test a change with recorded traffic, which proxymock skill applies to a task, to set up the quality loop in a repo, or to check whether the environment is ready.
 argument-hint: <doctor|regression|verify-fix|perf|chaos|contract|compare|summarize|tune|load> [args...]
 ---
 
@@ -20,6 +20,12 @@ checks preconditions.
 
 This workflow uses local files and the `proxymock` CLI. It does not require
 Speedscale Cloud access.
+
+**Requires proxymock v2.5.814 or newer.** Every fact in this pack was
+measured on that release. Older builds behave differently on connection
+faults, native body scoring, `--require-blueprint`, `proxymock validate`,
+and process teardown, so the guidance below will mislead you on them.
+`quality-loop.sh doctor` warns when the installed CLI is older.
 
 ## Routing
 
@@ -41,8 +47,10 @@ argument; args after it pass through to the sibling script unchanged.
 Route-specific notes an agent should apply while routing:
 
 - **regression**: the gate is per-RRPair match tags and budget flips, never
-  `requests.failed`. When field-level body changes matter, add the skill's
-  MCP `response_diff` step; match tags tolerate body changes.
+  `requests.failed`. Response bodies are scored natively by default, with the
+  offending fields listed per pair in `bodyChanges[]`; pass
+  `--ignore-body-changes` only when status and headers are the whole
+  contract.
 - **verify-fix**: run `--reproduce` against the buggy build FIRST, then
   verify the fixed build. The capture is the test; no hand-written test is
   needed. Pass/fail semantics invert: an all-match run means the bug still
@@ -106,10 +114,10 @@ Validated facts the sibling skills document individually; collected here
 because every flow eventually hits them.
 
 - **Blueprint anchoring**: blueprints load only from the `--in` parent's
-  `blueprints/` dir (see setup step 4).
-- **"Applied N active blueprint(s)" lies**: the console line reflects
-  snapshot-scoped state, not your workspace. Verify application by grepping
-  the replay output RRPairs for `smart_replace` events.
+  `blueprints/` dir (see setup step 4). The "Applied N active blueprint(s)"
+  console line is trustworthy on v2.5.814, and `--require-blueprint <name>`
+  turns the check into an exit code (0 when the blueprint loads, 1 when the
+  name does not resolve), so gate CI on it instead of eyeballing the log.
 - **`proxymock mock` needs an explicit `--in`**: it does not discover a
   recording from cwd.
 - **Mock-source union**: `proxymock mock` accepts repeated `--in` flags and
@@ -132,15 +140,25 @@ because every flow eventually hits them.
   flags are read once at startup, so changing the fault set means a restart.
   Restarting a mock that WRAPS the app restarts the app too; run recovery
   scenarios un-wrapped.
-- **A fault regexp that matches nothing is a silent no-op**: the pattern is
-  matched against the bare path and host+path only, with no scheme, port, or
-  method, so a plausible full-URL pattern starts cleanly and does nothing.
-- **`connection=` faults are silently ignored on HTTP/2**: no warning at any
-  verbosity, the app gets a clean 200. The chaos skill refuses the
-  combination rather than let it look like resilience.
-- **Teardown is SIGTERM plus surviving children**: a wrapped app can
-  outlive the proxymock process that launched it. After stopping a session,
-  kill leftover listeners on your ports (scoped to your own ports).
+- **A fault regexp that matches nothing warns where you are not looking**:
+  the pattern is matched against the bare path and host+path only, with no
+  scheme, port, or method, so a plausible full-URL pattern matches nothing.
+  proxymock warns about it, but when it WRAPS an app its output goes to
+  `proxymock.log`, not your terminal. Read the log before believing an
+  injected fault ran.
+- **Connection faults work on HTTP/2, and two of them look identical**: all
+  four (`refuse`, `reset`, `stall`, `drop`) fire over HTTP/2 and stay scoped
+  to the targeted endpoint, so untargeted endpoints keep their exact byte
+  count under every one. But `refuse` and `reset` are indistinguishable from
+  inside the app (both surface as an unexpected EOF), `stall` only becomes a
+  failure if the client has a timeout, and `drop` returns a 200 whose body is
+  truncated below its own `Content-Length`, so a status-only assertion scores
+  it a success.
+- **Teardown is clean**: on v2.5.814 a SIGTERM stops the wrapper and the app
+  it wraps in well under a second, child first, and children are reaped.
+  SIGKILL is not part of the normal stop path, so a listener still holding
+  your port after a session is a stray process worth investigating, not the
+  expected aftermath.
 - **Incident captures lack the fixed path's downstream traffic**: the buggy
   handler usually errored before calling its dependency, so the capture has
   no outbound pair for the fixed code path. Union the incident capture with
@@ -158,7 +176,8 @@ see that skill's SKILL.md for its flags.
   `quality-loop.sh regression --help` prints the regression script's own
   usage.
 - `doctor [--root DIR]`: precondition check and environment report over
-  `DIR` (default: cwd). Reports proxymock presence and version, RRPair
+  `DIR` (default: cwd). Reports proxymock presence and version (warning when
+  it is older than the v2.5.814 this pack assumes), RRPair
   recording directories found (with pair counts), blueprint staging for each
   recording's parent dir, runtime proxy-support notes (Node `fetch` ignores
   proxy env vars before 22.21/24; on supported versions set
@@ -205,6 +224,11 @@ scripts also source shared helpers from `skills/lib/common.sh` (resolved as
 
 - **doctor: MISSING proxymock**: install the CLI first; every route needs
   it.
+- **doctor: proxymock version warning**: the routes still run, but this
+  pack's documented behavior was measured on v2.5.814. On older builds
+  expect connection faults, native body scoring, `--require-blueprint`,
+  `proxymock validate`, and teardown to differ. Upgrade before trusting a
+  gotcha above.
 - **doctor: MISSING recording dirs**: the repo is not in the loop yet. Run
   the one-time setup; nothing else in this pack works without a snapshot.
 - **doctor: blueprint warning on a recording**: only a problem if that app

@@ -23,10 +23,11 @@ Routes:
   load         proxymock-load-test         plain load numbers / SLO gates
 
 doctor checks preconditions and prints an environment report:
-  proxymock present + version, RRPair recording dirs under --root (default
-  cwd) with pair counts, blueprint staging per recording parent, runtime
-  proxy-support notes (Node needs >= 22.21 or 24 for NODE_USE_ENV_PROXY),
-  and default port status (8080 app, 4140 proxy-out).
+  proxymock present + version (warns below v2.5.814, the release this skill
+  pack's guidance was measured on), RRPair recording dirs under --root
+  (default cwd) with pair counts, blueprint staging per recording parent,
+  runtime proxy-support notes (Node needs >= 22.21 or 24 for
+  NODE_USE_ENV_PROXY), and default port status (8080 app, 4140 proxy-out).
 
 Exit codes:
   dispatch: the sibling script's own codes
@@ -72,11 +73,26 @@ cmd_doctor() {
   echo "root: $root"
   echo
 
-  # proxymock CLI
+  # proxymock CLI. Every behavior this pack documents was measured on
+  # MIN_PROXYMOCK; older builds differ on the items named in the warning, so
+  # flag a stale CLI without failing the check.
+  local MIN_PROXYMOCK="2.5.814"
+  local stale_note="connection faults, native body scoring, --require-blueprint, proxymock validate, and teardown differ on older builds"
   if command -v proxymock >/dev/null 2>&1; then
-    local pv
+    local pv ver oldest
     pv="$(proxymock version 2>/dev/null | head -1 || true)"
     echo "ok   proxymock: $(command -v proxymock) (${pv:-version unknown})"
+    ver="$(printf '%s\n' "$pv" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1 || true)"
+    if [[ -z "$ver" ]]; then
+      warns+=("proxymock version not parseable from '${pv:-}'; this pack assumes >= $MIN_PROXYMOCK ($stale_note)")
+    else
+      oldest="$(printf '%s\n%s\n' "$MIN_PROXYMOCK" "$ver" | sort -t. -k1,1n -k2,2n -k3,3n | head -1)"
+      if [[ "$oldest" != "$MIN_PROXYMOCK" ]]; then
+        warns+=("proxymock $ver is older than $MIN_PROXYMOCK, which this pack's guidance assumes: $stale_note")
+      else
+        echo "ok   proxymock version $ver: >= $MIN_PROXYMOCK (this pack's minimum)"
+      fi
+    fi
   else
     echo "MISS proxymock: not on PATH"
     missing+=("proxymock CLI not on PATH; install per https://docs.speedscale.com/proxymock/")

@@ -115,17 +115,21 @@ summary_json="$work_dir/summary.json"
 ql_check_replay_out_empty "$replay_out" 2
 
 # --- precondition: blueprint anchoring ---------------------------------------
-# Blueprints are loaded only from the --in path's parent proxymock directory's
-# blueprints/ subdir, not from cwd and not from the output workspace (same
-# anchoring rule as replay's own help text: "--out ... default anchors to the
-# --in workspace, not the current directory"). Without a blueprint, endpoints
-# that chain moving IDs (fresh tokens, created order ids) replay with stale
-# recorded values, the target rejects them (401/404), and a regression on
-# those endpoints' SUCCESS paths is undetectable: they fail before and after.
+# Blueprints load from INSIDE the --in tree (replay reads --in recursively), not
+# from cwd and not from a sibling of --in. Without a blueprint, endpoints that
+# chain moving IDs (fresh tokens, created order ids) replay with stale recorded
+# values, the target rejects them (401/404), and a regression on those
+# endpoints' SUCCESS paths is undetectable: they fail before and after.
 bp_dir="$(ql_blueprint_dir "$in_dir")"
 bp_count="$(ql_blueprint_count "$bp_dir")"
 if [[ "$bp_count" -eq 0 ]]; then
   echo "WARNING: no blueprints found at $bp_dir" >&2
+  stray_dir="$(ql_stray_blueprint_dir "$in_dir")"
+  if [[ "$(ql_blueprint_count "$stray_dir")" -gt 0 ]]; then
+    echo "WARNING: but $stray_dir has blueprint(s). That is OUTSIDE the --in" >&2
+    echo "WARNING: tree, so proxymock never loads them. Move them under" >&2
+    echo "WARNING: $bp_dir, or point --in at the workspace root." >&2
+  fi
   echo "WARNING: auth/moving-ID endpoints will be unreplayable (401s) and any" >&2
   echo "WARNING: regression on their success paths is UNDETECTABLE (masked)." >&2
 else

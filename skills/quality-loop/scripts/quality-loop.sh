@@ -119,23 +119,27 @@ cmd_doctor() {
     done
   fi
 
-  # blueprint staging: blueprints load ONLY from the recording's parent
-  # directory's blueprints/ subdir (the --in anchoring rule)
-  local parents=() p seen bp found_bp
+  # blueprint staging: blueprints load from INSIDE the --in tree. These skills
+  # replay with --in <recording dir>, so a blueprint is only loaded from
+  # <recording>/blueprints/. One parked in the recording's PARENT is never read
+  # on that invocation, so report it as a misplacement rather than as staged.
+  local bp found_bp found_stray
   for d in "${rec_dirs[@]+"${rec_dirs[@]}"}"; do
-    p="$(dirname "$d")"
-    seen=0
-    for q in "${parents[@]+"${parents[@]}"}"; do [[ "$q" == "$p" ]] && seen=1; done
-    [[ $seen -eq 1 ]] && continue
-    parents+=("$p")
     found_bp=0
-    for bp in "$p"/blueprints/*.json; do
+    for bp in "$d"/blueprints/*.json; do
       [[ -f "$bp" ]] || continue
       found_bp=1
       echo "ok   blueprint: $bp"
     done
-    if [[ $found_bp -eq 0 ]]; then
-      warns+=("no blueprints staged at $p/blueprints/ (needed only if the app has moving IDs like rotating tokens or order ids)")
+    [[ $found_bp -eq 1 ]] && continue
+    found_stray=0
+    for bp in "$(dirname "$d")"/blueprints/*.json; do
+      [[ -f "$bp" ]] || continue
+      found_stray=1
+      warns+=("blueprint $bp sits beside the recording, outside the --in tree these skills replay ($d), so proxymock never loads it; move it to $d/blueprints/")
+    done
+    if [[ $found_stray -eq 0 ]]; then
+      warns+=("no blueprints staged at $d/blueprints/ (needed only if the app has moving IDs like rotating tokens or order ids)")
     fi
   done
 

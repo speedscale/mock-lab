@@ -98,13 +98,15 @@ A repo enters the loop once; after this every route reads the same files.
    on gate baseline-relative (`--baseline`), so the deterministic noise
    floor does not false-positive.
 4. **Stage blueprints if the app has moving IDs** (rotating tokens,
-   generated order ids). Put the smart-replace blueprint JSON in the
-   recording's parent proxymock directory under `blueprints/`, e.g.
-   `lab/proxymock/blueprints/`. The anchoring rule is strict: blueprints
-   load ONLY from the `--in` path's parent directory's `blueprints/` subdir,
-   not from cwd and not from the output workspace. Without them, moving-ID
-   endpoints 401/404 on every replay and regressions on those paths are
-   undetectable.
+   generated order ids). Blueprints load from INSIDE the `--in` tree, because
+   replay reads `--in` recursively. These skills replay with
+   `--in <recording dir>`, so put the smart-replace blueprint JSON in
+   `<recording>/blueprints/`, e.g. `lab/proxymock/recording/blueprints/`. A
+   `blueprints/` dir that is a SIBLING of the recording is never read on that
+   invocation — it only loads if you point `--in` at the workspace root
+   instead. Blueprints in `~/.speedscale/data/transforms/` load globally on
+   top of either. Without an applied blueprint, moving-ID endpoints 401/404 on
+   every replay and regressions on those paths are undetectable.
 
 `quality-loop.sh doctor` verifies all of this.
 
@@ -113,11 +115,15 @@ A repo enters the loop once; after this every route reads the same files.
 Validated facts the sibling skills document individually; collected here
 because every flow eventually hits them.
 
-- **Blueprint anchoring**: blueprints load only from the `--in` parent's
-  `blueprints/` dir (see setup step 4). The "Applied N active blueprint(s)"
-  console line is trustworthy on v2.5.814, and `--require-blueprint <name>`
-  turns the check into an exit code (0 when the blueprint loads, 1 when the
-  name does not resolve), so gate CI on it instead of eyeballing the log.
+- **Blueprint anchoring**: blueprints load from inside the `--in` tree, not
+  from a sibling of it (see setup step 4). `--require-blueprint <name>` exits 1
+  in TWO cases — the name never loaded, and it loaded but none of its transform
+  chains ran — and on either it aborts before writing
+  `<out>/replay-verdict.json`. That makes it a poor CI gate for these skills:
+  an inert blueprint costs you the whole verdict, which is the actual test
+  result. The sibling skills warn on an inert blueprint and still measure,
+  using `smart_replace` events in the replay output as the evidence that a
+  chain really ran.
 - **`proxymock mock` needs an explicit `--in`**: it does not discover a
   recording from cwd.
 - **Mock-source union**: `proxymock mock` accepts repeated `--in` flags and
@@ -231,10 +237,12 @@ scripts also source shared helpers from `skills/lib/common.sh` (resolved as
   gotcha above.
 - **doctor: MISSING recording dirs**: the repo is not in the loop yet. Run
   the one-time setup; nothing else in this pack works without a snapshot.
-- **doctor: blueprint warning on a recording**: only a problem if that app
-  has moving IDs. If it does, expect 401/404 noise on replay and an
-  undetectable-regression blind spot on those endpoints until a blueprint is
-  staged in the right `blueprints/` dir.
+- **doctor: blueprint warning on a recording**: two shapes. "no blueprints
+  staged" only matters if that app has moving IDs. "sits beside the recording"
+  means a blueprint exists but is outside the `--in` tree these skills replay,
+  so proxymock never loads it — the blind spot is real and the fix is a move,
+  not a new file. Either way expect 401/404 noise on replay and an
+  undetectable-regression blind spot on those endpoints until it is resolved.
 - **doctor: Node version warning**: recording a Node app on that runtime
   captures nothing through the proxy. Upgrade to >= 22.21 or 24 and set
   `NODE_USE_ENV_PROXY=1` (plus `NODE_EXTRA_CA_CERTS` for TLS).

@@ -104,15 +104,19 @@ source shared helpers from `skills/lib/common.sh` (resolved as
 
 ## Preconditions the script checks
 
-- **Blueprint anchoring.** Blueprints load only from the `--in` path's parent
-  proxymock directory's `blueprints/` subdir, not from cwd and not from the
-  output workspace. The script warns when that dir is missing or empty, and
+- **Blueprint anchoring.** Blueprints load from INSIDE the `--in` tree (replay
+  reads `--in` recursively), not from cwd and not from a sibling of `--in`; a
+  `blueprints/` dir parked beside the recording is silently inert, and the
+  script says so when it finds one. It warns when no blueprint is loadable, and
   warns again when a blueprint exists but no `smart_replace` events appear in
   the replay output, since loading a blueprint is not running it. Unapplied
   blueprints make moving-ID endpoints fail for reasons unrelated to the fix and
-  pollute the collateral list. Replay's own `--require-blueprint` is not used:
-  measured broken on v2.5.812, where it exits 1 with "loaded but none of its
-  transform chains ran" against a blueprint that demonstrably ran.
+  pollute the collateral list. Replay's own `--require-blueprint` is accurate on
+  v2.5.814 — re-measured with controls, it exits 1 both for a name that never
+  loaded and for one that loaded without firing, the latter agreeing with the
+  grep — but it is not used as the gate: it aborts the replay before
+  `<out>/replay-verdict.json` is written, and that verdict is what classifies
+  the fix, so gating on it would cost the whole verification.
 - **The incident capture's downstream gap.** An incident capture
   systematically LACKS the fixed code path's downstream traffic: the buggy
   handler usually errored BEFORE calling its dependencies, so no outbound

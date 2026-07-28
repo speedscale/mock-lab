@@ -158,11 +158,17 @@ always serves with `--response-selection round-robin`.
 
 ## MCP parity
 
-Every chaos knob is CLI-only. The `mock_server_start` MCP tool takes only
-`in-directory`, `out-directory`, and `log-to`: no `fault`, no `mock-timing`,
-no `response-selection`, no `mock-reload-interval`, no `app-health-endpoint`,
-not even `proxy-out-port`. `edit_rrpair` is body-only. An MCP-only agent
-cannot run this skill; shell out to the CLI.
+Most chaos knobs are now reachable over MCP. `mock_server_start` accepts
+`fault`, `mock-timing`, `mock-reload-interval` and `response-selection`
+alongside `in-directory`, `out-directory` and `log-to`, so the faults
+themselves no longer need the CLI.
+
+What is still missing is the port and readiness control this script relies on:
+no `proxy-out-port`, no `health-port`, no `app-health-endpoint`. `edit_rrpair`
+remains body-only (`file`, `side`, `body`). An MCP-only agent can therefore
+inject faults but cannot pin the proxy-out port, cannot wait on a health
+endpoint, and cannot run `--serve` reproducibly; this script shells out to the
+CLI for that.
 
 ## Output contract
 

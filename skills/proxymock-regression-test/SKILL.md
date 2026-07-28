@@ -92,20 +92,26 @@ scripts source shared helpers from `skills/lib/common.sh` (resolved as
 
 ## Preconditions the script checks
 
-- **Blueprint anchoring.** Blueprints are loaded only from the `--in` path's
-  parent proxymock directory's `blueprints/` subdir, not from cwd and not from
-  the output workspace (the same anchoring rule replay applies to `--out`,
-  which "anchors to the `--in` workspace, not the current directory"). If that
-  dir is missing or empty the script warns loudly: auth and moving-ID
+- **Blueprint anchoring.** Blueprints load from INSIDE the `--in` tree: replay
+  reads `--in` recursively, so it finds `<--in>/blueprints/`, and a workspace
+  root passed as `--in` picks up its own `blueprints/` beside `recording/`. A
+  `blueprints/` dir that is a SIBLING of `--in` is never read, which is the
+  usual misplacement; the script names that case explicitly when it sees it.
+  If no blueprint is loadable the script warns loudly: auth and moving-ID
   endpoints will be unreplayable (401s), and a regression on their success
   paths is UNDETECTABLE because they fail before and after the change.
 - **Blueprint application.** Loading a blueprint is not running it, and the
   `Loaded blueprint ...` console lines only report loading. The script verifies
   application by grepping the replay output RRPairs for `smart_replace` events
-  and warns when a blueprint exists but none appear. It deliberately does not
-  use replay's `--require-blueprint`: measured broken on v2.5.812, where it
-  exits 1 with "loaded but none of its transform chains ran" against a
-  blueprint that demonstrably ran.
+  and warns when a blueprint exists but none appear. Replay's own
+  `--require-blueprint` is accurate on v2.5.814 — re-measured with controls, it
+  exits 1 both for a name that never loaded ("was not loaded from the `--in`
+  workspace") and for one that loaded without firing ("loaded but none of its
+  transform chains ran"), the latter agreeing with the grep. It is still not
+  the gate, because it aborts the replay BEFORE `<out>/replay-verdict.json` is
+  written, and that verdict is the entire regression signal. Gating on it would
+  trade a blueprint warning for the loss of every status and body comparison in
+  the run, so the script warns and still measures.
 - **Mock reminder.** When the recording contains outbound pairs, the script
   reminds you that `proxymock mock` requires an explicit `--in`; it does not
   discover the recording from cwd.

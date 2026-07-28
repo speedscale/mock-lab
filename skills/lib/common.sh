@@ -174,8 +174,25 @@ ql_prove_cleanup() {
 }
 
 ql_blueprint_dir() {
-  # blueprints load ONLY from the recording's parent directory's blueprints/
-  # subdir (the --in anchoring rule), never from cwd
+  # Blueprints load from INSIDE the --in tree, never from cwd and never from a
+  # sibling of --in. replay reads --in recursively, so it picks up
+  # <--in>/blueprints/ -- and, when --in is a workspace root, that root's own
+  # blueprints/ next to recording/.
+  #
+  # Measured on v2.5.814 by staging one blueprint under eight candidate paths
+  # (<ws>/blueprints, <ws>/transforms, <--in>/blueprints, <--in>/transforms,
+  # <ws>/data/transforms, <ws>/.speedscale/data/transforms,
+  # <ws>/proxymock/blueprints, <ws>/proxymock/transforms) each with a distinct
+  # name, then replaying once: only the copy inside --in produced a "Loaded
+  # blueprint" line. The global ~/.speedscale/data/transforms/ blueprints load
+  # unconditionally on top of that and are not workspace state.
+  echo "$1/blueprints"
+}
+
+ql_stray_blueprint_dir() {
+  # The parent's blueprints/ -- the usual misplacement when --in points at the
+  # recording dir rather than the workspace root. proxymock never reads it from
+  # there, so a blueprint parked here is silently inert.
   echo "$(dirname "$1")/blueprints"
 }
 
@@ -194,9 +211,17 @@ ql_smart_replace_file_count() {
   # "Loaded blueprint ..." console lines do not tell you (they report loading,
   # not application).
   #
-  # Do NOT reach for replay's --require-blueprint here: measured broken on
-  # v2.5.812, where it exits 1 with "loaded but none of its transform chains
-  # ran" against a blueprint that demonstrably ran. Revisit when that is fixed.
+  # Why this and not replay's --require-blueprint: the flag is ACCURATE on
+  # v2.5.814. Both of its failure modes were re-measured with controls -- a
+  # name that never loaded exits 1 "was not loaded from the --in workspace",
+  # and a blueprint that loaded without firing exits 1 "loaded but none of its
+  # transform chains ran", which agrees with this grep returning 0.
+  #
+  # It is still not the gate, because it aborts the replay BEFORE writing
+  # <out>/replay-verdict.json (measured: no verdict file on either exit-1
+  # path). That verdict is the entire regression signal, so gating on the flag
+  # trades a warning about the blueprint for the loss of every status and body
+  # comparison in the run. Warn on an inert blueprint; still measure.
   (grep -ril 'smart_replace' "$1" 2>/dev/null || true) | wc -l | tr -d ' '
 }
 

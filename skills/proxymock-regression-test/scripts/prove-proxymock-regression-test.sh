@@ -6,6 +6,9 @@
 # changes only a response BODY field trips it too (exit 3, status identical to
 # the recording), and a pair that already failed in the baseline but now fails
 # DIFFERENTLY stays masked (exit 0) with the masked-but-different advisory.
+# Also pins the blueprint precondition: a blueprint loads from inside the --in
+# tree and not from a sibling of it, and --require-blueprint exits 1 without
+# writing a verdict -- a raw 1 that ql_run_replay maps onto exit 2.
 set -euo pipefail
 
 # shared ql_* helpers; a copied skill needs skills/lib/common.sh too
@@ -226,4 +229,67 @@ grep -q "/api/categories" "$tmp/adv.out" \
   && die "step 6: advisory fired on a pair failing identically"
 echo "ok: advisory names only the pair whose failure changed"
 
-echo "PASS: baseline clean, noise floor stable, status regression (3), body-only regression (3), changed failure not masked (3), advisory unit check"
+echo "step 7: blueprint load path and --require-blueprint exit mapping"
+# Pins the two measured facts behind the blueprint precondition:
+#   1. a blueprint loads from INSIDE the --in tree, and NOT from a sibling of
+#      --in (the usual misplacement)
+#   2. --require-blueprint exits 1 WITHOUT writing replay-verdict.json, which
+#      is why this skill warns on an inert blueprint instead of gating on the
+#      flag -- and when the flag is used, ql_run_replay maps that raw 1 onto
+#      the caller's own precondition code (2 here), never leaking it as 1
+src_bp="$repo_root/lab/proxymock/blueprints/mocklab-smart-replace.json"
+[[ -s "$src_bp" ]] || die "step 7: missing committed blueprint: $src_bp"
+bp_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["name"])' "$src_bp")"
+
+# (a) inside the --in tree: loads
+mkdir -p "$tmp/bp-inside/recording"
+cp -R "$recording"/. "$tmp/bp-inside/recording/"
+mkdir -p "$tmp/bp-inside/recording/blueprints"
+cp "$src_bp" "$tmp/bp-inside/recording/blueprints/"
+proxymock replay --in "$tmp/bp-inside/recording" \
+  --test-against "http://127.0.0.1:${app_port}" \
+  --out "$tmp/bp-inside-out" --output json \
+  >"$tmp/bp-inside.json" 2>"$tmp/bp-inside.log" || true
+grep -q "Loaded blueprint \"$bp_name\"" "$tmp/bp-inside.log" \
+  || die "step 7a: blueprint inside the --in tree did not load; see $tmp/bp-inside.log"
+[[ "$(ql_blueprint_count "$(ql_blueprint_dir "$tmp/bp-inside/recording")")" -eq 1 ]] \
+  || die "step 7a: ql_blueprint_dir does not point at the loading path"
+echo "ok: blueprint inside --in loads, ql_blueprint_dir agrees"
+
+# (b) sibling of --in: does NOT load
+mkdir -p "$tmp/bp-sibling/blueprints"
+cp -R "$recording" "$tmp/bp-sibling/recording"
+cp "$src_bp" "$tmp/bp-sibling/blueprints/"
+proxymock replay --in "$tmp/bp-sibling/recording" \
+  --test-against "http://127.0.0.1:${app_port}" \
+  --out "$tmp/bp-sibling-out" --output json \
+  >"$tmp/bp-sibling.json" 2>"$tmp/bp-sibling.log" || true
+grep -q "Loaded blueprint \"$bp_name\"" "$tmp/bp-sibling.log" \
+  && die "step 7b: a blueprint beside --in loaded; the anchoring rule changed"
+[[ "$(ql_blueprint_count "$(ql_stray_blueprint_dir "$tmp/bp-sibling/recording")")" -eq 1 ]] \
+  || die "step 7b: ql_stray_blueprint_dir does not point at the sibling"
+echo "ok: blueprint beside --in stays inert, ql_stray_blueprint_dir names it"
+
+# (c) --require-blueprint fails closed and writes no verdict
+bogus_rc=0
+proxymock replay --in "$tmp/bp-inside/recording" \
+  --test-against "http://127.0.0.1:${app_port}" \
+  --out "$tmp/bp-bogus-out" --output json \
+  --require-blueprint "does-not-exist" \
+  >"$tmp/bp-bogus.json" 2>"$tmp/bp-bogus.log" || bogus_rc=$?
+[[ "$bogus_rc" -eq 1 ]] || die "step 7c: expected raw exit 1 from --require-blueprint, got $bogus_rc"
+[[ ! -s "$tmp/bp-bogus-out/replay-verdict.json" ]] \
+  || die "step 7c: --require-blueprint wrote a verdict; it could now be a gate"
+echo "ok: --require-blueprint exits 1 and writes no replay-verdict.json"
+
+# (d) that raw 1 is mapped onto this skill's precondition code, not leaked
+mapped_rc=0
+( ql_run_replay proxymock "$tmp/bp-inside/recording" \
+    "http://127.0.0.1:${app_port}" "$tmp/bp-mapped-out" \
+    "$tmp/bp-mapped.json" "$tmp/bp-mapped.log" 2 \
+    --require-blueprint "does-not-exist" ) >/dev/null 2>&1 || mapped_rc=$?
+[[ "$mapped_rc" -eq 2 ]] \
+  || die "step 7d: replay exit 1 must map to the skill's precondition code 2, got $mapped_rc"
+echo "ok: replay exit 1 maps to precondition exit 2, never leaked as 1"
+
+echo "PASS: baseline clean, noise floor stable, status regression (3), body-only regression (3), changed failure not masked (3), advisory unit check, blueprint load path + require-blueprint mapping"

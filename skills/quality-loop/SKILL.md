@@ -234,6 +234,11 @@ busy ports — do not fail the check.
 ./skills/quality-loop/scripts/prove-quality-loop.sh
 ```
 
+`demo.sh [regression|contract|chaos|verify-fix]` beside it is the showing path,
+not the contract: it seeds four real defects into a temp copy of `go/`, runs the
+native commands against them, prints each finding, and cleans up. `PAUSE=1`
+steps between scenes for a screencast.
+
 This is the pack's single proof — a documented deviation from the repo's
 one-prove-per-skill convention, adopted because all five loop skills now run
 the same native binary and per-skill proofs would be five copies of the same

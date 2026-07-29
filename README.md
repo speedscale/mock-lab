@@ -189,6 +189,21 @@ release, and older builds differ on connection faults, native body scoring,
 `--require-blueprint`, `proxymock validate`, and process teardown.
 `./skills/quality-loop/scripts/quality-loop.sh doctor` warns if the installed CLI is older.
 
+### See it work
+
+```shell
+./skills/quality-loop/scripts/demo.sh          # all four scenes, about 30 seconds
+```
+
+Four defects seeded into a throwaway copy of `go/` and caught by the native commands.
+`regression`: an off-by-one in `/api/stats` that keeps its 200 and its clean transport metrics,
+so a status-only gate ships it. `contract`: a `count` integer shipped as a string, reported with
+the JSON path of the field. `chaos`: a dropped downstream connection that still answers 200, and
+a 503 downstream that `/api/stats` reports as healthy aggregates, both with one line in the app
+log. `verify-fix`: an incident capture that reads BUG REPRODUCED against the broken build and
+FIX CONFIRMED against the fixed one. Run one scene by name, or set `PAUSE=1` to step between
+them. It prints findings and asserts nothing; the contract lives in `prove-quality-loop.sh`.
+
 | Skill | What it does | Wraps |
 | --- | --- | --- |
 | [`proxymock-load-test`](skills/proxymock-load-test/SKILL.md) | Replay recorded traffic at a target with parallel virtual users; report latency percentiles, throughput, and match rate, with `--fail-if` SLO gates | `proxymock replay --vus --for --fail-if` |

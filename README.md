@@ -14,15 +14,15 @@ One click — all seven runtimes and the `proxymock` CLI are preinstalled. Run
 
 ## Pick your language
 
-| Language | Run |
-| --- | --- |
-| [Go](go/README.md) | `cd go && go run .` |
-| [Node.js](node/README.md) | `cd node && node index.js` |
-| [Python](python/README.md) | `cd python && python3 app.py` |
-| [Java](java/README.md) | `cd java && java App.java` |
-| [Ruby](ruby/README.md) | `cd ruby && ruby app.rb` |
-| [.NET](dotnet/README.md) | `cd dotnet && dotnet run` |
-| [C++](cpp/README.md) | `cd cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app` |
+| Language | Run | Its own recording |
+| --- | --- | --- |
+| [Go](go/README.md) | `cd go && go run .` | [`go/proxymock/recording`](go/proxymock/recording) |
+| [Node.js](node/README.md) | `cd node && node index.js` | [`node/proxymock/recording`](node/proxymock/recording) |
+| [Python](python/README.md) | `cd python && python3 app.py` | [`python/proxymock/recording`](python/proxymock/recording) |
+| [Java](java/README.md) | `cd java && java App.java` | [`java/proxymock/recording`](java/proxymock/recording) |
+| [Ruby](ruby/README.md) | `cd ruby && ruby app.rb` | [`ruby/proxymock/recording`](ruby/proxymock/recording) |
+| [.NET](dotnet/README.md) | `cd dotnet && dotnet run` | [`dotnet/proxymock/recording`](dotnet/proxymock/recording) |
+| [C++](cpp/README.md) | `cd cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app` | [`cpp/proxymock/recording`](cpp/proxymock/recording) |
 
 Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWNSTREAM_URL`
 (default `https://demo-api.trafficreplay.com`).
@@ -90,6 +90,45 @@ proxymock replay --in ../lab/proxymock/recording --test-against http://localhost
 Replay passes 0% failed — the blueprint (`res_body → json_path → smart_replace_recorded` on
 `access_token` and `order_id`) re-chains both IDs. To record your own and watch it happen, use the
 quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow too).
+
+## Two kinds of committed recording
+
+There are two, and they answer different questions.
+
+[`lab/proxymock/recording`](lab/proxymock/recording) is the **shared cross-language fixture**. It ships with the smart-replace blueprint, replays 0% failed against *any* of the seven apps, and is what the [`skills/`](skills/) proof scripts run against. Use it when the language does not matter and you want the auth flow to chain cleanly.
+
+`<lang>/proxymock/recording` is the **per-runtime one**: one recording per language, each captured from that language's own server. Use it when you care how a specific runtime actually behaves on the wire. Every language dir has one, so `proxymock/` next to the app is also the layout you get from a plain `proxymock record` in that directory. That is the convention, not a special case.
+
+Each per-language recording holds 13 RRPairs: 8 inbound under `localhost/` (the app's own API) and 5 outbound under `demo-api.trafficreplay.com/` (the CNCF downstream). To mock + replay a language against its own capture:
+
+```shell
+cd ruby                                                    # any language dir
+proxymock mock --in ./proxymock/recording -- ruby app.rb   # downstream served from ruby's own recording
+# in another terminal:
+proxymock replay --in ./proxymock/recording --test-against http://localhost:8080
+```
+
+Use `localhost`, not `127.0.0.1`, because the recorded signature keys on the host as written. Replay reports 8 requests, 0% failed, 25% status-code mismatch: the two Bearer-protected endpoints (`POST /api/orders` and `GET /api/orders/{order_id}`) 401 because the recorded `access_token` is stale and no blueprint is staged in the language dir. That is expected. For a clean 0%, use the `lab/` fixture and its blueprint above.
+
+### What actually differs between runtimes
+
+The seven apps serve identical endpoints with identical JSON, so the interesting difference is what each HTTP server adds on its own. Measured from the committed recordings, `GET /` on each:
+
+| Language | Server implementation | Response headers recorded | `Server` banner | `Content-Type` |
+| --- | --- | --- | --- | --- |
+| Go | `net/http` | `Content-Type`, `Date` | none | `application/json` |
+| Node.js | `node:http` | `Connection`, `Content-Type`, `Date`, `Keep-Alive` | none | `application/json` |
+| Python | `http.server` | `Content-Type`, `Date`, `Server` | `BaseHTTP/0.6 Python/3.14.6` | `application/json` |
+| Java | `com.sun.net.httpserver` | `Content-Type`, `Date` | none | `application/json` |
+| Ruby | raw `TCPServer` | `Content-Type` | none | `application/json` |
+| .NET | Kestrel | `Content-Type`, `Date`, `Server` | `Kestrel` | `application/json; charset=utf-8` |
+| C++ | raw POSIX sockets | `Content-Type` | none | `application/json` |
+
+Three things fall out of that table. Only **Python and .NET announce themselves** with a `Server` header, and .NET's is the bare product name while Python's carries both the handler and the interpreter version, so a Python recording pins the patch release it was captured on. **Ruby and C++ emit neither `Date` nor `Server`**, because both hand-write the status line and headers into the socket rather than going through a server library; a library adds `Date` for you, a `printf` does not. And **.NET is the only one that appends `charset=utf-8`** to `Content-Type`, which matters because a strict content-type assertion tuned on one runtime will fail on Kestrel.
+
+Node is the only runtime that records connection-management headers (`Connection: keep-alive` plus `Keep-Alive: timeout=5`).
+
+Two things that are **not** differences, worth stating because they look like they should be. Status lines are identical everywhere (`200 OK` and `201 Created`, same spelling, same casing), and `Date`, wherever present, is the same RFC 7231 IMF-fixdate format. Header ordering and message framing are **not observable** from an RRPair at all: proxymock stores headers alphabetically, and no `Content-Length` or `Transfer-Encoding` survives capture in any recording here, including the outbound ones from the real remote server. Ruby and C++ both write a `Content-Length` that the recording does not keep. So do not use these files to reason about framing.
 
 ## Mock match-rate tuning (MCP)
 

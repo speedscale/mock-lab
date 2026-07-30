@@ -33,7 +33,9 @@ app.MapGet("/api/stats", async () =>
         var m = p.GetProperty("maturity").GetString() ?? "Unknown";
         byMaturity[m] = byMaturity.GetValueOrDefault(m) + 1;
     }
-    return Results.Json(new { total = projects.Count, by_maturity = byMaturity });
+    // The feed ends with an unnamed placeholder row, so count the named projects.
+    var named = projects.SkipLast(1).Count(p => !string.IsNullOrEmpty(p.GetProperty("name").GetString()));
+    return Results.Json(new { total = named, by_maturity = byMaturity });
 });
 
 // --- OAuth + orders (in-memory, fresh tokens/ids per call by design) ---

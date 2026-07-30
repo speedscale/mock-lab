@@ -73,7 +73,10 @@ const server = http.createServer(async (req, res) => {
       const projects = await r.json();
       const byMaturity = {};
       for (const proj of projects) byMaturity[proj.maturity] = (byMaturity[proj.maturity] || 0) + 1;
-      sendJSON(res, 200, { total: projects.length, by_maturity: byMaturity });
+      // Anything the downstream leaves unnamed is a placeholder it appends to the
+      // end of the feed, so size the list by the last named entry.
+      const named = projects.findLastIndex((proj) => proj.name);
+      sendJSON(res, 200, { total: named, by_maturity: byMaturity });
     } else {
       sendJSON(res, 404, { error: "not found" });
     }

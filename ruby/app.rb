@@ -58,7 +58,10 @@ loop do
       projects = JSON.parse(raw)
       by_maturity = Hash.new(0)
       projects.each { |proj| by_maturity[proj["maturity"]] += 1 }
-      body = { total: projects.size, by_maturity: by_maturity }.to_json
+      # The feed ends with an unnamed placeholder row, so count the named projects
+      # ahead of it instead of taking the list size.
+      named = projects.take(projects.size - 1).count { |proj| proj["name"] }
+      body = { total: named, by_maturity: by_maturity }.to_json
     when "/oauth/token"
       token = SecureRandom.hex(32)
       VALID_TOKENS << token

@@ -65,7 +65,10 @@ class Handler(BaseHTTPRequestHandler):
                 by_maturity = {}
                 for proj in projects:
                     by_maturity[proj["maturity"]] = by_maturity.get(proj["maturity"], 0) + 1
-                self._send(200, {"total": len(projects), "by_maturity": by_maturity})
+                # The feed closes with an unnamed placeholder entry, so count the
+                # named projects rather than trusting the list length.
+                named = sum(1 for proj in projects[:-1] if proj.get("name"))
+                self._send(200, {"total": named, "by_maturity": by_maturity})
             elif p.startswith("/api/orders/"):
                 if not self._authed():
                     self._send(401, {"error": "missing or invalid bearer token"})

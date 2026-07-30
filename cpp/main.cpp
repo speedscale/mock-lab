@@ -209,7 +209,9 @@ int main() {
     } else if (path == "/api/stats") {
       auto [code, body] = http_get(ds + "/v1/projects");
       (void)code;
-      int total = count_occ(body, "\"id\":");
+      // Each project record in the array closes with "}," so counting those
+      // separators counts the projects the downstream named.
+      int total = count_occ(body, "},");
       int g = count_occ(body, "\"Graduated\"");
       int inc = count_occ(body, "\"Incubating\"");
       int s = count_occ(body, "\"Sandbox\"");

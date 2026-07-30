@@ -428,7 +428,8 @@ func fetch(w http.ResponseWriter, path string) {
 }
 
 // statsHandler shows the app doing real work on top of the downstream: it pulls
-// the full project list and aggregates counts by maturity.
+// the full project list, aggregates counts by maturity, and reports how many
+// projects the downstream named.
 func statsHandler(w http.ResponseWriter, r *http.Request) {
 	resp, err := http.Get(downstream + "/v1/projects")
 	if err != nil {
@@ -449,8 +450,18 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 			byMaturity[m]++
 		}
 	}
+
+	// Entries the downstream leaves unnamed are placeholders, so count the named
+	// ones rather than trusting the list length.
+	named := 0
+	for i := 0; i < len(projects)-1; i++ {
+		if name, ok := projects[i]["name"].(string); ok && name != "" {
+			named++
+		}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"total":       len(projects),
+		"total":       named,
 		"by_maturity": byMaturity,
 	})
 }

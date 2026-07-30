@@ -103,8 +103,9 @@ which decides what a test can assert:
   Measured with `curl -m 8`: exit 28 at 8s. An app with no timeout hangs with
   it, which is itself the finding.
 - **`drop` is the sharp one.** It truncates mid-stream, so the status line and
-  headers are already on the wire: the response advertises
-  `Content-Length: 17` and delivers 7 bytes. A pass-through handler returns
+  headers are already on the wire: the response advertises a `Content-Length`
+  it never delivers. The truncated length varies between runs, so assert that
+  the body is short rather than on a number. A pass-through handler returns
   **HTTP 200 with a silently short body**, which a status-only assertion scores
   as a pass. **Assert on body length or content.** A handler that JSON-decodes
   the body surfaces the truncation as a 5xx instead.

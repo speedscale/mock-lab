@@ -61,11 +61,9 @@ back.
 
 ## Judging the number honestly
 
-The load generator and the app usually share a host, and on that setup the
-generator saturates the host well before an efficient app does, **with zero
-failed requests the whole way**. No field in the replay output attributes the
-ceiling, so a naive report calls host saturation an app limit. These are the
-measured rules for refusing to do that.
+The load generator and the app usually share a host, and on that setup the generator saturates the host well before an efficient app does, **with zero failed requests the whole way**, so a naive report calls host saturation an app limit.
+
+**As of proxymock v2.5.824 the binary does this for you.** Load runs (`--vus`, `--sessions`, `--stage`, `--load-test`) sample generator, mock and app CPU and mark a run `HARNESS-BOUND` when host idle falls below 20%, or harness CPU (generator + mock) is at least a full core and more than 2x the app's. Harness-bound throughput is reported as a floor, not the app's ceiling. Read that marking and trust it. The rules below are the same ones the binary applies, kept here so you can sanity-check a number by hand and so the reasoning is visible on older builds.
 
 **Treat a level as harness-bound when either holds:**
 

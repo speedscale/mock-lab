@@ -1,13 +1,25 @@
 # generated static export (rendered from lab/server/data, synced to S3)
 /lab/static/
-# scratch proxymock recordings from `proxymock record` in a language dir
-/go/proxymock/
-/node/proxymock/
-/python/proxymock/
-/java/proxymock/
-/ruby/proxymock/
-/dotnet/proxymock/
-/cpp/proxymock/
+# scratch proxymock recordings from `proxymock record` in a language dir --
+# the committed per-language recording/ is the exception, everything else
+# (recorded-*, replayed-*, results/, .replay/) stays ignored
+/go/proxymock/*
+!/go/proxymock/recording/
+/node/proxymock/*
+!/node/proxymock/recording/
+/python/proxymock/*
+!/python/proxymock/recording/
+/java/proxymock/*
+!/java/proxymock/recording/
+/ruby/proxymock/*
+!/ruby/proxymock/recording/
+/dotnet/proxymock/*
+!/dotnet/proxymock/recording/
+/cpp/proxymock/*
+!/cpp/proxymock/recording/
+# scratch proxymock writes inside the committed per-language recordings
+/*/proxymock/recording/.replay/
+/*/proxymock/recording/*/.replay/
 # scratch proxymock writes into the committed shared workspace (lab/proxymock/)
 /lab/proxymock/results/
 /lab/proxymock/recording/.replay/

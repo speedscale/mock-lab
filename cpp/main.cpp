@@ -114,6 +114,7 @@ static void respond(int fd, int code, const std::string& body) {
       : code == 400 ? "400 Bad Request"
       : code == 401 ? "401 Unauthorized"
       : code == 404 ? "404 Not Found"
+      : code == 500 ? "500 Internal Server Error"
                     : "502 Bad Gateway";
   std::string resp = std::string("HTTP/1.1 ") + status +
                      "\r\nContent-Type: application/json\r\nContent-Length: " +
@@ -205,7 +206,23 @@ int main() {
       respond(fd, code, body);
     } else if (path == "/api/categories") {
       auto [code, body] = http_get(ds + "/v1/categories");
-      respond(fd, code, body);
+      (void)code;
+      // The category list arrives wrapped in {"categories": [...]}; lift it out and
+      // add up the per-category counts so callers do not have to.
+      size_t key = body.find("\"categories\"");
+      if (key == std::string::npos) {
+        respond(fd, 500, "{\"error\":\"cannot read category list\"}");
+      } else {
+        size_t open = body.find('[', key);
+        size_t close = body.rfind(']');
+        std::string list = body.substr(open, close - open + 1);
+        int total = 0;
+        for (size_t i = list.find("\"count\":"); i != std::string::npos;
+             i = list.find("\"count\":", i + 1)) {
+          total += std::atoi(list.c_str() + i + 8);
+        }
+        respond(fd, 200, "{\"categories\":" + list + ",\"total\":" + std::to_string(total) + "}");
+      }
     } else if (path == "/api/stats") {
       auto [code, body] = http_get(ds + "/v1/projects");
       (void)code;

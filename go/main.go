@@ -389,7 +389,7 @@ func main() {
 	})
 	mux.HandleFunc("GET /api/categories", func(w http.ResponseWriter, r *http.Request) {
 		trackEvent(r.URL.Path)
-		fetch(w, "/v1/categories")
+		categoriesHandler(w, r)
 	})
 	mux.HandleFunc("GET /api/stats", func(w http.ResponseWriter, r *http.Request) {
 		trackEvent(r.URL.Path)
@@ -425,6 +425,37 @@ func fetch(w http.ResponseWriter, path string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(resp.StatusCode)
 	_, _ = w.Write(body)
+}
+
+// categoriesHandler returns the downstream category list plus a total of the
+// project counts across every category, so callers do not have to sum it.
+func categoriesHandler(w http.ResponseWriter, r *http.Request) {
+	resp, err := http.Get(downstream + "/v1/categories")
+	if err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":%q}`, err.Error()), http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	var payload struct {
+		Categories []struct {
+			Name  string `json:"name"`
+			Count int    `json:"count"`
+		} `json:"categories"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		http.Error(w, `{"error":"cannot read category list"}`, http.StatusInternalServerError)
+		return
+	}
+
+	total := 0
+	for _, c := range payload.Categories {
+		total += c.Count
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"categories": payload.Categories,
+		"total":      total,
+	})
 }
 
 // statsHandler shows the app doing real work on top of the downstream: it pulls

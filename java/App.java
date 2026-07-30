@@ -34,6 +34,7 @@ public class App {
     static final SecureRandom RNG = new SecureRandom();
     static final Pattern PROJECT_FIELD =
             Pattern.compile("\"project\"\\s*:\\s*\"([^\"]*)\"");
+    static final Pattern COUNT_FIELD = Pattern.compile("\"count\"\\s*:\\s*(\\d+)");
 
     static void send(HttpExchange ex, int code, String body) throws IOException {
         byte[] b = body.getBytes();
@@ -65,7 +66,7 @@ public class App {
                 } else if (p.startsWith("/api/projects/")) {
                     proxy(ex, "/v1/project/" + p.substring("/api/projects/".length()));
                 } else if (p.equals("/api/categories")) {
-                    proxy(ex, "/v1/categories");
+                    categories(ex);
                 } else if (p.equals("/api/stats")) {
                     stats(ex);
                 } else if (p.equals("/oauth/token") && m.equals("POST")) {
@@ -86,6 +87,27 @@ public class App {
         });
         server.start();
         System.out.println("java demo on :" + port + " (downstream=" + DOWNSTREAM + ")");
+    }
+
+    // categories returns the downstream category list plus a total of the per-category
+    // counts. No JSON parser here, so the list is lifted out of the wrapper by hand.
+    static void categories(HttpExchange ex) throws Exception {
+        HttpResponse<String> r = CLIENT.send(
+                HttpRequest.newBuilder(URI.create(DOWNSTREAM + "/v1/categories")).build(),
+                HttpResponse.BodyHandlers.ofString());
+        String b = r.body();
+        int key = b.indexOf("\"categories\"");
+        if (key < 0) {
+            send(ex, 500, "{\"error\":\"cannot read category list\"}");
+            return;
+        }
+        String list = b.substring(b.indexOf('[', key), b.lastIndexOf(']') + 1);
+        int total = 0;
+        Matcher m = COUNT_FIELD.matcher(list);
+        while (m.find()) {
+            total += Integer.parseInt(m.group(1));
+        }
+        send(ex, 200, "{\"categories\":" + list + ",\"total\":" + total + "}");
     }
 
     // stats aggregates maturity counts. Java has no built-in JSON parser, so this counts

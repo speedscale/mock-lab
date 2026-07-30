@@ -52,7 +52,20 @@ loop do
     when %r{\A/api/projects/(.+)\z}
       code, body = fetch("/v1/project/#{$1}")
     when "/api/categories"
-      code, body = fetch("/v1/categories")
+      # Report the per-category counts with their total, so callers do not have to
+      # add them up themselves.
+      _, raw = fetch("/v1/categories")
+      categories = begin
+        JSON.parse(raw).fetch("categories")
+      rescue TypeError, KeyError, JSON::ParserError
+        nil
+      end
+      if categories.nil?
+        code = 500
+        body = { error: "cannot read category list" }.to_json
+      else
+        body = { categories: categories, total: categories.sum { |c| c["count"] } }.to_json
+      end
     when "/api/stats"
       _, raw = fetch("/v1/projects")
       projects = JSON.parse(raw)

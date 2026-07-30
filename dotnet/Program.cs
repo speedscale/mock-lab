@@ -8,6 +8,7 @@ using System.Text.Json;
 var downstream = Environment.GetEnvironmentVariable("DOWNSTREAM_URL") ?? "https://demo-api.trafficreplay.com";
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 var http = new HttpClient();
+var jsonOpts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
@@ -23,7 +24,23 @@ async Task<IResult> Proxy(string path)
 app.MapGet("/", () => Results.Json(new { service = "proxymock-cncf-demo", lang = "dotnet", downstream }));
 app.MapGet("/api/projects", () => Proxy("/v1/projects"));
 app.MapGet("/api/projects/{id}", (string id) => Proxy("/v1/project/" + id));
-app.MapGet("/api/categories", () => Proxy("/v1/categories"));
+app.MapGet("/api/categories", async () =>
+{
+    // Report the per-category counts with their total, so callers do not have to
+    // add them up themselves.
+    var raw = await http.GetStringAsync(downstream + "/v1/categories");
+    CategoryPage? page;
+    try
+    {
+        page = JsonSerializer.Deserialize<CategoryPage>(raw, jsonOpts);
+    }
+    catch (JsonException)
+    {
+        return Results.Json(new { error = "cannot read category list" }, statusCode: 500);
+    }
+    var categories = page?.Categories ?? new List<Category>();
+    return Results.Json(new { categories, total = categories.Sum(c => c.Count) });
+});
 app.MapGet("/api/stats", async () =>
 {
     var projects = await http.GetFromJsonAsync<List<JsonElement>>(downstream + "/v1/projects") ?? new();
@@ -102,3 +119,6 @@ app.MapGet("/api/orders/{id}", (string id, HttpRequest req) =>
 
 Console.WriteLine($"dotnet demo on :{port} (downstream={downstream})");
 app.Run();
+
+record Category(string Name, int Count);
+record CategoryPage(List<Category> Categories);

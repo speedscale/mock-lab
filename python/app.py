@@ -58,7 +58,15 @@ class Handler(BaseHTTPRequestHandler):
             elif p.startswith("/api/projects/"):
                 self._send(*fetch("/v1/project/" + p.split("/api/projects/", 1)[1]))
             elif p == "/api/categories":
-                self._send(*fetch("/v1/categories"))
+                # Report the per-category counts with their total, so callers do not
+                # have to add them up themselves.
+                _, raw = fetch("/v1/categories")
+                try:
+                    categories = json.loads(raw)["categories"]
+                except (KeyError, TypeError, ValueError):
+                    self._send(500, {"error": "cannot read category list"})
+                    return
+                self._send(200, {"categories": categories, "total": sum(c["count"] for c in categories)})
             elif p == "/api/stats":
                 _, body = fetch("/v1/projects")
                 projects = json.loads(body)

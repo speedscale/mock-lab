@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "proxymock": {
+      "command": "proxymock",
+      "args": ["mcp", "run", "--work-dir", "."]
+    },
+    "grafana": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "--add-host",
+        "host.docker.internal:host-gateway",
+        "-e",
+        "GRAFANA_URL=http://host.docker.internal:3000",
+        "-e",
+        "GRAFANA_USERNAME=admin",
+        "-e",
+        "GRAFANA_PASSWORD=admin",
+        "grafana/mcp-grafana:0.14.0",
+        "-t",
+        "stdio",
+        "--disable-write",
+        "--enabled-tools",
+        "datasource,pyroscope,navigation"
+      ]
+    }
+  }
+}

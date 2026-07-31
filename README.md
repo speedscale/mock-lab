@@ -27,6 +27,12 @@ One click — all seven runtimes and the `proxymock` CLI are preinstalled. Run
 Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWNSTREAM_URL`
 (default `https://demo-api.trafficreplay.com`).
 
+## Profiling + replay agent lab
+
+[`pyroscope/`](pyroscope/README.md) is a separate Go performance-debugging lab. It combines a
+Grafana Pyroscope CPU profile with deterministic proxymock traffic so an AI coding agent can locate
+a bottleneck, optimize it, prove the response did not change, and measure the same workload again.
+
 ## Endpoints (identical across every language)
 
 | Endpoint | Calls downstream | Returns |

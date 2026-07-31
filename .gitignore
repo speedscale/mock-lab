@@ -24,6 +24,11 @@
 /lab/proxymock/results/
 /lab/proxymock/recording/.replay/
 /lab/proxymock/recording/localhost/.replay/
+/pyroscope/proxymock/recording/
+/pyroscope/proxymock/results/
+/pyroscope/bin/
+/pyroscope/.run/
+/pyroscope/proxymock.log
 # python bytecode
 __pycache__/
 # build artifacts

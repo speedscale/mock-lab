@@ -1,0 +1,35 @@
+services:
+  pyroscope:
+    image: grafana/pyroscope:2.0.2
+    command: ["server"]
+    ports:
+      - "127.0.0.1:4040:4040"
+
+  alloy:
+    image: grafana/alloy:v1.18.0
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - /etc/alloy/config.alloy
+    volumes:
+      - ./config/alloy/config.alloy:/etc/alloy/config.alloy:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "127.0.0.1:12345:12345"
+    depends_on:
+      - pyroscope
+
+  grafana:
+    image: grafana/grafana:13.1.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_PLUGINS_PREINSTALL_SYNC: grafana-pyroscope-app@2.2.0
+    volumes:
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      - pyroscope

@@ -2,6 +2,16 @@ name: CI
 
 on:
   push:
+    # stats-project-count and category-totals are demo fixtures: each carries a
+    # deliberate bug in all seven apps so the quality-loop demo has something
+    # real to find. category-totals returns 500, which this suite correctly
+    # fails on, so running CI there is permanent red noise. Neither branch is
+    # ever merged. To see the contrast the demo is about, run
+    # ./lab/tests/run_tests.sh locally: it passes on stats-project-count while
+    # the endpoint answers a wrong total, and fails on category-totals.
+    branches-ignore:
+      - stats-project-count
+      - category-totals
   pull_request:
 
 # Builds and smoke-tests every demo app against the bundled reference downstream

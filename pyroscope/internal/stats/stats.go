@@ -43,7 +43,6 @@ func Build(projects []Project) Result {
 // deduplicateProjects preserves the first valid project for each ID.
 func deduplicateProjects(projects []Project) ([]Project, int) {
 	unique := make([]Project, 0, len(projects))
-	seen := make(map[string]struct{}, len(projects))
 	invalid := 0
 
 	for _, project := range projects {
@@ -54,11 +53,18 @@ func deduplicateProjects(projects []Project) ([]Project, int) {
 			continue
 		}
 
-		if _, duplicate := seen[project.ID]; duplicate {
+		duplicate := false
+		for _, existing := range unique {
+			if existing.ID == project.ID {
+				duplicate = true
+				break
+			}
+		}
+
+		if duplicate {
 			continue
 		}
 
-		seen[project.ID] = struct{}{}
 		unique = append(unique, project)
 	}
 

@@ -44,7 +44,7 @@ make catalog
 In a second terminal, start recording:
 
 ```shell
-make record
+make record RECORDING_DIR=proxymock/recording
 ```
 
 In a third terminal, send one request through proxymock's inbound recording
@@ -54,10 +54,19 @@ port:
 curl http://localhost:4143/api/catalog/stats
 ```
 
-Stop `make record`. The recording now contains one inbound API exchange and its
-outbound `/v1/catalog` exchange. The latter contains 15,120 records, including
-duplicates and invalid entries. Those cases are deliberate: an optimization
-that merely deletes validation or deduplication should fail the semantic check.
+Stop `make record`. Confirm that proxymock wrote the inbound and outbound
+exchanges to the directory that the remaining commands will use:
+
+```shell
+find proxymock/recording -type f -name '*.md'
+```
+
+You should see two RRPair files under `proxymock/recording/localhost`. If the
+directory does not exist, make sure every terminal is in `mock-lab/pyroscope`
+and repeat the record command above. The latter exchange contains 15,120
+records, including duplicates and invalid entries. Those cases are deliberate:
+an optimization that merely deletes validation or deduplication should fail the
+semantic check.
 
 ## 3. Run the baseline offline
 
@@ -65,15 +74,15 @@ The real catalog is no longer required after recording. Start the app with the
 recorded downstream response and disable passthrough:
 
 ```shell
-make mock
+make mock RECORDING_DIR=proxymock/recording
 ```
 
 In another terminal, capture the functional baseline and then the sustained CPU
 sample:
 
 ```shell
-make functional-replay RESULTS_DIR=proxymock/results/baseline
-make load-replay RESULTS_DIR=proxymock/results/baseline
+make functional-replay RECORDING_DIR=proxymock/recording RESULTS_DIR=proxymock/results/baseline
+make load-replay RECORDING_DIR=proxymock/recording RESULTS_DIR=proxymock/results/baseline
 ```
 
 The functional replay makes three requests so proxymock can learn that headers

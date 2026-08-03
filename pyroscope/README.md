@@ -11,6 +11,9 @@ The application intentionally starts in the slow but functionally correct
 state. The goal is for an agent to diagnose and fix it, not to guess from a
 synthetic benchmark alone.
 
+For a presenter-ready walkthrough with talk-track notes and explanations of why
+each data source matters, see [DEMO_SCRIPT.md](DEMO_SCRIPT.md).
+
 ## Prerequisites
 
 - Go 1.23 or newer

@@ -116,6 +116,8 @@ proxymock replay --in ./proxymock/recording --test-against http://localhost:8080
 
 Use `localhost`, not `127.0.0.1`, because the recorded signature keys on the host as written. Replay reports 8 requests, 0% failed, 25% status-code mismatch: the two Bearer-protected endpoints (`POST /api/orders` and `GET /api/orders/{order_id}`) 401 because the recorded `access_token` is stale and no blueprint is staged in the language dir. That is expected. For a clean 0%, use the `lab/` fixture and its blueprint above.
 
+There is also [`lab/vendor-capture`](lab/vendor-capture), which is not a third kind of recording but a deliberately drifted copy of the same five downstream pairs, standing in for a capture taken after the vendor shipped an API update. Two responses were edited to break [`lab/openapi.yaml`](lab/openapi.yaml): one `GET /v1/categories` element reports `count` as a string, and one of the two `GET /v1/project/kubernetes` pairs drops the required `maturity` field while the other keeps it, so the capture contradicts itself on the same endpoint minutes apart. It exists to demo contract testing — `proxymock validate --spec lab/openapi.yaml --in lab/vendor-capture/demo-api.trafficreplay.com` exits 2 with 3 conformant and 2 violating, while the same command against `lab/proxymock/recording/demo-api.trafficreplay.com` still exits 0 with 5 conformant. `lab/proxymock/recording` remains the clean one and is what every skill proof and replay example uses; nothing mocks or replays the vendor capture.
+
 ### What actually differs between runtimes
 
 The seven apps serve identical endpoints with identical JSON, so the interesting difference is what each HTTP server adds on its own. Measured from the committed recordings, `GET /` on each:

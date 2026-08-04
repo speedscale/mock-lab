@@ -36,10 +36,18 @@ functional-replay:
 	$(PROXYMOCK) replay --in $(RECORDING_DIR) --out $(RESULTS_DIR)/functional --test-against http://localhost:8080 --times 3 --fail-if 'requests.failed>0'
 
 load-replay:
-	mkdir -p $(RESULTS_DIR)/load
-	@start=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
-	$(PROXYMOCK) replay --in $(RECORDING_DIR) --out $(RESULTS_DIR)/load --test-against http://localhost:8080 --load-test --vus 8 --for 45s; \
-	replay_status=$$?; \
-	end=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
-	printf '{\n  "start": "%s",\n  "end": "%s"\n}\n' "$$start" "$$end" > $(RESULTS_DIR)/load/profile-window.json; \
-	exit $$replay_status
+	mkdir -p "$(RESULTS_DIR)/load"
+	@rm -f "$(RESULTS_DIR)/load/profile-window.json" "$(RESULTS_DIR)/load/profile-window.json.tmp"
+	@test -d "$(RECORDING_DIR)" || { echo 'recording directory "$(RECORDING_DIR)" does not exist' >&2; exit 1; }
+	@window="$(RESULTS_DIR)/load/profile-window.json"; \
+	temporary_window="$$window.tmp"; \
+	start=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
+	if $(PROXYMOCK) replay --in "$(RECORDING_DIR)" --out "$(RESULTS_DIR)/load" --test-against http://localhost:8080 --load-test --vus 8 --for 45s; then \
+		end=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
+		printf '{\n  "start": "%s",\n  "end": "%s"\n}\n' "$$start" "$$end" > "$$temporary_window"; \
+		mv "$$temporary_window" "$$window"; \
+	else \
+		replay_status=$$?; \
+		echo 'load replay failed; profile-window.json was not written' >&2; \
+		exit $$replay_status; \
+	fi

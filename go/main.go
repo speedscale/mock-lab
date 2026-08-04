@@ -6,8 +6,11 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base32"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -401,6 +404,17 @@ func main() {
 	mux.HandleFunc("POST /api/orders", createOrderHandler)
 	mux.HandleFunc("GET /api/orders/{id}", getOrderHandler)
 
+	// Additional credential styles for the Sessions replay-readiness demo. Purely
+	// additive — the flows above are unchanged. /oauth/token issues an OPAQUE
+	// bearer ("Opaque · preflight"); these add the other two classes so the
+	// readiness view and the Replace-credentials wizard can exercise all three:
+	//   POST /auth/login  → signed JWT bearer   ("JWT · re-sign")
+	//   GET  /api/profile → JWT-protected
+	//   GET  /api/account → HTTP Basic protected ("Basic · cred set")
+	mux.HandleFunc("POST /auth/login", loginHandler)
+	mux.HandleFunc("GET /api/profile", profileHandler)
+	mux.HandleFunc("GET /api/account", accountHandler)
+
 	log.Printf("Starting HTTP server on :%s (downstream=%s)", port, downstream)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
 }
@@ -530,6 +544,127 @@ func getOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, o)
+}
+
+// ── Additional credential styles (Sessions replay-readiness demo) ────────────
+//
+// The /oauth/token flow above issues an OPAQUE bearer, classified by the
+// Sessions replay-readiness view as "Opaque · preflight". The endpoints below
+// add the other two credential styles so that view — and the Replace-credentials
+// wizard — can exercise all three classes. The JWT is hand-rolled (HS256, stdlib
+// only) to keep the demo dependency-free.
+
+// demoJWTSecret signs the demo JWTs. Intentionally fixed and well-known: the
+// point is a re-signable token for the replay-readiness demo, where proxymock
+// re-signs it per virtual user. Never hardcode a signing key outside a demo.
+const demoJWTSecret = "mock-lab-demo-signing-key"
+
+// b64url is base64url without padding — the JWT segment encoding.
+func b64url(b []byte) string { return base64.RawURLEncoding.EncodeToString(b) }
+
+// signJWT builds a minimal HS256 JWT carrying sub/iss/iat/exp for the subject.
+func signJWT(sub string) string {
+	header := b64url([]byte(`{"alg":"HS256","typ":"JWT"}`))
+	now := time.Now().UTC()
+	payload := b64url(fmt.Appendf(nil,
+		`{"sub":%q,"iss":"mock-lab","iat":%d,"exp":%d}`,
+		sub, now.Unix(), now.Add(24*time.Hour).Unix()))
+	signing := header + "." + payload
+	mac := hmac.New(sha256.New, []byte(demoJWTSecret))
+	_, _ = mac.Write([]byte(signing))
+	return signing + "." + b64url(mac.Sum(nil))
+}
+
+// jwtSubject verifies a demo JWT's HS256 signature and expiry and returns its
+// subject. ok=false for a malformed, mis-signed, or expired token.
+func jwtSubject(token string) (sub string, ok bool) {
+	parts := strings.Split(token, ".")
+	if len(parts) != 3 {
+		return "", false
+	}
+	mac := hmac.New(sha256.New, []byte(demoJWTSecret))
+	_, _ = mac.Write([]byte(parts[0] + "." + parts[1]))
+	if !hmac.Equal([]byte(b64url(mac.Sum(nil))), []byte(parts[2])) {
+		return "", false
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return "", false
+	}
+	var claims struct {
+		Sub string `json:"sub"`
+		Exp int64  `json:"exp"`
+	}
+	if err := json.Unmarshal(raw, &claims); err != nil {
+		return "", false
+	}
+	if claims.Exp > 0 && time.Now().Unix() > claims.Exp {
+		return "", false
+	}
+	return claims.Sub, true
+}
+
+// loginHandler issues a signed JWT bearer for the posted username — a re-signable
+// credential, distinct from the opaque /oauth/token bearer. Defaults the subject
+// so an empty body still works.
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username string `json:"username"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&req)
+	sub := strings.TrimSpace(req.Username)
+	if sub == "" {
+		sub = "demo-user"
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"access_token": signJWT(sub),
+		"token_type":   "Bearer",
+		"expires_in":   86400,
+		"subject":      sub,
+	})
+}
+
+// profileHandler is JWT-protected: the signed bearer rides in the Authorization
+// header, so a recording of it yields one readiness session per subject.
+func profileHandler(w http.ResponseWriter, r *http.Request) {
+	h := r.Header.Get("Authorization")
+	sub, ok := jwtSubject(strings.TrimPrefix(h, "Bearer "))
+	if !strings.HasPrefix(h, "Bearer ") || !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "missing or invalid JWT bearer"})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"subject": sub,
+		"plan":    "pro",
+		"ts":      time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// demoBasicUsers is the credential set the Basic-auth endpoint accepts. Fixed,
+// well-known demo values — readiness classifies these as "Basic · cred set" and
+// the Replace-credentials wizard swaps them per user at replay.
+var demoBasicUsers = map[string]string{
+	"acme":   "acme-secret",
+	"globex": "globex-secret",
+}
+
+// accountHandler is HTTP Basic protected — a credential-set style credential, one
+// recorded session per username.
+func accountHandler(w http.ResponseWriter, r *http.Request) {
+	user, pass, ok := r.BasicAuth()
+	if !ok || demoBasicUsers[user] != pass {
+		w.Header().Set("WWW-Authenticate", `Basic realm="mock-lab"`)
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid basic credentials"})
+		return
+	}
+	mu.Lock()
+	n := len(orders)
+	mu.Unlock()
+	writeJSON(w, http.StatusOK, map[string]any{
+		"account": user,
+		"orders":  n,
+		"ts":      time.Now().UTC().Format(time.RFC3339),
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

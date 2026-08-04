@@ -85,6 +85,10 @@ make functional-replay RECORDING_DIR=proxymock/recording RESULTS_DIR=proxymock/r
 make load-replay RECORDING_DIR=proxymock/recording RESULTS_DIR=proxymock/results/baseline
 ```
 
+Both commands use the same baseline results root. The Makefile writes the
+functional evidence under `baseline/functional` and the performance evidence
+under `baseline/load`; neither command overwrites the other.
+
 The functional replay makes three requests so proxymock can learn that headers
 such as `Date` are volatile. Load mode intentionally skips full response-match
 scoring in exchange for high throughput; use it for performance evidence, not
@@ -92,9 +96,14 @@ correctness evidence.
 
 The load target writes its UTC start and end to
 `proxymock/results/baseline/load/profile-window.json`. There is no timestamp to
-copy by hand. In Grafana, open Profiles Drilldown and select `catalog-api` and
-the Process CPU profile. Use the saved window with a 15-second buffer on each
-side to cover profiler scrape boundaries.
+copy by hand. It publishes that file only after a successful replay. If the
+file is missing, do not infer a window from file timestamps. Confirm the mock
+is running and repeat the full `make load-replay` command above, including both
+directory arguments.
+
+In Grafana, open Profiles Drilldown and select `catalog-api` and the Process CPU
+profile. Use the saved window with a 15-second buffer on each side to cover
+profiler scrape boundaries.
 
 ## 4. Connect an AI coding agent
 
@@ -114,7 +123,10 @@ is:
 2. Read `proxymock/results/baseline/load/profile-window.json`, subtract 15
    seconds from `start`, add 15 seconds to `end`, and call `query_pyroscope`
    with datasource `pyroscope`, Process CPU, and matcher
-   `{service_name="catalog-api"}`.
+   `{service_name="catalog-api"}`. If the window is missing, do not infer one or
+   use an inherited directory setting. Run
+   `make load-replay RECORDING_DIR=proxymock/recording RESULTS_DIR=proxymock/results/baseline`
+   and proceed only if it succeeds and creates the file.
 3. proxymock `search_local_traffic` over `proxymock/recording` to inspect input
    shape and response invariants.
 4. Change the code and run tests.

@@ -39,11 +39,13 @@ load-replay:
 	mkdir -p "$(RESULTS_DIR)/load"
 	@rm -f "$(RESULTS_DIR)/load/profile-window.json" "$(RESULTS_DIR)/load/profile-window.json.tmp"
 	@test -d "$(RECORDING_DIR)" || { echo 'recording directory "$(RECORDING_DIR)" does not exist' >&2; exit 1; }
-	@window="$(RESULTS_DIR)/load/profile-window.json"; \
+	@result_dir="$(RESULTS_DIR)/load"; \
+	window="$$result_dir/profile-window.json"; \
 	temporary_window="$$window.tmp"; \
 	start=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
-	if $(PROXYMOCK) replay --in "$(RECORDING_DIR)" --out "$(RESULTS_DIR)/load" --test-against http://localhost:8080 --load-test --vus 8 --for 45s; then \
+	if $(PROXYMOCK) replay --in "$(RECORDING_DIR)" --out "$$result_dir" --test-against http://localhost:8080 --load-test --vus 8 --for 45s; then \
 		end=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
+		mkdir -p "$$result_dir"; \
 		printf '{\n  "start": "%s",\n  "end": "%s"\n}\n' "$$start" "$$end" > "$$temporary_window"; \
 		mv "$$temporary_window" "$$window"; \
 	else \

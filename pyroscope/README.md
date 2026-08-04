@@ -96,10 +96,12 @@ correctness evidence.
 
 The load target writes its UTC start and end to
 `proxymock/results/baseline/load/profile-window.json`. There is no timestamp to
-copy by hand. It publishes that file only after a successful replay. If the
-file is missing, do not infer a window from file timestamps. Confirm the mock
-is running and repeat the full `make load-replay` command above, including both
-directory arguments.
+copy by hand. Successful load runs can produce no RRPair files because
+proxymock's low-data mode retains only failures; the target still creates the
+`load` directory and publishes the profile window. If the file is missing, the
+target did not finish successfully. Do not infer a window from file timestamps.
+Confirm the mock is running and repeat the full `make load-replay` command
+above, including both directory arguments.
 
 In Grafana, open Profiles Drilldown and select `catalog-api` and the Process CPU
 profile. Use the saved window with a 15-second buffer on each side to cover

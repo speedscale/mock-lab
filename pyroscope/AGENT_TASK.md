@@ -14,8 +14,10 @@ Use both connected data sources:
 5. Use proxymock `response_diff` against the baseline functional replay. A 200
    status and matching schema are insufficient; stable response values must not
    change.
-6. Run the same 8-VU, 45-second load replay and query the new CPU profile over
-   that exact time window.
+6. Run the same 8-VU, 45-second load replay. Read the generated
+   `load/profile-window.json`, subtract 15 seconds from `start`, add 15 seconds
+   to `end`, and query the new CPU profile over that buffered window. Do not ask
+   the user to copy timestamps.
 
 Report the before/after latency and throughput, the original hotspot, the new
 top application work, and any semantic differences.

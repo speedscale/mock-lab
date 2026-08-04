@@ -90,9 +90,11 @@ such as `Date` are volatile. Load mode intentionally skips full response-match
 scoring in exchange for high throughput; use it for performance evidence, not
 correctness evidence.
 
-Record the UTC start/end timestamps printed for the 45-second load. In Grafana,
-open Profiles Drilldown and select `catalog-api` and the Process CPU profile for
-that exact window.
+The load target writes its UTC start and end to
+`proxymock/results/baseline/load/profile-window.json`. There is no timestamp to
+copy by hand. In Grafana, open Profiles Drilldown and select `catalog-api` and
+the Process CPU profile. Use the saved window with a 15-second buffer on each
+side to cover profiler scrape boundaries.
 
 ## 4. Connect an AI coding agent
 
@@ -109,15 +111,18 @@ Give the agent [AGENT_TASK.md](AGENT_TASK.md). A useful investigation sequence
 is:
 
 1. `list_datasources` and `list_pyroscope_profile_types`.
-2. `query_pyroscope` with datasource `pyroscope`, Process CPU, matcher
-   `{service_name="catalog-api"}`, and the exact baseline interval.
+2. Read `proxymock/results/baseline/load/profile-window.json`, subtract 15
+   seconds from `start`, add 15 seconds to `end`, and call `query_pyroscope`
+   with datasource `pyroscope`, Process CPU, and matcher
+   `{service_name="catalog-api"}`.
 3. proxymock `search_local_traffic` over `proxymock/recording` to inspect input
    shape and response invariants.
 4. Change the code and run tests.
 5. Re-run functional replay to `proxymock/results/candidate` and call proxymock
    `response_diff` with baseline `proxymock/results/baseline/functional`.
-6. Re-run load replay to `proxymock/results/candidate`, then query Pyroscope for
-   that exact candidate interval.
+6. Re-run load replay to `proxymock/results/candidate`, read its
+   `load/profile-window.json`, apply the same 15-second buffer, and query
+   Pyroscope for the candidate interval.
 
 ## 5. Acceptance criteria
 

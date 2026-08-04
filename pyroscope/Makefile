@@ -37,4 +37,9 @@ functional-replay:
 
 load-replay:
 	mkdir -p $(RESULTS_DIR)/load
-	$(PROXYMOCK) replay --in $(RECORDING_DIR) --out $(RESULTS_DIR)/load --test-against http://localhost:8080 --load-test --vus 8 --for 45s
+	@start=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
+	$(PROXYMOCK) replay --in $(RECORDING_DIR) --out $(RESULTS_DIR)/load --test-against http://localhost:8080 --load-test --vus 8 --for 45s; \
+	replay_status=$$?; \
+	end=$$(date -u +"%Y-%m-%dT%H:%M:%SZ"); \
+	printf '{\n  "start": "%s",\n  "end": "%s"\n}\n' "$$start" "$$end" > $(RESULTS_DIR)/load/profile-window.json; \
+	exit $$replay_status

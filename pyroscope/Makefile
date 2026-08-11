@@ -1,5 +1,5 @@
 .PHONY: test build observability-up observability-down catalog app record mock functional-replay load-replay \
-	opencost-up opencost-down opencost-build opencost-forward \
+	opencost-up opencost-down opencost-build opencost-forward opencost-stop \
 	opencost-deploy-baseline opencost-deploy-candidate \
 	opencost-functional-baseline opencost-functional-candidate \
 	opencost-load-baseline opencost-load-candidate \
@@ -59,6 +59,9 @@ load-replay:
 
 opencost-up:
 	./scripts/opencost-up.sh
+
+opencost-stop:
+	minikube stop -p "$${MINIKUBE_PROFILE:-opencost-lab}"
 
 opencost-down:
 	minikube delete -p "$${MINIKUBE_PROFILE:-opencost-lab}"

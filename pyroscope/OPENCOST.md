@@ -237,6 +237,42 @@ STABLE_RESPONSE_DIFFERENCES=0 make opencost-compare
 The command writes both JSON and Markdown comparisons under
 `proxymock/results/opencost/` and emits an explicit candidate-valid verdict.
 
+## Pause, resume, or remove the lab
+
+Stop `make opencost-forward` with Ctrl-C before pausing or removing the
+cluster. To retain the cluster without consuming CPU and memory:
+
+```shell
+make opencost-stop
+```
+
+Resume in two terminals:
+
+```shell
+make opencost-up
+```
+
+```shell
+make opencost-forward
+```
+
+`opencost-up` repairs stopped or stale minikube state, removes interrupted Helm
+releases, converges the pinned stack, and restores the baseline allocation. If
+you stopped during a baseline or candidate measurement, redeploy that variant
+and rerun both its functional and load commands. A load result is complete only
+when its `load/window.json` exists; never construct a window from partial
+results or file timestamps.
+
+For a clean teardown, stop the forwarder with Ctrl-C, then run:
+
+```shell
+make opencost-down
+```
+
+This deletes only the minikube profile selected by `MINIKUBE_PROFILE` (default
+`opencost-lab`). Recordings and replay evidence under `proxymock/` remain on
+the host.
+
 ## Validated local run
 
 The complete workflow was exercised on Apple arm64 with Docker Desktop and the
@@ -273,6 +309,3 @@ of the method, not optional waiting. Do not turn the percentage difference from
 this local run into a production savings claim. See OpenCost's
 [allocation API documentation](https://opencost.io/docs/integrations/api/) for
 the window and resolution behavior.
-
-When finished, `make opencost-down` deletes only the minikube profile named by
-`MINIKUBE_PROFILE` (default `opencost-lab`).

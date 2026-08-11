@@ -5,7 +5,7 @@ root_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 profile=${MINIKUBE_PROFILE:-opencost-lab}
 context=${KUBE_CONTEXT:-opencost-lab}
 
-for command_name in docker minikube kubectl helm; do
+for command_name in docker minikube kubectl helm jq; do
   command -v "$command_name" >/dev/null || {
     echo "missing required command: $command_name" >&2
     exit 1
@@ -14,7 +14,11 @@ done
 
 docker info >/dev/null
 
-if ! minikube status -p "$profile" >/dev/null 2>&1; then
+profile_status=$(minikube status -p "$profile" \
+  --format='{{.Host}}:{{.Kubelet}}:{{.APIServer}}:{{.Kubeconfig}}' \
+  2>/dev/null || true)
+if [[ "$profile_status" != "Running:Running:Running:Configured" ]]; then
+  echo "starting minikube profile '$profile' (current state: ${profile_status:-missing or stale})"
   minikube start \
     -p "$profile" \
     --driver=docker \
@@ -27,6 +31,32 @@ if ! kubectl config get-contexts "$context" >/dev/null 2>&1; then
   echo "expected Kubernetes context '$context' was not created" >&2
   exit 1
 fi
+
+if ! kubectl --context "$context" get --raw=/readyz --request-timeout=5s >/dev/null 2>&1; then
+  echo "Kubernetes context '$context' is not ready after starting minikube profile '$profile'" >&2
+  echo "To recreate only this isolated lab, run: minikube delete -p '$profile'" >&2
+  exit 1
+fi
+
+reset_pending_helm_release() {
+  local namespace=$1
+  local release=$2
+  local release_status
+
+  release_status=$(helm --kube-context "$context" --namespace "$namespace" \
+    status "$release" --output json 2>/dev/null | \
+    jq -r '.info.status // empty' 2>/dev/null || true)
+  case "$release_status" in
+    pending-*)
+      echo "removing interrupted Helm release '$release' ($release_status)"
+      helm --kube-context "$context" --namespace "$namespace" \
+        uninstall "$release" --wait --timeout 5m
+      ;;
+  esac
+}
+
+reset_pending_helm_release prometheus-system prometheus
+reset_pending_helm_release opencost opencost
 
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts --force-update
 helm repo add opencost https://opencost.github.io/opencost-helm-chart --force-update

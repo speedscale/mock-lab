@@ -29,6 +29,11 @@
 /pyroscope/bin/
 /pyroscope/.run/
 /pyroscope/proxymock.log
+/tempo/proxymock/recording/
+/tempo/proxymock/results/
+/tempo/bin/
+/tempo/.run/
+/tempo/proxymock.log
 # python bytecode
 __pycache__/
 # build artifacts

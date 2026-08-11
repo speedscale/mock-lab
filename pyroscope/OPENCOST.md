@@ -239,31 +239,54 @@ The command writes both JSON and Markdown comparisons under
 
 ## Pause, resume, or remove the lab
 
-Stop `make opencost-forward` with Ctrl-C before pausing or removing the
-cluster. To retain the cluster without consuming CPU and memory:
+This section is not part of an uninterrupted demo run. Continue through the
+comparison above, then perform only the final teardown below. Use pause and
+resume only when leaving the experiment midway.
+
+To pause, press Ctrl-C in the terminal running `make opencost-forward`. Then,
+from the lab directory, run:
 
 ```shell
 make opencost-stop
 ```
 
-Resume in two terminals:
+To resume, start or repair the cluster from the lab directory:
 
 ```shell
 make opencost-up
 ```
+
+In a second terminal, restart the forwarder:
 
 ```shell
 make opencost-forward
 ```
 
 `opencost-up` repairs stopped or stale minikube state, removes interrupted Helm
-releases, converges the pinned stack, and restores the baseline allocation. If
-you stopped during a baseline or candidate measurement, redeploy that variant
-and rerun both its functional and load commands. A load result is complete only
+releases, converges the pinned stack, and restores the baseline allocation.
+
+If a baseline measurement was interrupted, rerun the complete baseline block:
+
+```shell
+make opencost-deploy-baseline
+make opencost-functional-baseline
+make opencost-load-baseline
+```
+
+If a candidate measurement was interrupted, run this block instead:
+
+```shell
+make opencost-deploy-candidate
+make opencost-functional-candidate
+make opencost-load-candidate
+```
+
+Run only the block for the interrupted variant. A load result is complete only
 when its `load/window.json` exists; never construct a window from partial
 results or file timestamps.
 
-For a clean teardown, stop the forwarder with Ctrl-C, then run:
+After the final comparison, press Ctrl-C in the forwarding terminal. Then
+remove the isolated cluster:
 
 ```shell
 make opencost-down

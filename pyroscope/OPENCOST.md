@@ -21,6 +21,8 @@ application-code optimization.
 - kubectl and Helm
 - proxymock, activated and available on `PATH`
 - curl and jq
+- an agent that supports STDIO and Streamable HTTP MCP servers; the examples
+  below use Codex
 - the recording and validated CPU candidate created by completing the main
   [Pyroscope guide](README.md) through its final replay-and-profile step
 
@@ -64,9 +66,18 @@ The forwarded endpoints are:
 | OpenCost API | `http://127.0.0.1:19003` |
 | OpenCost MCP | `http://127.0.0.1:18081/` |
 
-Copy `mcp.example.json` into the MCP configuration format supported by your
-agent, or translate its entries. OpenCost uses Streamable HTTP; proxymock and
-Grafana use the transports already described in the main guide.
+From this directory, add the two servers used by this guide to Codex:
+
+```shell
+codex mcp add proxymock -- proxymock mcp run --work-dir .
+codex mcp add opencost --url http://127.0.0.1:18081/
+codex mcp list
+```
+
+Other agents can translate the same entries from `mcp.example.json`.
+OpenCost uses Streamable HTTP and proxymock uses STDIO. Keep
+`make opencost-forward` running while OpenCost MCP is in use. Grafana is used
+by the main Pyroscope guide, not by this allocation comparison.
 
 ## 2. Measure the baseline allocation
 
@@ -100,16 +111,27 @@ minute boundary, runs two virtual users for three minutes, and publishes
 latency is at most 250 ms. The exact request summary is beside it in
 `summary.json`.
 
-Through OpenCost MCP, call `get_allocation_costs` with:
+Paste this task into Codex:
 
-- `window`: the exact comma-separated `start,end` from `window.json`
-- `aggregate`: `namespace`
-- `resolution`: `1m`
+```text
+Read proxymock/results/opencost/baseline/load/window.json. Join its exact
+start and end values with a comma; do not round or widen them. Call OpenCost
+MCP get_allocation_costs with:
 
-Read the `catalog-api` allocation and retain its raw `totalCost`. If the
-namespace is absent, Prometheus has not completed ingestion. Wait one scrape
-interval and repeat the identical query; do not widen the window or substitute
-pod timestamps.
+window: "<start>,<end>"
+aggregate: "namespace"
+step: "1m"
+accumulate: true
+
+Select the catalog-api allocation and report start, end, cpuCost, ramCost,
+and totalCost. In baseline/load/summary.json, select the endpoints entry
+whose url and method both equal "-ALL-". Report requests.succeeded,
+requests.failed, requests.per-second, and latency.p95 from its metrics object.
+```
+
+Substitute the file's values for `<start>` and `<end>`. If `catalog-api` is
+absent, wait one scrape interval and repeat the identical tool call. Do not
+widen the window or substitute pod timestamps.
 
 The optional API companion saves the same exact-window allocation beside the
 replay evidence and retries ingestion without changing the interval:
@@ -128,17 +150,21 @@ make opencost-functional-candidate
 make opencost-load-candidate
 ```
 
-Through proxymock MCP, call `response_diff` with:
+Paste this task into Codex:
 
-- baseline: `proxymock/results/opencost/baseline/functional`
-- candidate: `proxymock/results/opencost/candidate/functional`
+```text
+Call proxymock MCP response_diff with:
+- baseline-directory: ["proxymock/results/opencost/baseline/functional"]
+- in-directory: ["proxymock/results/opencost/candidate/functional"]
 
-Report every stable-field difference. Matching HTTP status codes or response
-schemas are not proof of equivalence.
+Report every stable-field difference. Matching status codes or schemas are
+not proof of equivalence.
 
-Then query OpenCost MCP over the candidate's exact
-`candidate/load/window.json` interval using the same allocation arguments as
-the baseline.
+Read proxymock/results/opencost/candidate/load/window.json. Call OpenCost MCP
+get_allocation_costs with its exact "<start>,<end>", aggregate="namespace",
+step="1m", and accumulate=true. Select catalog-api and retain cpuCost,
+ramCost, and totalCost.
+```
 
 Save the API companion evidence as well:
 

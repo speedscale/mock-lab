@@ -114,11 +114,11 @@ latency is at most 250 ms. The exact request summary is beside it in
 Paste this task into Codex:
 
 ```text
-Read proxymock/results/opencost/baseline/load/window.json. Join its exact
-start and end values with a comma; do not round or widen them. Call OpenCost
-MCP get_allocation_costs with:
+Read proxymock/results/opencost/baseline/load/window.json yourself.
+Programmatically construct the window argument as file.start + "," + file.end
+and pass it directly to OpenCost MCP get_allocation_costs. Do not ask me to
+copy, substitute, or confirm timestamps. Do not round or widen the interval.
 
-window: "<start>,<end>"
 aggregate: "namespace"
 step: "1m"
 accumulate: true
@@ -129,9 +129,8 @@ whose url and method both equal "-ALL-". Report requests.succeeded,
 requests.failed, requests.per-second, and latency.p95 from its metrics object.
 ```
 
-Substitute the file's values for `<start>` and `<end>`. If `catalog-api` is
-absent, wait one scrape interval and repeat the identical tool call. Do not
-widen the window or substitute pod timestamps.
+If `catalog-api` is absent, wait one scrape interval and repeat the identical
+tool call. Do not widen the window or substitute pod timestamps.
 
 The optional API companion saves the same exact-window allocation beside the
 replay evidence and retries ingestion without changing the interval:
@@ -160,10 +159,11 @@ Call proxymock MCP response_diff with:
 Report every stable-field difference. Matching status codes or schemas are
 not proof of equivalence.
 
-Read proxymock/results/opencost/candidate/load/window.json. Call OpenCost MCP
-get_allocation_costs with its exact "<start>,<end>", aggregate="namespace",
-step="1m", and accumulate=true. Select catalog-api and retain cpuCost,
-ramCost, and totalCost.
+Read proxymock/results/opencost/candidate/load/window.json yourself.
+Programmatically construct the window argument as file.start + "," + file.end
+and pass it directly to OpenCost MCP get_allocation_costs with
+aggregate="namespace", step="1m", and accumulate=true. Do not ask me for
+timestamps. Select catalog-api and retain cpuCost, ramCost, and totalCost.
 ```
 
 Save the API companion evidence as well:

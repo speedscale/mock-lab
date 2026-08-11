@@ -8,13 +8,15 @@ and memory requests and limits may differ.
 2. Through proxymock MCP, call `response_diff` on the baseline and candidate
    functional result directories. Inspect every stable-field difference; matching
    status codes or schemas alone are insufficient.
-3. Run the load replay for each allocation. Use the exact `start` and `end`
-   published in that variant's `load/window.json`; do not infer timestamps from
-   files or pod age.
-4. Through OpenCost MCP, call `get_allocation_costs` with the exact RFC3339
-   window, namespace aggregation, and one-minute resolution. Select the
-   `catalog-api` allocation. If it is absent, wait for ingestion and repeat the
-   same query without silently changing the interval.
+3. Run the load replay for each allocation. The command writes the exact UTC
+   interval to that variant's `load/window.json`; never ask the user to record
+   or provide timestamps.
+4. Read each `window.json` yourself. Programmatically construct the MCP
+   `window` argument as `file.start + "," + file.end`, then call
+   `get_allocation_costs` with `aggregate="namespace"`, `step="1m"`, and
+   `accumulate=true`. Select `catalog-api`. If it is absent, wait for ingestion
+   and repeat the identical call without widening the interval or inferring
+   timestamps from file or pod age.
 5. For each variant, report total allocation cost divided by the replay's
    successful-request count, alongside p95 latency, throughput, and failures.
 

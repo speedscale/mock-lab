@@ -184,7 +184,9 @@ schemas do not satisfy the contract; report every stable-field difference.
 The complete workflow was run locally on Apple arm64. Both trace intervals came
 directly from their functional `window.json` files and were passed unchanged to
 Grafana MCP 0.14.0. The selected trace in each interval was the longest of the
-three functional requests.
+three functional requests. [`reference-evidence.json`](reference-evidence.json)
+retains the exact replay windows, unrounded metrics, trace facts, attribution,
+and proxymock comparison result in one machine-readable record.
 
 | Evidence | Baseline | Bounded-concurrency candidate |
 | --- | ---: | ---: |

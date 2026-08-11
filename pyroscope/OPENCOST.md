@@ -237,6 +237,43 @@ STABLE_RESPONSE_DIFFERENCES=0 make opencost-compare
 The command writes both JSON and Markdown comparisons under
 `proxymock/results/opencost/` and emits an explicit candidate-valid verdict.
 
+## Validated local run
+
+The complete workflow was exercised on Apple arm64 with Docker Desktop and the
+pinned chart versions in this guide.
+
+| Evidence | Baseline | Candidate |
+| --- | ---: | ---: |
+| Failed functional requests | 0 | 0 |
+| Stable response differences | baseline | 0 |
+| Load p95 latency | 54 ms | 52 ms |
+| Load throughput | 94.5 req/s | 98.8 req/s |
+| Failed load requests | 0 | 0 |
+| Allocation cost | 0.06000 | 0.05125 |
+| Successful requests | 17,019 | 17,785 |
+| Cost / successful request | 0.0000035255 | 0.0000028816 |
+
+The candidate passed every gate and reduced allocation cost per successful
+request by 18.3% in this run. These measurements are directional rather than
+portable hardware guarantees.
+
+An earlier candidate cut CPU to 500 millicores as well as memory. It still met
+the loose 250 ms latency SLO, but throughput fell from 99.0 to 41.7 requests/s;
+normalized cost rose 18.6%. The workflow rejected that cheaper-looking
+allocation and preserved the CPU capacity in the final candidate. This is why
+the denominator and throughput belong beside the cost number.
+
+## Measurement boundaries
+
+This lab measures requested Kubernetes allocation under fixed local prices.
+It does not include a cloud provider's discounts, idle-sharing policy,
+commitments, node bin-packing, or network/storage charges. Because Prometheus
+samples at one-minute resolution, the warm-up and multi-minute windows are part
+of the method, not optional waiting. Do not turn the percentage difference from
+this local run into a production savings claim. See OpenCost's
+[allocation API documentation](https://opencost.io/docs/integrations/api/) for
+the window and resolution behavior.
+
 ## Pause, resume, or remove the lab
 
 This section is not part of an uninterrupted demo run. Continue through the
@@ -295,40 +332,3 @@ make opencost-down
 This deletes only the minikube profile selected by `MINIKUBE_PROFILE` (default
 `opencost-lab`). Recordings and replay evidence under `proxymock/` remain on
 the host.
-
-## Validated local run
-
-The complete workflow was exercised on Apple arm64 with Docker Desktop and the
-pinned chart versions in this guide.
-
-| Evidence | Baseline | Candidate |
-| --- | ---: | ---: |
-| Failed functional requests | 0 | 0 |
-| Stable response differences | baseline | 0 |
-| Load p95 latency | 54 ms | 52 ms |
-| Load throughput | 94.5 req/s | 98.8 req/s |
-| Failed load requests | 0 | 0 |
-| Allocation cost | 0.06000 | 0.05125 |
-| Successful requests | 17,019 | 17,785 |
-| Cost / successful request | 0.0000035255 | 0.0000028816 |
-
-The candidate passed every gate and reduced allocation cost per successful
-request by 18.3% in this run. These measurements are directional rather than
-portable hardware guarantees.
-
-An earlier candidate cut CPU to 500 millicores as well as memory. It still met
-the loose 250 ms latency SLO, but throughput fell from 99.0 to 41.7 requests/s;
-normalized cost rose 18.6%. The workflow rejected that cheaper-looking
-allocation and preserved the CPU capacity in the final candidate. This is why
-the denominator and throughput belong beside the cost number.
-
-## Measurement boundaries
-
-This lab measures requested Kubernetes allocation under fixed local prices.
-It does not include a cloud provider's discounts, idle-sharing policy,
-commitments, node bin-packing, or network/storage charges. Because Prometheus
-samples at one-minute resolution, the warm-up and multi-minute windows are part
-of the method, not optional waiting. Do not turn the percentage difference from
-this local run into a production savings claim. See OpenCost's
-[allocation API documentation](https://opencost.io/docs/integrations/api/) for
-the window and resolution behavior.

@@ -12,9 +12,13 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"golang.org/x/sync/errgroup"
 )
 
-const maxInventoryResponseBytes = 64 << 10
+const (
+	maxInventoryResponseBytes = 64 << 10
+	maxConcurrentLookups      = 4
+)
 
 type InventoryItem struct {
 	ProductID string `json:"product_id"`
@@ -47,16 +51,25 @@ func NewService(client *http.Client, baseURL string, tracer trace.Tracer) (*Serv
 	return &Service{client: client, baseURL: parsed, tracer: tracer}, nil
 }
 
-// Build deliberately performs one inventory lookup at a time. The serial
-// dependency pattern is the baseline diagnosed by this lab.
+// Build fetches inventory with bounded concurrency while preserving request
+// order in the response.
 func (s *Service) Build(ctx context.Context, productIDs []string) (Result, error) {
-	items := make([]InventoryItem, 0, len(productIDs))
-	for _, productID := range productIDs {
-		item, err := s.fetchInventory(ctx, productID)
-		if err != nil {
-			return Result{}, err
-		}
-		items = append(items, item)
+	items := make([]InventoryItem, len(productIDs))
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(maxConcurrentLookups)
+	for i, productID := range productIDs {
+		i, productID := i, productID
+		group.Go(func() error {
+			item, err := s.fetchInventory(groupCtx, productID)
+			if err != nil {
+				return err
+			}
+			items[i] = item
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return Result{}, err
 	}
 
 	result := Result{Items: items, RequestedItems: len(items)}

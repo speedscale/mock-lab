@@ -61,7 +61,7 @@ opencost-up:
 	./scripts/opencost-up.sh
 
 opencost-stop:
-	minikube stop -p "$${MINIKUBE_PROFILE:-opencost-lab}"
+	minikube pause -p "$${MINIKUBE_PROFILE:-opencost-lab}"
 
 opencost-down:
 	minikube delete -p "$${MINIKUBE_PROFILE:-opencost-lab}"

@@ -299,8 +299,11 @@ In a second terminal, restart the forwarder:
 make opencost-forward
 ```
 
-`opencost-up` repairs stopped or stale minikube state, removes interrupted Helm
-releases, converges the pinned stack, and restores the baseline allocation.
+`opencost-stop` pauses the lab containers, so `opencost-up` can normally
+unpause them without rebuilding Kubernetes. If an older stopped or stale
+profile cannot restart, minikube deletes and recreates only this isolated
+profile. Startup then removes interrupted Helm releases, converges the pinned
+stack, and restores the baseline allocation.
 
 If a baseline measurement was interrupted, rerun the complete baseline block:
 

@@ -17,11 +17,19 @@ docker info >/dev/null
 profile_status=$(minikube status -p "$profile" \
   --format='{{.Host}}:{{.Kubelet}}:{{.APIServer}}:{{.Kubeconfig}}' \
   2>/dev/null || true)
+if [[ "$profile_status" == "Running:Stopped:Paused:Configured" ]]; then
+  echo "unpausing minikube profile '$profile'"
+  minikube unpause -p "$profile"
+  profile_status=$(minikube status -p "$profile" \
+    --format='{{.Host}}:{{.Kubelet}}:{{.APIServer}}:{{.Kubeconfig}}' \
+    2>/dev/null || true)
+fi
 if [[ "$profile_status" != "Running:Running:Running:Configured" ]]; then
   echo "starting minikube profile '$profile' (current state: ${profile_status:-missing or stale})"
   minikube start \
     -p "$profile" \
     --driver=docker \
+    --delete-on-failure \
     --kubernetes-version=v1.34.0 \
     --cpus=4 \
     --memory=6144
@@ -37,6 +45,11 @@ if ! kubectl --context "$context" get --raw=/readyz --request-timeout=5s >/dev/n
   echo "To recreate only this isolated lab, run: minikube delete -p '$profile'" >&2
   exit 1
 fi
+
+for addon in default-storageclass storage-provisioner; do
+  echo "ensuring minikube addon '$addon'"
+  minikube -p "$profile" addons enable "$addon"
+done
 
 reset_pending_helm_release() {
   local namespace=$1

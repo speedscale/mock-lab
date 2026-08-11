@@ -129,6 +129,34 @@ whose url and method both equal "-ALL-". Report requests.succeeded,
 requests.failed, requests.per-second, and latency.p95 from its metrics object.
 ```
 
+A successful response should have this shape:
+
+```text
+Queried exact window: 2026-08-11T18:19:00Z,2026-08-11T18:22:01Z
+
+catalog-api allocation:
+
+- start: 2026-08-11T18:19:00Z
+- end: 2026-08-11T18:23:00Z
+- cpuCost: 0.06666666666666667
+- ramCost: 0.013333333333333334
+- totalCost: 0.08
+
+-ALL- / -ALL- endpoint metrics:
+
+- requests.succeeded: 17132
+- requests.failed: 0
+- requests.per-second: 95.17747305599376
+- latency.p95: 42
+```
+
+Your timestamps, costs, request count, throughput, and latency will vary. Check
+that `Queried exact window` exactly matches `baseline/load/window.json`, that
+the response includes the `catalog-api` allocation, and that the `-ALL-` metrics
+show zero failed requests. OpenCost may align the allocation's returned `start`
+and `end` to the configured one-minute step, as shown above; that does not
+change the exact interval passed to the MCP tool.
+
 If `catalog-api` is absent, wait one scrape interval and repeat the identical
 tool call. Do not widen the window or substitute pod timestamps.
 

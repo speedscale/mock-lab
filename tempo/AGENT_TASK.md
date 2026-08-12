@@ -30,10 +30,14 @@ Work in /Users/matthewleray/s2/mock-lab/tempo. Do not edit application code yet.
 Then call Grafana MCP list_datasources with:
 {"type":"tempo","limit":50,"offset":0}
 
+Parse /Users/matthewleray/s2/mock-lab/tempo/proxymock/results/baseline/functional/summary.json first. Stop without querying Tempo unless the -ALL- endpoint reports requests.total=3, requests.failed=0, and requests.result-match-pct=100. A 0% match or a 502 response means the recorder is still running or the mock failed to start; rerun the functional replay after correcting the process state.
+
 Parse /Users/matthewleray/s2/mock-lab/tempo/proxymock/results/baseline/functional/window.json yourself. Pass file.start and file.end directly, unchanged, to Grafana MCP tempo_traceql-search with:
 {"datasourceUid":"tempo","query":"{ resource.service.name = \"catalog-api\" && name = \"POST /api/catalog\" }","start":file.start,"end":file.end}
 
 Do not ask me to record, copy, substitute, widen, round, or confirm timestamps.
+If no trace is returned, make at most three identical calls over 30 seconds. If all three are empty, stop and inspect docker compose ps and docker compose logs tempo read-only; do not retry indefinitely or change the interval.
+
 Choose the longest returned trace, then call tempo_get-trace with:
 {"datasourceUid":"tempo","trace_id":the returned traceID}
 

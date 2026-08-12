@@ -54,8 +54,10 @@ curl -H 'Content-Type: application/json' \
   http://localhost:4143/api/catalog
 ```
 
-Stop `make record`, then stop `make inventory`. The recording should contain
-one inbound `POST /api/catalog` and eight outbound inventory GETs:
+Press Ctrl-C to stop `make record` and wait for proxymock to exit, then stop
+`make inventory`. Do not leave the recorder wrapping the app: the replay phase
+must start a new `proxymock mock` process. The recording should contain one
+inbound `POST /api/catalog` and eight outbound inventory GETs:
 
 ```shell
 find proxymock/recording -type f -name '*.md'
@@ -76,6 +78,12 @@ no longer needed:
 make mock RECORDING_DIR=proxymock/recording
 ```
 
+Wait for proxymock to print `mocking traffic sent from your app`. The mock
+exposes a readiness endpoint on port 4141. Both replay targets check that
+endpoint and stop with a corrective message if `make record` is still running
+or the mock failed to start. They also verify the catalog health endpoint, and
+the functional target waits up to 30 seconds for Tempo's `/ready` endpoint.
+
 In another terminal:
 
 ```shell
@@ -93,8 +101,11 @@ proxymock/results/baseline/load/window.json
 
 The corresponding `summary.json` files contain machine-readable request,
 latency, and throughput metrics. Functional mode repeats the request three
-times and scores response behavior. Load mode runs four VUs for 30 seconds and
-does not score response bodies; never use the load result as correctness proof.
+times and now fails unless there are zero failed requests **and** the stable
+response behavior matches 100%. A failed functional run publishes neither its
+summary nor its window. Load mode runs four VUs for 30 seconds, requires that
+successful functional gate first, and does not score response bodies; never use
+the load result as correctness proof.
 
 ## 3. Configure the two MCP servers
 
@@ -134,8 +145,10 @@ tempo_get-trace
 ```
 
 Do not copy timestamps into the prompt. Do not widen the interval for ingestion
-lag. If no trace is returned, wait briefly and repeat the identical MCP call
-with the values already parsed from the file.
+lag. Before querying, verify that the functional summary reports three requests,
+zero failures, and a 100% result match. If no trace is returned, make at most
+three identical MCP calls over 30 seconds. Then stop and inspect the pipeline;
+indefinite retries cannot repair a bad replay.
 
 Before any edit, proxymock MCP should find one inbound body with eight IDs and
 eight outbound `/v1/inventory/{productID}` calls. Their timestamps advance one

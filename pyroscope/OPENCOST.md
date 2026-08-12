@@ -237,25 +237,41 @@ STABLE_RESPONSE_DIFFERENCES=0 make opencost-compare
 The command writes both JSON and Markdown comparisons under
 `proxymock/results/opencost/` and emits an explicit candidate-valid verdict.
 
-## Validated local run
+## Example of good AI output
 
-The complete workflow was exercised on Apple arm64 with Docker Desktop and the
-pinned chart versions in this guide.
+The comparison response should contain a verdict, payload-level evidence, raw
+costs and throughput, the normalized cost, and the exact windows used for each
+OpenCost query. For example:
 
-| Evidence | Baseline | Candidate |
-| --- | ---: | ---: |
-| Failed functional requests | 0 | 0 |
-| Stable response differences | baseline | 0 |
-| Load p95 latency | 54 ms | 52 ms |
-| Load throughput | 94.5 req/s | 98.8 req/s |
-| Failed load requests | 0 | 0 |
-| Allocation cost | 0.06000 | 0.05125 |
-| Successful requests | 17,019 | 17,785 |
-| Cost / successful request | 0.0000035255 | 0.0000028816 |
+**Approved.**
 
-The candidate passed every gate and reduced allocation cost per successful
-request by 18.3% in this run. These measurements are directional rather than
-portable hardware guarantees.
+The payload-level response diff found no stable-field differences. One volatile
+field was correctly excluded as noise.
+
+| Metric | Baseline | Candidate | Change |
+| --- | ---: | ---: | ---: |
+| Replay passed | Yes | Yes | — |
+| Functional failures | 0 | 0 | 0 |
+| Stable-field differences | — | 0 | 0 |
+| Load p95 latency | 57 ms | 58 ms | +1 ms |
+| Throughput | 98.6830 req/s | 96.9218 req/s | −1.78% |
+| Load failures | 0 | 0 | 0 |
+| `cpuCost` | 0.06666667 | 0.06666667 | 0 |
+| `ramCost` | 0.01333333 | 0.00166667 | −87.50% |
+| `totalCost` | 0.08000000 | 0.06833333 | −14.58% |
+| Successful requests | 17,763 | 17,446 | −317 |
+| `totalCost / requests.succeeded` | 0.000004503744 | 0.000003916848 | −13.03% |
+
+OpenCost windows were constructed directly from each file:
+
+- Baseline: `2026-08-12T00:06:00Z,2026-08-12T00:09:02Z`
+- Candidate: `2026-08-12T00:17:00Z,2026-08-12T00:20:01Z`
+
+Both replays passed, all functional and load failure counts are zero,
+stable-field differences are zero, and cost per successful request decreased by
+13.03%.
+
+These measurements are directional rather than portable hardware guarantees.
 
 An earlier candidate cut CPU to 500 millicores as well as memory. It still met
 the loose 250 ms latency SLO, but throughput fell from 99.0 to 41.7 requests/s;

@@ -1,4 +1,9 @@
-.PHONY: test build observability-up observability-down catalog app record mock functional-replay load-replay
+.PHONY: test build observability-up observability-down catalog app record mock functional-replay load-replay \
+	opencost-up opencost-down opencost-build opencost-forward opencost-stop \
+	opencost-deploy-baseline opencost-deploy-candidate \
+	opencost-functional-baseline opencost-functional-candidate \
+	opencost-load-baseline opencost-load-candidate \
+	opencost-query-baseline opencost-query-candidate opencost-compare
 
 PROXYMOCK ?= proxymock
 RECORDING_DIR ?= proxymock/recording
@@ -51,3 +56,46 @@ load-replay:
 		echo 'load replay failed; profile-window.json was not written' >&2; \
 		exit $$replay_status; \
 	fi
+
+opencost-up:
+	./scripts/opencost-up.sh
+
+opencost-stop:
+	minikube pause -p "$${MINIKUBE_PROFILE:-opencost-lab}"
+
+opencost-down:
+	minikube delete -p "$${MINIKUBE_PROFILE:-opencost-lab}"
+
+opencost-build:
+	docker build -t mock-lab-catalog:local -f Dockerfile.opencost .
+	minikube -p "$${MINIKUBE_PROFILE:-opencost-lab}" image load mock-lab-catalog:local
+
+opencost-forward:
+	./scripts/opencost-forward.sh
+
+opencost-deploy-baseline:
+	./scripts/opencost-deploy.sh baseline
+
+opencost-deploy-candidate:
+	./scripts/opencost-deploy.sh candidate
+
+opencost-functional-baseline:
+	./scripts/opencost-replay.sh functional baseline
+
+opencost-functional-candidate:
+	./scripts/opencost-replay.sh functional candidate
+
+opencost-load-baseline:
+	./scripts/opencost-replay.sh load baseline
+
+opencost-load-candidate:
+	./scripts/opencost-replay.sh load candidate
+
+opencost-query-baseline:
+	./scripts/opencost-query.sh baseline
+
+opencost-query-candidate:
+	./scripts/opencost-query.sh candidate
+
+opencost-compare:
+	./scripts/opencost-compare.sh

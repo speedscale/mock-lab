@@ -1,0 +1,14 @@
+FROM golang:1.23.12-alpine3.22 AS build
+
+WORKDIR /src
+COPY go.mod ./
+COPY cmd ./cmd
+COPY internal ./internal
+RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/catalog-api ./cmd/app && \
+    CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/catalog-fixture ./cmd/catalog
+
+FROM scratch
+COPY --from=build /out/catalog-api /catalog-api
+COPY --from=build /out/catalog-fixture /catalog-fixture
+USER 65532:65532
+ENTRYPOINT ["/catalog-api"]

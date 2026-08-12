@@ -25,6 +25,10 @@
         "--enabled-tools",
         "datasource,pyroscope,navigation"
       ]
+    },
+    "opencost": {
+      "type": "http",
+      "url": "http://127.0.0.1:18081/"
     }
   }
 }

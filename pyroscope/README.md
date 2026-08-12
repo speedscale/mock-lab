@@ -11,6 +11,11 @@ The application intentionally starts in the slow but functionally correct
 state. The goal is for an agent to diagnose and fix it, not to guess from a
 synthetic benchmark alone.
 
+The companion [OpenCost + proxymock guide](OPENCOST.md) reuses the same
+application and recorded traffic to test a different question: whether a lower
+Kubernetes allocation preserves responses and the latency/error SLO while
+reducing allocation cost per successful request.
+
 ## Prerequisites
 
 - Go 1.23 or newer

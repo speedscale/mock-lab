@@ -1,0 +1,46 @@
+{
+ "endpoints": [
+  {
+   "url": "-ALL-",
+   "method": "-ALL-",
+   "metrics": {
+    "latency.avg": 1,
+    "latency.max": 3,
+    "latency.min": 1,
+    "latency.p50": 1,
+    "latency.p75": 1,
+    "latency.p90": 2,
+    "latency.p95": 2,
+    "latency.p99": 2,
+    "requests.failed": 0,
+    "requests.per-minute": 23259.993765352505,
+    "requests.per-second": 387.6665627558751,
+    "requests.response-pct": 100,
+    "requests.result-match-pct": 100,
+    "requests.succeeded": 8,
+    "requests.total": 8
+   }
+  },
+  {
+   "url": "/api/quote",
+   "method": "GET",
+   "metrics": {
+    "latency.avg": 1,
+    "latency.max": 3,
+    "latency.min": 1,
+    "latency.p50": 1,
+    "latency.p75": 1,
+    "latency.p90": 2,
+    "latency.p95": 2,
+    "latency.p99": 2,
+    "requests.failed": 0,
+    "requests.per-minute": 23259.993765352505,
+    "requests.per-second": 387.6665627558751,
+    "requests.response-pct": 100,
+    "requests.result-match-pct": 100,
+    "requests.succeeded": 8,
+    "requests.total": 8
+   }
+  }
+ ]
+}

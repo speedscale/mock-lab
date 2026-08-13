@@ -1,0 +1,61 @@
+2026/08/13 15:24:57 pricing fixture listening on :8090 with 10ms lookup delay
+proxymock output will be redirected to /Users/matthewleray/s2/mock-lab/loki/proxymock/recording/proxymock.log
+recording outbound traffic on proxy port 4140
+recording inbound traffic sent to port 4143 (forwarded to your app on port 8080)
+Paste the following environment variables into your app's terminal to record outbound HTTP-only traffic:
+  export http_proxy=http://localhost:4140
+  export https_proxy=http://localhost:4140
+  export grpc_proxy=http://$(hostname):4140
+Paste the following environemnt variables into your app's terminal to record outbound non-HTTP traffic:
+  export http_proxy=socks5h://localhost:4140
+  export https_proxy=socks5h://localhost:4140
+  export all_proxy=socks5h://localhost:4140
+  export grpc_proxy=http://$(hostname):4140
+See https://docs.speedscale.com/proxymock/getting-started/language-reference/ for language specific examples.
+recorded test / mock files are being written to /Users/matthewleray/s2/mock-lab/loki/proxymock/recording
+Press ctrl-c to interrupt
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2026/08/13 15:24:59 checkout API listening on :8080, structured logs at scratch/logs/checkout.log
+2026/08/13 15:24:59 listen tcp :8080: bind: address already in use
+2026/08/13 15:25:15 pricing fixture listening on :8090 with 10ms lookup delay
+proxymock output will be redirected to /Users/matthewleray/s2/mock-lab/loki/proxymock/recording/proxymock.log
+recording outbound traffic on proxy port 4140
+recording inbound traffic sent to port 4143 (forwarded to your app on port 8080)
+Paste the following environment variables into your app's terminal to record outbound HTTP-only traffic:
+  export http_proxy=http://localhost:4140
+  export https_proxy=http://localhost:4140
+  export grpc_proxy=http://$(hostname):4140
+Paste the following environemnt variables into your app's terminal to record outbound non-HTTP traffic:
+  export http_proxy=socks5h://localhost:4140
+  export https_proxy=socks5h://localhost:4140
+  export all_proxy=socks5h://localhost:4140
+  export grpc_proxy=http://$(hostname):4140
+See https://docs.speedscale.com/proxymock/getting-started/language-reference/ for language specific examples.
+recorded test / mock files are being written to /Users/matthewleray/s2/mock-lab/loki/proxymock/recording
+Press ctrl-c to interrupt
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2026/08/13 15:25:17 checkout API listening on :8080, structured logs at scratch/logs/checkout.log
+2026/08/13 15:25:43 pricing fixture listening on :8090 with 10ms lookup delay
+proxymock output will be redirected to /Users/matthewleray/s2/mock-lab/loki/proxymock/recording/proxymock.log
+recording outbound traffic on proxy port 4140
+recording inbound traffic sent to port 4143 (forwarded to your app on port 8080)
+Paste the following environment variables into your app's terminal to record outbound HTTP-only traffic:
+  export http_proxy=http://localhost:4140
+  export https_proxy=http://localhost:4140
+  export grpc_proxy=http://$(hostname):4140
+Paste the following environemnt variables into your app's terminal to record outbound non-HTTP traffic:
+  export http_proxy=socks5h://localhost:4140
+  export https_proxy=socks5h://localhost:4140
+  export all_proxy=socks5h://localhost:4140
+  export grpc_proxy=http://$(hostname):4140
+See https://docs.speedscale.com/proxymock/getting-started/language-reference/ for language specific examples.
+recorded test / mock files are being written to /Users/matthewleray/s2/mock-lab/loki/proxymock/recording
+Press ctrl-c to interrupt
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+2026/08/13 15:25:45 checkout API listening on :8080, structured logs at scratch/logs/checkout.log

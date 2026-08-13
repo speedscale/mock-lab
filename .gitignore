@@ -34,6 +34,9 @@
 /tempo/bin/
 /tempo/.run/
 /tempo/proxymock.log
+/obi/bin/
+/obi/proxymock/
+/obi/proxymock.log
 # python bytecode
 __pycache__/
 # build artifacts

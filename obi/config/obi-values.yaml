@@ -1,0 +1,56 @@
+fullnameOverride: obi
+
+image:
+  tag: v0.10.0
+  pullPolicy: IfNotPresent
+
+privileged: true
+
+contextPropagation:
+  enabled: true
+
+service:
+  enabled: true
+  type: ClusterIP
+  port: 80
+  targetPort: 9090
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 1Gi
+
+config:
+  create: true
+  data:
+    ebpf:
+      # This is a deliberately low-traffic lab. The default (500) can leave one
+      # request buffered for about a minute before OBI wakes user space.
+      wakeup_len: 1
+    discovery:
+      instrument:
+        - k8s_namespace: opaque-demo
+    routes:
+      patterns:
+        - /
+        - /api/projects
+        - /api/projects/{id}
+        - /api/categories
+        - /api/stats
+        - /v1/projects
+        - /v1/project/{id}
+        - /v1/categories
+      ignored_patterns:
+        - /healthz
+      unmatched: heuristic
+    attributes:
+      kubernetes:
+        enable: true
+    otel_traces_export:
+      endpoint: http://tempo.observability.svc.cluster.local:4318
+    otel_metrics_export: null
+    prometheus_export:
+      port: 9090
+      path: /metrics

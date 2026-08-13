@@ -1,0 +1,35 @@
+# The corrected policy.
+#
+# Identical to policy-broken.yaml plus the one missing rule: catalog-api is
+# allowed to reach catalog-fixture on 8090. Nothing about the application
+# changes - same image, same environment, same handler code.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: catalog-api-egress
+  namespace: netpath-demo
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: catalog-api
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: catalog-fixture
+      toPorts:
+        - ports:
+            - port: "8090"
+              protocol: TCP

@@ -1,0 +1,20 @@
+# Pinned Cilium/Hubble configuration for the disposable lab.
+kubeProxyReplacement: false
+operator:
+  replicas: 1
+hubble:
+  enabled: true
+  relay:
+    enabled: true
+  ui:
+    enabled: true
+  # Keep enough flows in the per-node ring buffer that a capture window from a
+  # few minutes ago is still queryable.
+  eventBufferCapacity: "16383"
+  metrics:
+    enabled:
+      - dns
+      - drop
+      - tcp
+      - flow
+      - http

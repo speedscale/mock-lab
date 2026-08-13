@@ -17,8 +17,10 @@ locate without application source access.
 - minikube 1.37 or newer with the Docker driver
 - Kubernetes CLI 1.34 or newer and Helm 4
 - Go 1.23 or newer, `curl`, and `jq`
-- proxymock 2.5.857 or newer, installed, initialized, and on `PATH`
+- proxymock 2.5.842 or newer, installed, initialized, and on `PATH`
 - An MCP client with STDIO support; the examples use Codex
+
+Run every command below from this `obi` directory of your `mock-lab` clone.
 
 The lab pins Kubernetes 1.34.0, OBI Helm chart 0.11.0 and OBI 0.10.0,
 Tempo 2.10.7, Prometheus 3.12.0, Grafana 13.1.0, Grafana MCP 0.14.0, and
@@ -36,14 +38,12 @@ features.
 ## 1. Start the zero-code lab
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/obi
 make up
 ```
 
 In another terminal keep Grafana, Tempo, and Prometheus forwarded:
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/obi
 make forward
 ```
 
@@ -53,7 +53,6 @@ credentials. Tempo is at port 3202 and Prometheus at port 19090.
 ## 2. Record one slow boundary and its exact window
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/obi
 make capture RECORDING_DIR=proxymock/recording
 ```
 
@@ -63,21 +62,20 @@ It writes nanosecond capture boundaries plus a conservative whole-second query
 interval to:
 
 ```text
-/Users/matthewleray/s2/mock-lab/obi/proxymock/recording/window.json
+proxymock/recording/window.json
 ```
 
-Grafana MCP 0.14.0 rejects fractional RFC3339 values. The script therefore
-floors `query_start` and ceilings `query_end` itself; the agent passes those
-fields unchanged. Nobody records, copies, rounds, substitutes, or confirms a
-timestamp by hand. OBI's `ebpf.wakeup_len` is pinned to `1`, because the default
+The script floors `query_start` and ceilings `query_end` itself so the query
+interval is conservative and every Grafana MCP call receives whole-second
+RFC3339 values; the agent passes those fields unchanged. Nobody records,
+copies, rounds, substitutes, or confirms a timestamp by hand. OBI's `ebpf.wakeup_len` is pinned to `1`, because the default
 500-event threshold can delay a lone lab request for about a minute.
 
 ## 3. Connect Grafana and proxymock MCP
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/obi
 codex mcp add proxymock -- proxymock mcp run \
-  --work-dir /Users/matthewleray/s2/mock-lab/obi
+  --work-dir "$PWD"
 codex mcp add grafana -- docker run --rm -i \
   --add-host host.docker.internal:host-gateway \
   -e GRAFANA_URL=http://host.docker.internal:3002 \
@@ -95,7 +93,6 @@ tools proxied through the provisioned datasource.
 ## 4. Replay behavior independently of telemetry
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/obi
 make functional-replay \
   RECORDING_DIR=proxymock/recording \
   RESULTS_DIR=proxymock/results/baseline

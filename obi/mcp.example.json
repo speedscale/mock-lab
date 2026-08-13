@@ -2,7 +2,7 @@
   "mcpServers": {
     "proxymock": {
       "command": "proxymock",
-      "args": ["mcp", "run", "--work-dir", "/Users/matthewleray/s2/mock-lab/obi"]
+      "args": ["mcp", "run", "--work-dir", "/path/to/mock-lab/obi"]
     },
     "grafana": {
       "command": "docker",

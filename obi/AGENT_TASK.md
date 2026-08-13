@@ -1,12 +1,13 @@
 # OBI + proxymock investigation task
 
-Work in `/Users/matthewleray/s2/mock-lab/obi`. Do not edit the application.
+Work in the `obi` directory of your `mock-lab` clone. Do not edit the
+application.
 
 1. Read `proxymock/recording/window.json`. Report `capture_start` and
    `capture_end` as the exact recording boundaries. Pass `query_start` and
    `query_end` unchanged to every Grafana MCP time-range argument below. The
-   capture script creates this conservative, whole-second query interval because
-   Grafana MCP 0.14.0 rejects fractional RFC3339 timestamps.
+   capture script publishes this conservative, whole-second query interval so
+   no timestamp ever needs to be edited, rounded, or reasoned about by hand.
 2. Call `list_datasources` with
    `{"type":"prometheus","limit":50,"offset":0}`, then with
    `{"type":"tempo","limit":50,"offset":0}`.

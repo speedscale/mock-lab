@@ -51,3 +51,6 @@ node_modules/
 cpp/app
 
 .claude/worktrees
+/prometheus/proxymock/
+/prometheus/bin/
+/prometheus/proxymock.log

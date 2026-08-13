@@ -96,12 +96,16 @@ func main() {
 	if port == "" {
 		port = "8090"
 	}
+	projectsDelay := durationFromEnv("PROJECTS_DELAY")
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"status": "ok"})
 	})
 	mux.HandleFunc("GET /v1/projects", func(w http.ResponseWriter, r *http.Request) {
+		if projectsDelay > 0 {
+			time.Sleep(projectsDelay)
+		}
 		writeJSON(w, projects)
 	})
 	mux.HandleFunc("GET /v1/project/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -210,8 +214,20 @@ func main() {
 		writeJSON(w, map[string]any{"user": "cncf-bot", "plan": "oss"})
 	})
 
-	log.Printf("CNCF reference API listening on :%s (%d projects)", port, len(projects))
+	log.Printf("CNCF reference API listening on :%s (%d projects, projects delay %s)", port, len(projects), projectsDelay)
 	log.Fatal(http.ListenAndServe(":"+port, mux))
+}
+
+func durationFromEnv(name string) time.Duration {
+	value := os.Getenv(name)
+	if value == "" {
+		return 0
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil || duration < 0 {
+		log.Fatalf("%s must be a non-negative Go duration: %q", name, value)
+	}
+	return duration
 }
 
 // newOrderID mints a fresh UUID-shaped order id, so tooling reads the path segment

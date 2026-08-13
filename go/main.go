@@ -372,6 +372,12 @@ func main() {
 	if downstream == "" {
 		downstream = "https://demo-api.trafficreplay.com"
 	}
+	// A bounded downstream timeout turns an unreachable dependency into a fast,
+	// deterministic 502 instead of a multi-minute TCP retry. Opt-in so the
+	// default behavior of the other labs is unchanged.
+	if d := durationFromEnv("DOWNSTREAM_TIMEOUT"); d > 0 {
+		http.DefaultClient.Timeout = d
+	}
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -538,4 +544,18 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
 	_ = enc.Encode(v)
+}
+
+// durationFromEnv reads an optional Go duration (for example "5s") from the
+// environment. It returns zero when unset or unparseable.
+func durationFromEnv(key string) time.Duration {
+	v := os.Getenv(key)
+	if v == "" {
+		return 0
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		return 0
+	}
+	return d
 }

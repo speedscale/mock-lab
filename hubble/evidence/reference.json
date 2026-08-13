@@ -1,0 +1,76 @@
+{
+  "lab": "hubble",
+  "description": "Reference run separating application latency from a network policy drop using Cilium Hubble flows and proxymock traffic.",
+  "pinned": {
+    "kubernetes": "v1.34.0",
+    "cilium": "1.19.6",
+    "hubble_cli": "v1.19.4",
+    "minikube_profile": "hubble-lab"
+  },
+  "stable_response": {
+    "endpoint": "GET /api/stats",
+    "total": 24,
+    "by_maturity": { "Graduated": 16, "Incubating": 5, "Sandbox": 3 }
+  },
+  "baseline_capture": {
+    "window": "2026-08-13T15:05:22Z..2026-08-13T15:05:28Z",
+    "rrpairs": 2,
+    "flows_total": 65,
+    "flows_dropped": 0,
+    "catalog_api_to_catalog_fixture_8090": "FORWARDED"
+  },
+  "failure": {
+    "window": "2026-08-13T15:06:01Z..2026-08-13T15:06:22Z",
+    "application_evidence": {
+      "requests": 3,
+      "http_status": 502,
+      "durations_seconds": [5.010835, 5.010503, 5.011488],
+      "error": "context deadline exceeded (Client.Timeout exceeded while awaiting headers)",
+      "container_log_lines_about_failure": 0
+    },
+    "network_evidence": {
+      "flows_total": 290,
+      "verdicts": { "FORWARDED": 226, "REDIRECTED": 16, "DROPPED": 48 },
+      "dropped": {
+        "count": 48,
+        "source": "catalog-api",
+        "destination": "catalog-fixture",
+        "destination_port": 8090,
+        "reason": "POLICY_DENIED",
+        "note": "48 drops for 3 requests are TCP SYN retransmissions, not 48 distinct requests."
+      },
+      "dns": {
+        "verdict": "FORWARDED",
+        "resolved": "catalog-fixture.netpath-demo.svc.cluster.local",
+        "note": "DNS succeeded, which rules out resolution as the cause."
+      }
+    }
+  },
+  "after_fix": {
+    "change": "added one egress rule to CiliumNetworkPolicy catalog-api-egress; application image unchanged",
+    "functional_replay": {
+      "requests.total": 3,
+      "requests.failed": 0,
+      "requests.result-match-pct": 100,
+      "latency.avg": 34,
+      "latency.p99": 31,
+      "requests.per-second": 28.093921012086877
+    },
+    "load_replay": {
+      "requests.total": 50,
+      "requests.failed": 0,
+      "latency.avg": 31,
+      "latency.min": 29,
+      "latency.p50": 30,
+      "latency.p95": 37,
+      "latency.p99": 38,
+      "latency.max": 40,
+      "requests.per-second": 62.871570984518506
+    },
+    "network_evidence": {
+      "flows_total": 132,
+      "flows_dropped": 0,
+      "catalog_api_to_catalog_fixture_8090": "FORWARDED"
+    }
+  }
+}

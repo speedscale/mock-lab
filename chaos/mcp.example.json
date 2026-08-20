@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "proxymock": {
+      "command": "proxymock",
+      "args": ["mcp", "run", "--work-dir", "/path/to/mock-lab/chaos"]
+    }
+  }
+}

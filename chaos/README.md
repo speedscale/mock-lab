@@ -102,6 +102,39 @@ completely down:
 `degraded:false`. `source:"inventory"`. No warning in the log. The fallback
 cache — which exists, and is correct — never ran.
 
+## 3b. See it in proxymock web
+
+The header on the wire is one view. The other is the run itself.
+
+Stop `make mock-chaos` and start a run that writes what it serves — the
+earlier targets pass `--no-out` so repeat runs do not pile up result
+directories, and here the output is the point:
+
+```shell
+make mock-chaos-record    # leave running
+make baseline             # a few times, in a second terminal
+```
+
+Then, in a third terminal:
+
+```shell
+make web
+```
+
+Open `http://127.0.0.1:7788` and go to Requests. The **Chaos** column marks
+every perturbed response, the toolbar filter narrows to just those, and
+opening one shows which rule fired and what it changed.
+
+This variant uses `percent=50`, so the grid holds both kinds of row and the
+filter has something to do. That is the view worth having: injected failures
+are labelled, so an injected 503 is never mistaken for a real one.
+
+**One thing that looks wrong and is not.** The STATUS column shows `200` on
+chaosed rows. The recorded pair deliberately keeps its pre-chaos status,
+because that pair is mock input for a later run and rewriting it would change
+what a re-replay does. The Chaos column carries what the caller actually
+received — `status=503` here. Read the two together.
+
 ## 4. Find it
 
 The evidence is in [`evidence/broken-storefront.jsonl`](evidence/broken-storefront.jsonl)

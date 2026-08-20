@@ -1,10 +1,11 @@
-.PHONY: build capture mock mock-flaky verify-mock verify baseline chaos-evidence clean
+.PHONY: build capture mock mock-chaos mock-chaos-record mock-flaky web verify-mock verify baseline chaos-evidence clean
 
 PROXYMOCK ?= proxymock
 RECORDING_DIR ?= proxymock/recording
 APP_URL ?= http://127.0.0.1:8080
 MOCK_HEALTH_PORT ?= 4141
 MOCK_HEALTH_URL ?= http://127.0.0.1:$(MOCK_HEALTH_PORT)
+WEB_PORT ?= 7788
 SKUS ?= SSC-4110 SSC-4111 SSC-5200 SSC-5201 SSC-6100 SSC-7300
 
 # The scope is a filter query - the same one the Requests grid and
@@ -37,6 +38,18 @@ mock-chaos: build
 mock-flaky: build
 	$(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --no-out \
 		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE_FLAKY)' -- ./bin/app
+
+# Same as mock-chaos but WRITES the observed pairs, because proxymock web
+# reads them off disk. --no-out elsewhere keeps repeat runs from piling up
+# result directories; here the output is the point.
+mock-chaos-record: build
+	$(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough \
+		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE_FLAKY)' -- ./bin/app
+
+# Browse the run: the Chaos column, the "chaos applied" filter, and the
+# per-pair banner naming the rule that fired.
+web:
+	$(PROXYMOCK) web --port $(WEB_PORT)
 
 verify-mock:
 	@curl --fail --silent --show-error "$(MOCK_HEALTH_URL)" >/dev/null || { \

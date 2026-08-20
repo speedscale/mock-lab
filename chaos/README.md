@@ -129,11 +129,15 @@ This variant uses `percent=50`, so the grid holds both kinds of row and the
 filter has something to do. That is the view worth having: injected failures
 are labelled, so an injected 503 is never mistaken for a real one.
 
-**One thing that looks wrong and is not.** The STATUS column shows `200` on
-chaosed rows. The recorded pair deliberately keeps its pre-chaos status,
-because that pair is mock input for a later run and rewriting it would change
-what a re-replay does. The Chaos column carries what the caller actually
-received — `status=503` here. Read the two together.
+**The STATUS column shows what the client actually received** — `503` on
+chaosed rows — with a tooltip reading `Chaos sent 503; the mock recorded 200`.
+Both numbers are true and the grid keeps both: the recorded pair deliberately
+holds its pre-chaos status, because that pair is mock input for a later run
+and rewriting it would change what a re-replay does. A response chaos withheld
+entirely shows `—` rather than a status.
+
+So the file on disk and the `/api/rrpairs` field say `200` while the cell says
+`503`. That is the intended split, not a disagreement.
 
 ## 4. Find it
 

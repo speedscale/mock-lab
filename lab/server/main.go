@@ -160,6 +160,19 @@ func main() {
 	var jobMu sync.Mutex
 	jobStates := []string{"pending", "running", "done"}
 	jobN := 0
+	// Stable endpoint for the chaos demo. Unlike every other beacon route, nothing
+	// here rotates: the SKU is fixed and the body is constant, so a replay is a
+	// reliable cache HIT. Chaos perturbs a matched response, so the endpoint has
+	// to match before there is anything to perturb — a rotating value would
+	// produce misses and hide the effect being demonstrated.
+	mux.HandleFunc("GET /v1/inventory/{sku}", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, map[string]any{
+			"sku":       r.PathValue("sku"),
+			"inStock":   true,
+			"warehouse": "us-east",
+			"quantity":  42,
+		})
+	})
 	mux.HandleFunc("GET /v1/job/status", func(w http.ResponseWriter, r *http.Request) {
 		jobMu.Lock()
 		s := jobStates[jobN%len(jobStates)]

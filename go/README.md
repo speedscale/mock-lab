@@ -35,6 +35,12 @@ to exercise them (`cd ../lab/server && go run .` in another terminal). The app's
 order flow (below) is a further correlation example: the `access_token` and `order_id` flow
 response→request too.
 
+The [mock match-rate tuning guide](https://docs.speedscale.com/proxymock/guides/mock-match-rate/)
+uses the beacon to demonstrate the `improve-mock-match-rate` skill and the proxymock MCP
+tuning tools (`analyze_mock_matches`, `accept_mock_recommendation`, `similar_candidates`):
+record with the beacon on, mock + replay, then let an AI agent tune the blueprint until the
+match rate is 100%.
+
 ## Chaos: does the client actually survive it?
 
 Recording `/v1/inventory/{sku}` is unremarkable — one call, one 200. The point is replaying it

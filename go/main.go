@@ -60,6 +60,57 @@ func trackEvent(path string) {
 	trackPoll()
 	trackCreateUse()
 	trackAuth()
+	trackResilience()
+}
+
+// trackResilience is the chaos demo's raw material: a downstream call wrapped in
+// the retry-and-timeout logic a resilient client is supposed to have. It is the
+// one beacon flow whose request does NOT rotate - the SKU and body are fixed, so
+// a replay is a reliable cache hit. Chaos perturbs a matched response, so there
+// has to be a match before there is anything to perturb.
+//
+// Recording it is unremarkable: one call, one 200. The point is what happens when
+// the mock is then run with a chaos rule scoped to this path, for example
+//
+//	proxymock mock --chaos '(location REGEX "^/v1/inventory"): status=503,percent=50'
+//
+// The retry loop below is what turns that into an observable outcome, and the log
+// line is what tells you whether the client actually survived it. Unlike the other
+// beacon flows this one reports failure loudly: a silent fire-and-forget would
+// defeat the purpose, since "the app coped" and "the app never noticed" look
+// identical from the outside.
+func trackResilience() {
+	const attempts = 3
+	client := &http.Client{Timeout: 2 * time.Second}
+
+	start := time.Now()
+	for attempt := 1; attempt <= attempts; attempt++ {
+		resp, err := client.Get(downstream + "/v1/inventory/CNCF-1001")
+		if err != nil {
+			log.Printf("resilience: attempt %d/%d failed: %v", attempt, attempts, err)
+		} else {
+			body, _ := io.ReadAll(resp.Body)
+			_ = resp.Body.Close()
+			// The chaos marker names the effects that fired and the rule that
+			// fired them, so a perturbed attempt can be told apart from an
+			// ordinary upstream error.
+			note := ""
+			if chaos := resp.Header.Get("X-Speedscale-Chaos"); chaos != "" {
+				note = " [chaos: " + chaos + "]"
+			}
+			if resp.StatusCode < 500 {
+				if attempt > 1 {
+					log.Printf("resilience: recovered on attempt %d/%d in %s (%d bytes)%s", attempt, attempts, time.Since(start).Round(time.Millisecond), len(body), note)
+				}
+				return
+			}
+			log.Printf("resilience: attempt %d/%d got %d%s", attempt, attempts, resp.StatusCode, note)
+		}
+		if attempt < attempts {
+			time.Sleep(time.Duration(attempt) * 100 * time.Millisecond)
+		}
+	}
+	log.Printf("resilience: GAVE UP after %d attempts in %s - the client did not survive this", attempts, time.Since(start).Round(time.Millisecond))
 }
 
 // trackAuth exercises an auth/session flow: POST mints a fresh access token and a

@@ -4,7 +4,7 @@ Demo apps for the [proxymock](https://docs.speedscale.com/proxymock/) quickstart
 small app in seven languages. Each one calls a CNCF projects API as its downstream; proxymock
 records that call, then mocks it so the app runs and tests with **no network**.
 
-This repo also holds [observability labs](#observability-labs) and
+This repo also holds [other labs](#other-labs) and
 [agent skills](skills/README.md) that reuse the same recordings.
 
 ## Try it in GitHub Codespaces
@@ -137,10 +137,10 @@ Two things that are **not** differences, worth stating because they look like th
 
 The Go app also has an opt-in telemetry beacon (`EMIT_TELEMETRY=1`) for mock match-rate tuning — see [go/README.md](go/README.md#run).
 
-## Observability labs
+## Other labs
 
 Each lab is its own subdirectory. They are not the seven-language demo; they pair proxymock
-with a specific observability tool so an agent can diagnose a planted issue from real evidence.
+with a specific tool so an agent can diagnose a planted issue from real evidence.
 
 | Lab | What it demonstrates |
 | --- | --- |
@@ -150,6 +150,7 @@ with a specific observability tool so an agent can diagnose a planted issue from
 | [loki](loki/README.md) | a rare retry path that never fails the response contract — evidence is only in the logs |
 | [hubble](hubble/README.md) | a request timeout caused by a Cilium network policy, not the application |
 | [obi](obi/README.md) | eBPF instrumentation of an opaque service with no OpenTelemetry SDK |
+| [chaos](chaos/README.md) | a scoped chaos rule that forces the storefront's unused inventory-fallback path to run |
 
 ## Agent skills
 

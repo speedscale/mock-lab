@@ -27,6 +27,7 @@ capability of the match-rate tuner:
 | `GET /v1/time` ×2 | **differential noise probe** — the response differs *only* in a rotating `now` timestamp. A whole-body comparison would wrongly call this stateful; the field-level probe discounts the volatile leaf and leaves the endpoint unflagged, listing `now` as an observed-volatile response field. |
 | `POST /v1/orders` → `GET /v1/orders/{id}` | **create→use id** — the POST mints a fresh order id (in `Location` + body) that the GET then uses in its path. The tuner recognizes the create→use chain and does *not* wildcard `/v1/orders/*` (that would match ids the mock never issued); at mock time the client reuses the issued id, so it self-satisfies. |
 | `POST /v1/auth/token` → `GET /v1/me` | **credentials / session** — a fresh access token and a rotated `SESSIONID` cookie are issued, then replayed in the `Authorization` and `Cookie` headers. Headers are outside the mock signature, so these never cause a miss; the tuner surfaces them under *Credentials & session* to correlate for a validating replay, not to mask. |
+| `GET /v1/inventory/{sku}` ×up to 3 | **chaos / resilience** — the one flow that does *not* rotate. A fixed SKU and a constant body make the replay a reliable cache hit, because chaos perturbs a *matched* response and a rotating value would produce misses instead. The call is wrapped in the retry-and-timeout logic a resilient client is supposed to have, so a chaos rule scoped to this path produces an observable outcome rather than a silent one. |
 
 The cursor, poll, create→use, and auth flows all call the **lab reference server** for their
 routes, so run the beacon with `DOWNSTREAM_URL=http://localhost:8090` against `../lab/server`
@@ -39,6 +40,52 @@ uses the beacon to demonstrate the `improve-mock-match-rate` skill and the proxy
 tuning tools (`analyze_mock_matches`, `accept_mock_recommendation`, `similar_candidates`):
 record with the beacon on, mock + replay, then let an AI agent tune the blueprint until the
 match rate is 100%.
+
+## Chaos: does the client actually survive it?
+
+Recording `/v1/inventory/{sku}` is unremarkable — one call, one 200. The point is replaying it
+through a mock with a chaos rule scoped to that path. The scope is an ordinary
+[filter query](https://docs.speedscale.com/reference/filters/), the same syntax the Filters dialog
+uses:
+
+```shell
+proxymock mock --in ./proxymock \
+  --chaos '(location REGEX "^/v1/inventory"): status=503,percent=50,seed=demo' \
+  -- go run .
+```
+
+Then drive the API (`curl localhost:8080/api/projects`) a few times and watch the app's own log. The
+retry loop reports what it saw, and the `X-Speedscale-Chaos` header names the effects that fired and
+the rule that fired them, so a perturbed attempt is distinguishable from an ordinary upstream error:
+
+```
+resilience: attempt 1/3 got 503 [chaos: effect=status code;rule=chaos-1]
+resilience: attempt 2/3 got 503 [chaos: effect=status code;rule=chaos-1]
+resilience: recovered on attempt 3/3 in 307ms (70 bytes)
+```
+
+...and, on a less lucky run of the *same* rule:
+
+```
+resilience: attempt 3/3 got 503 [chaos: effect=status code;rule=chaos-1]
+resilience: GAVE UP after 3 attempts in 307ms - the client did not survive this
+```
+
+Both outcomes come from one rule because `percent` is a per-occurrence probability: a flaky endpoint
+is a *rate*, not a fixed verdict on an endpoint. `seed=demo` makes the sequence reproducible, so a
+failing run can be replayed exactly.
+
+Other effects worth pointing at the same path:
+
+| Rule | Exercises |
+| --- | --- |
+| `(location REGEX "^/v1/inventory"): latency=3s` | the client's 2s timeout — the retry loop reports `context deadline exceeded` |
+| `(location REGEX "^/v1/inventory"): no-response` | a connection closed with no reply at all |
+| `(location REGEX "^/v1/inventory"): body=corrupt` | a 200 whose body no longer parses |
+| `(location REGEX "^/v1/inventory") AND (command IS "GET"): status=503,latency=1s` | composed effects, both applied to the same response |
+
+Every chaosed response is tagged in the recording too, so `proxymock web` shows a **Chaos** column
+naming the effects, and the chaos-only filter narrows the grid to just the perturbed calls.
 
 ## proxymock: record, mock, replay
 

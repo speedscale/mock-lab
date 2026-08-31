@@ -1,6 +1,6 @@
 # Go demo app
 
-The Go version of the [mock-lab](../README.md) proxymock demo. It serves an HTTP API on
+The Go version of the [mock-lab](../../README.md) proxymock demo. It serves an HTTP API on
 `:8080` and fulfills each request by calling the CNCF projects API downstream
 (`DOWNSTREAM_URL`, default `https://demo-api.trafficreplay.com`; set `PORT` to change the port).
 
@@ -30,8 +30,8 @@ capability of the match-rate tuner:
 | `GET /v1/inventory/{sku}` ×up to 3 | **chaos / resilience** — the one flow that does *not* rotate. A fixed SKU and a constant body make the replay a reliable cache hit, because chaos perturbs a *matched* response and a rotating value would produce misses instead. The call is wrapped in the retry-and-timeout logic a resilient client is supposed to have, so a chaos rule scoped to this path produces an observable outcome rather than a silent one. |
 
 The cursor, poll, create→use, and auth flows all call the **lab reference server** for their
-routes, so run the beacon with `DOWNSTREAM_URL=http://localhost:8090` against `../lab/server`
-to exercise them (`cd ../lab/server && go run .` in another terminal). The app's own auth +
+routes, so run the beacon with `DOWNSTREAM_URL=http://localhost:8090` against `../../lab/server`
+to exercise them (`cd ../../lab/server && go run .` in another terminal). The app's own auth +
 order flow (below) is a further correlation example: the `access_token` and `order_id` flow
 response→request too.
 
@@ -93,7 +93,7 @@ naming the effects, and the chaos-only filter narrows the grid to just the pertu
 
 ```shell
 proxymock record -- go run .                     # 1. record the downstream calls
-../lab/tests/run_tests.sh --recording            # 2. second terminal: drive every endpoint
+../../lab/tests/run_tests.sh --recording            # 2. second terminal: drive every endpoint
 proxymock web                                    # 3. browse the recorded traffic (:7788)
 proxymock mock -- go run .                        # 4. serve the downstream from the recording
 proxymock replay --test-against http://localhost:8080   # 5. replay (or use Replay in proxymock web)
@@ -104,6 +104,6 @@ proxymock replay --test-against http://localhost:8080   # 5. replay (or use Repl
 
 ## Auth flow (two moving IDs)
 
-This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. The quickstart's `../lab/tests/run_tests.sh` drives this flow too. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see the [root README](../README.md#auth-handshake--the-two-moving-ids) and [`../lab/proxymock/`](../lab/proxymock/) for the ready-to-run recording + blueprint.
+This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. The quickstart's `../../lab/tests/run_tests.sh` drives this flow too. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see the [root README](../../README.md#auth-handshake--the-two-moving-ids) and [`../../lab/proxymock/`](../../lab/proxymock/) for the ready-to-run recording + blueprint.
 
-Endpoints and the API contract: see the [root README](../README.md) and [`openapi.yaml`](../lab/openapi.yaml).
+Endpoints and the API contract: see the [root README](../../README.md) and [`openapi.yaml`](../../lab/openapi.yaml).

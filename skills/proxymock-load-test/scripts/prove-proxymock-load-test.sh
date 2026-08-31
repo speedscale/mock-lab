@@ -69,7 +69,7 @@ out_port="$(pick_port)"
 health_port="$(pick_port)"
 
 echo "starting mock-lab Go app with downstream mocked from the recording"
-( cd "$repo_root/go" && PORT="$app_port" \
+( cd "$repo_root/languages/go" && PORT="$app_port" \
     proxymock mock \
       --in "$recording" \
       --proxy-out-port "$out_port" \

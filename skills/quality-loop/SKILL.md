@@ -74,7 +74,7 @@ Tie-breakers:
 1. **Record once.** From the app's own directory run
    `proxymock record -- <app command>`, then drive real traffic at it (the
    repo's test driver, a curl pass over every endpoint, a browser session). In
-   this repo: `cd go && proxymock record -- go run .` plus
+   this repo: `cd languages/go && proxymock record -- go run .` plus
    `./lab/tests/run_tests.sh --recording` from the root.
 2. **Keep the recording.** Commit it as the baseline snapshot; RRPairs are
    markdown and diff cleanly. This repo ships one at `lab/proxymock/recording`.

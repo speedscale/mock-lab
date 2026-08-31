@@ -86,7 +86,7 @@ wait_url "http://127.0.0.1:${downstream_port}/healthz" || die "downstream API di
 app_runner="$tmp/run-go-app.sh"
 cat >"$app_runner" <<EOF
 #!/usr/bin/env bash
-cd "$repo_root/go"
+cd "$repo_root/languages/go"
 exec go run .
 EOF
 chmod +x "$app_runner"

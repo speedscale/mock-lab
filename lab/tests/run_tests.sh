@@ -67,4 +67,33 @@ echo "  → ${oid}"; sleep "$DELAY"
 step "GET /api/orders/${oid}  (Bearer) — read the order back"
 req GET "/api/orders/${oid}" "" "$tok"; expect 200; head -c 200 "$TMP"; echo
 
+# --- extra credential styles (opt-in: CREDS=1) -------------------------------
+# The Go demo adds a JWT flow (POST /auth/login → GET /api/profile) and an HTTP
+# Basic endpoint (GET /api/account) so the proxymock web Sessions → Replay
+# readiness view has all three credential classes — opaque bearer (above), a
+# re-signable JWT, and a Basic credential set — with one recorded session per
+# user. Gated behind CREDS=1: this script is the shared driver for every language
+# demo, and only the Go app implements these routes, so the default run must stay
+# unchanged and never hit endpoints another language doesn't serve. Enable with:
+#   CREDS=1 ./lab/tests/run_tests.sh --recording
+if [[ -n "${CREDS:-}" ]]; then
+  for u in alice bob; do
+    step "POST /auth/login (${u})  → JWT bearer (re-signable credential)"
+    req POST /auth/login "{\"username\":\"${u}\"}"; expect 200
+    jwt="$(field access_token)"; [[ -n "$jwt" ]] || { echo "  FAIL: no JWT"; exit 1; }
+    echo "  → ${jwt:0:24}…"; sleep "$DELAY"
+
+    step "GET /api/profile  (${u}, JWT bearer)"
+    req GET /api/profile "" "$jwt"; expect 200; head -c 160 "$TMP"; echo; sleep "$DELAY"
+  done
+
+  for creds in "acme:acme-secret" "globex:globex-secret"; do
+    user="${creds%%:*}"
+    step "GET /api/account  (${user}, HTTP Basic credential set)"
+    CODE="$(curl -s -o "$TMP" -w '%{http_code}' -u "$creds" "${BASE}/api/account")"; expect 200
+    head -c 160 "$TMP"; echo; sleep "$DELAY"
+  done
+  echo; echo "  (+ credential styles: 2 JWT logins/profiles + 2 Basic accounts)"
+fi
+
 echo; echo "✅ All endpoints OK (5 read + oauth/token + create order + get order)."

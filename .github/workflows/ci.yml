@@ -24,13 +24,13 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { lang: go,     start: "cd go && go run ." }
-          - { lang: node,   start: "node node/index.js" }
-          - { lang: python, start: "python3 python/app.py" }
-          - { lang: java,   start: "java java/App.java" }
-          - { lang: ruby,   start: "ruby ruby/app.rb" }
-          - { lang: dotnet, start: "dotnet run --project dotnet/demo.csproj" }
-          - { lang: cpp,    start: "cd cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app" }
+          - { lang: go,     start: "cd languages/go && go run ." }
+          - { lang: node,   start: "node languages/node/index.js" }
+          - { lang: python, start: "python3 languages/python/app.py" }
+          - { lang: java,   start: "java languages/java/App.java" }
+          - { lang: ruby,   start: "ruby languages/ruby/app.rb" }
+          - { lang: dotnet, start: "dotnet run --project languages/dotnet/demo.csproj" }
+          - { lang: cpp,    start: "cd languages/cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app" }
     steps:
       - uses: actions/checkout@v4
 

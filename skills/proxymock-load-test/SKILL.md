@@ -52,7 +52,7 @@ another:
 
 ```bash
 # terminal 1 — app with its downstream mocked from the committed recording
-cd go && proxymock mock --in ../lab/proxymock/recording -- go run .
+cd languages/go && proxymock mock --in ../../lab/proxymock/recording -- go run .
 # terminal 2 — push load at the app
 ./skills/proxymock-load-test/scripts/proxymock-load-test.sh \
   --in lab/proxymock/recording/localhost \

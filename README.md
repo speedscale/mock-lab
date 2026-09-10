@@ -19,13 +19,13 @@ One click — all seven runtimes and the `proxymock` CLI are preinstalled. Run
 
 | Language | Run | Its own recording |
 | --- | --- | --- |
-| [Go](go/README.md) | `cd go && go run .` | [`go/proxymock/recording`](go/proxymock/recording) |
-| [Node.js](node/README.md) | `cd node && node index.js` | [`node/proxymock/recording`](node/proxymock/recording) |
-| [Python](python/README.md) | `cd python && python3 app.py` | [`python/proxymock/recording`](python/proxymock/recording) |
-| [Java](java/README.md) | `cd java && java App.java` | [`java/proxymock/recording`](java/proxymock/recording) |
-| [Ruby](ruby/README.md) | `cd ruby && ruby app.rb` | [`ruby/proxymock/recording`](ruby/proxymock/recording) |
-| [.NET](dotnet/README.md) | `cd dotnet && dotnet run` | [`dotnet/proxymock/recording`](dotnet/proxymock/recording) |
-| [C++](cpp/README.md) | `cd cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app` | [`cpp/proxymock/recording`](cpp/proxymock/recording) |
+| [Go](languages/go/README.md) | `cd languages/go && go run .` | [`languages/go/proxymock/recording`](languages/go/proxymock/recording) |
+| [Node.js](languages/node/README.md) | `cd languages/node && node index.js` | [`languages/node/proxymock/recording`](languages/node/proxymock/recording) |
+| [Python](languages/python/README.md) | `cd languages/python && python3 app.py` | [`languages/python/proxymock/recording`](languages/python/proxymock/recording) |
+| [Java](languages/java/README.md) | `cd languages/java && java App.java` | [`languages/java/proxymock/recording`](languages/java/proxymock/recording) |
+| [Ruby](languages/ruby/README.md) | `cd languages/ruby && ruby app.rb` | [`languages/ruby/proxymock/recording`](languages/ruby/proxymock/recording) |
+| [.NET](languages/dotnet/README.md) | `cd languages/dotnet && dotnet run` | [`languages/dotnet/proxymock/recording`](languages/dotnet/proxymock/recording) |
+| [C++](languages/cpp/README.md) | `cd languages/cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app` | [`languages/cpp/proxymock/recording`](languages/cpp/proxymock/recording) |
 
 Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWNSTREAM_URL`
 (default `https://demo-api.trafficreplay.com`).
@@ -53,7 +53,7 @@ once — `proxymock init --api-key <key>` (free key at
 installed, so you only need the `init`.
 
 ```shell
-cd go                                          # pick any language dir (node/, python/, ...)
+cd languages/go                                # pick any language dir (languages/node/, ...)
 proxymock record -- go run .                   # 1. record the app calling the downstream
 ./lab/tests/run_tests.sh --recording           # 2. new terminal (repo root): drive every endpoint
 proxymock web                                   # 3. browse the recorded traffic in your browser (:7788)
@@ -68,7 +68,7 @@ Step 5 can also be run **from the proxymock web UI** instead of the `proxymock r
 Go, Python, Ruby, Java, .NET, and C++ all work with `proxymock record` out of the box — proxymock
 injects the proxy and TLS settings each runtime understands (for Java, via `JAVA_TOOL_OPTIONS`).
 **Node is the exception:** its `fetch` ignores proxy env vars until Node 24 (backported to 22.21),
-so set `NODE_USE_ENV_PROXY=1` and `NODE_EXTRA_CA_CERTS` first — see [node/README.md](node/README.md).
+so set `NODE_USE_ENV_PROXY=1` and `NODE_EXTRA_CA_CERTS` first — see [languages/node/README.md](languages/node/README.md).
 
 ## Auth handshake + the two moving IDs
 
@@ -84,10 +84,10 @@ so you can mock + replay the whole demo (basic + auth endpoints) **offline again
 with no recording step:
 
 ```shell
-cd go                                                          # any language dir
-proxymock mock --in ../lab/proxymock/recording -- go run .     # downstream served from the recording
+cd languages/go                                                # any language dir
+proxymock mock --in ../../lab/proxymock/recording -- go run .  # downstream served from the recording
 # in another terminal:
-proxymock replay --in ../lab/proxymock/recording --test-against http://localhost:8080
+proxymock replay --in ../../lab/proxymock/recording --test-against http://localhost:8080
 ```
 
 Replay passes 0% failed — the blueprint (`res_body → json_path → smart_replace_recorded` on
@@ -100,12 +100,12 @@ There are two, and they answer different questions.
 
 [`lab/proxymock/recording`](lab/proxymock/recording) is the **shared cross-language fixture**. It ships with the smart-replace blueprint, replays 0% failed against *any* of the seven apps, and is what the [`skills/`](skills/) proof scripts run against. Use it when the language does not matter and you want the auth flow to chain cleanly.
 
-`<lang>/proxymock/recording` is the **per-runtime one**: one recording per language, each captured from that language's own server. Use it when you care how a specific runtime actually behaves on the wire. Every language dir has one, so `proxymock/` next to the app is also the layout you get from a plain `proxymock record` in that directory. That is the convention, not a special case.
+`languages/<lang>/proxymock/recording` is the **per-runtime one**: one recording per language, each captured from that language's own server. Use it when you care how a specific runtime actually behaves on the wire. Every language dir has one, so `proxymock/` next to the app is also the layout you get from a plain `proxymock record` in that directory. That is the convention, not a special case.
 
 Each per-language recording holds 13 RRPairs: 8 inbound under `localhost/` (the app's own API) and 5 outbound under `demo-api.trafficreplay.com/` (the CNCF downstream). To mock + replay a language against its own capture:
 
 ```shell
-cd ruby                                                    # any language dir
+cd languages/ruby                                          # any language dir
 proxymock mock --in ./proxymock/recording -- ruby app.rb   # downstream served from ruby's own recording
 # in another terminal:
 proxymock replay --in ./proxymock/recording --test-against http://localhost:8080
@@ -135,7 +135,7 @@ Node is the only runtime that records connection-management headers (`Connection
 
 Two things that are **not** differences, worth stating because they look like they should be. Status lines are identical everywhere (`200 OK` and `201 Created`, same spelling, same casing), and `Date`, wherever present, is the same RFC 7231 IMF-fixdate format. Header ordering and message framing are **not observable** from an RRPair at all: proxymock stores headers alphabetically, and no `Content-Length` or `Transfer-Encoding` survives capture in any recording here, including the outbound ones from the real remote server. Ruby and C++ both write a `Content-Length` that the recording does not keep. So do not use these files to reason about framing.
 
-The Go app also has an opt-in telemetry beacon (`EMIT_TELEMETRY=1`) for mock match-rate tuning — see [go/README.md](go/README.md#run).
+The Go app also has an opt-in telemetry beacon (`EMIT_TELEMETRY=1`) for mock match-rate tuning — see [languages/go/README.md](languages/go/README.md#run).
 
 ## Other labs
 

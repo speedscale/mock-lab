@@ -72,7 +72,7 @@ proxymock replay --in lab/proxymock/recording/localhost \
 
 The Go app's opt-in telemetry beacon (`EMIT_TELEMETRY=1`) is the fixture for mock match-rate
 tuning — rotating IDs, GraphQL, cursor pagination, sequenced polls, create→use, and auth/session.
-See [go/README.md](../go/README.md#run) and the
+See [go/README.md](../languages/go/README.md#run) and the
 [mock match-rate tuning guide](https://docs.speedscale.com/proxymock/guides/mock-match-rate/).
 
 ## Traffic replay tuning
@@ -102,8 +102,8 @@ app, but the same pattern works from any language directory in this repo:
 
 ```shell
 git clone https://github.com/speedscale/mock-lab.git
-cd mock-lab/go
-proxymock record --out ../replay-work/recording -- go run .
+cd mock-lab/languages/go
+proxymock record --out ../../replay-work/recording -- go run .
 ```
 
 In another terminal from the repo root, drive the demo traffic, then tune the recording:

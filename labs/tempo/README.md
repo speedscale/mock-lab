@@ -33,7 +33,7 @@ proxymock version
 ## 1. Start Tempo and record the causal input
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/tempo
+cd /Users/matthewleray/s2/mock-lab/labs/tempo
 make observability-up
 make inventory
 ```
@@ -41,14 +41,14 @@ make inventory
 In a second terminal:
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/tempo
+cd /Users/matthewleray/s2/mock-lab/labs/tempo
 make record RECORDING_DIR=proxymock/recording
 ```
 
 In a third terminal, send the one fixture through proxymock's inbound port:
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/tempo
+cd /Users/matthewleray/s2/mock-lab/labs/tempo
 curl -H 'Content-Type: application/json' \
   --data @fixtures/catalog-request.json \
   http://localhost:4143/api/catalog
@@ -113,7 +113,7 @@ From this directory, add the local proxymock MCP server and the pinned,
 read-only Grafana MCP server:
 
 ```shell
-codex mcp add proxymock -- proxymock mcp run --work-dir /Users/matthewleray/s2/mock-lab/tempo
+codex mcp add proxymock -- proxymock mcp run --work-dir /Users/matthewleray/s2/mock-lab/labs/tempo
 codex mcp add grafana -- docker run --rm -i \
   --add-host host.docker.internal:host-gateway \
   -e GRAFANA_URL=http://host.docker.internal:3001 \

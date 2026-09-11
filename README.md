@@ -139,18 +139,17 @@ The Go app also has an opt-in telemetry beacon (`EMIT_TELEMETRY=1`) for mock mat
 
 ## Other labs
 
-Each lab is its own subdirectory. They are not the seven-language demo; they pair proxymock
-with a specific tool so an agent can diagnose a planted issue from real evidence.
+Companion scenarios live under [`labs/`](labs/). Each is its own subdirectory with a README. They are not the seven-language demo; they pair proxymock with a specific tool so an agent can diagnose a planted issue from real evidence.
 
 | Lab | What it demonstrates |
 | --- | --- |
-| [pyroscope](pyroscope/README.md) | CPU profile + proxymock replay to find a bottleneck, prove the response did not change, and measure again |
-| [prometheus](prometheus/README.md) | p95 latency from connection queueing, not CPU |
-| [tempo](tempo/README.md) | a serial dependency waterfall made visible in traces |
-| [loki](loki/README.md) | a rare retry path that never fails the response contract — evidence is only in the logs |
-| [hubble](hubble/README.md) | a request timeout caused by a Cilium network policy, not the application |
-| [obi](obi/README.md) | eBPF instrumentation of an opaque service with no OpenTelemetry SDK |
-| [chaos](chaos/README.md) | a scoped chaos rule that forces the storefront's unused inventory-fallback path to run |
+| [pyroscope](labs/pyroscope/README.md) | CPU profile + proxymock replay to find a bottleneck, prove the response did not change, and measure again |
+| [prometheus](labs/prometheus/README.md) | p95 latency from connection queueing, not CPU |
+| [tempo](labs/tempo/README.md) | a serial dependency waterfall made visible in traces |
+| [loki](labs/loki/README.md) | a rare retry path that never fails the response contract — evidence is only in the logs |
+| [hubble](labs/hubble/README.md) | a request timeout caused by a Cilium network policy, not the application |
+| [obi](labs/obi/README.md) | eBPF instrumentation of an opaque service with no OpenTelemetry SDK |
+| [chaos](labs/chaos/README.md) | a scoped chaos rule that forces the storefront's unused inventory-fallback path to run |
 
 ## Agent skills
 

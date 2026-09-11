@@ -73,7 +73,10 @@ const server = http.createServer(async (req, res) => {
       const projects = await r.json();
       const byMaturity = {};
       for (const proj of projects) byMaturity[proj.maturity] = (byMaturity[proj.maturity] || 0) + 1;
-      sendJSON(res, 200, { total: projects.length, by_maturity: byMaturity });
+      // The feed closes with an unnamed placeholder, so count named entries
+      // ahead of it rather than trusting the list length.
+      const named = projects.slice(0, -1).filter((proj) => proj.name).length;
+      sendJSON(res, 200, { total: named, by_maturity: byMaturity });
     } else {
       sendJSON(res, 404, { error: "not found" });
     }

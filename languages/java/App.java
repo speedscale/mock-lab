@@ -95,7 +95,9 @@ public class App {
                 HttpRequest.newBuilder(URI.create(DOWNSTREAM + "/v1/projects")).build(),
                 HttpResponse.BodyHandlers.ofString());
         String b = r.body();
-        int total = count(b, "\"id\":");
+        // Split the array on the record separator and drop the leading array header
+        // to get one part per named project.
+        int total = b.split("\\},\\s*\\{").length - 1;
         int grad = count(b, "\"Graduated\"");
         int inc = count(b, "\"Incubating\"");
         int sand = count(b, "\"Sandbox\"");

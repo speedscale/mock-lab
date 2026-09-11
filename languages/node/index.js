@@ -37,6 +37,18 @@ const proxy = async (res, path) => {
   res.end(text);
 };
 
+// Return the downstream category list plus a total of the per-category counts, so
+// callers do not have to sum it themselves.
+const categories = async (res) => {
+  const r = await fetch(DOWNSTREAM + "/v1/categories");
+  const payload = await r.json();
+  if (!Array.isArray(payload.categories)) {
+    return sendJSON(res, 500, { error: "cannot read category list" });
+  }
+  const total = payload.categories.reduce((n, c) => n + c.count, 0);
+  sendJSON(res, 200, { categories: payload.categories, total });
+};
+
 const server = http.createServer(async (req, res) => {
   const p = req.url;
   const m = req.method;
@@ -67,7 +79,7 @@ const server = http.createServer(async (req, res) => {
     } else if (p.startsWith("/api/projects/")) {
       await proxy(res, "/v1/project/" + p.slice("/api/projects/".length));
     } else if (p === "/api/categories") {
-      await proxy(res, "/v1/categories");
+      await categories(res);
     } else if (p === "/api/stats") {
       const r = await fetch(DOWNSTREAM + "/v1/projects");
       const projects = await r.json();

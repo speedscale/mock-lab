@@ -29,7 +29,7 @@ this disposable local lab.
 ## 1. Start profiling
 
 ```shell
-cd pyroscope
+cd labs/pyroscope
 make observability-up
 ```
 
@@ -67,7 +67,7 @@ find proxymock/recording -type f -name '*.md'
 ```
 
 You should see two RRPair files under `proxymock/recording/localhost`. If the
-directory does not exist, make sure every terminal is in `mock-lab/pyroscope`
+directory does not exist, make sure every terminal is in `mock-lab/labs/pyroscope`
 and repeat the record command above. The latter exchange contains 15,120
 records, including duplicates and invalid entries. Those cases are deliberate:
 an optimization that merely deletes validation or deduplication should fail the

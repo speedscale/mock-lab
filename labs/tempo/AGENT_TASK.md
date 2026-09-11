@@ -1,6 +1,6 @@
 # Agent task: diagnose serial inventory calls with Tempo and proxymock
 
-Work from `/Users/matthewleray/s2/mock-lab/tempo`.
+Work from `/Users/matthewleray/s2/mock-lab/labs/tempo`.
 
 The acceptance gates are:
 
@@ -17,12 +17,12 @@ The acceptance gates are:
 Start with this prompt:
 
 ```text
-Work in /Users/matthewleray/s2/mock-lab/tempo. Do not edit application code yet.
+Work in /Users/matthewleray/s2/mock-lab/labs/tempo. Do not edit application code yet.
 
 1. Call proxymock MCP search_local_traffic with:
-   {"in-directory":["/Users/matthewleray/s2/mock-lab/tempo/proxymock/recording"],"direction":"in","method":"POST","query":"product_ids","limit":20,"offset":0}
+   {"in-directory":["/Users/matthewleray/s2/mock-lab/labs/tempo/proxymock/recording"],"direction":"in","method":"POST","query":"product_ids","limit":20,"offset":0}
 2. Call it again with:
-   {"in-directory":["/Users/matthewleray/s2/mock-lab/tempo/proxymock/recording"],"direction":"out","method":"GET","query":"/v1/inventory/","limit":20,"offset":0}
+   {"in-directory":["/Users/matthewleray/s2/mock-lab/labs/tempo/proxymock/recording"],"direction":"out","method":"GET","query":"/v1/inventory/","limit":20,"offset":0}
 3. Read the inbound RRPair file returned by the first call. Explain exactly why
    that input produces the repeated dependency operations and whether their
    timestamps are serial or overlapping.
@@ -30,9 +30,9 @@ Work in /Users/matthewleray/s2/mock-lab/tempo. Do not edit application code yet.
 Then call Grafana MCP list_datasources with:
 {"type":"tempo","limit":50,"offset":0}
 
-Parse /Users/matthewleray/s2/mock-lab/tempo/proxymock/results/baseline/functional/summary.json first. Stop without querying Tempo unless the -ALL- endpoint reports requests.total=3, requests.failed=0, and requests.result-match-pct=100. A 0% match or a 502 response means the recorder is still running or the mock failed to start; rerun the functional replay after correcting the process state.
+Parse /Users/matthewleray/s2/mock-lab/labs/tempo/proxymock/results/baseline/functional/summary.json first. Stop without querying Tempo unless the -ALL- endpoint reports requests.total=3, requests.failed=0, and requests.result-match-pct=100. A 0% match or a 502 response means the recorder is still running or the mock failed to start; rerun the functional replay after correcting the process state.
 
-Parse /Users/matthewleray/s2/mock-lab/tempo/proxymock/results/baseline/functional/window.json yourself. Pass file.start and file.end directly, unchanged, to Grafana MCP tempo_traceql-search with:
+Parse /Users/matthewleray/s2/mock-lab/labs/tempo/proxymock/results/baseline/functional/window.json yourself. Pass file.start and file.end directly, unchanged, to Grafana MCP tempo_traceql-search with:
 {"datasourceUid":"tempo","query":"{ resource.service.name = \"catalog-api\" && name = \"POST /api/catalog\" }","start":file.start,"end":file.end}
 
 Do not ask me to record, copy, substitute, widen, round, or confirm timestamps.
@@ -51,7 +51,7 @@ After the evidence is reported, use this prompt:
 
 ```text
 Implement the smallest maintainable bounded-concurrency fix in
-/Users/matthewleray/s2/mock-lab/tempo/internal/catalog/catalog.go.
+/Users/matthewleray/s2/mock-lab/labs/tempo/internal/catalog/catalog.go.
 
 Pin the only new dependency first with:
 go get golang.org/x/sync@v0.16.0
@@ -66,7 +66,7 @@ make functional-replay RECORDING_DIR=proxymock/recording RESULTS_DIR=proxymock/r
 make load-replay RECORDING_DIR=proxymock/recording RESULTS_DIR=proxymock/results/candidate
 
 Call proxymock MCP response_diff with:
-{"baseline-directory":["/Users/matthewleray/s2/mock-lab/tempo/proxymock/results/baseline/functional"],"in-directory":["/Users/matthewleray/s2/mock-lab/tempo/proxymock/results/candidate/functional"]}
+{"baseline-directory":["/Users/matthewleray/s2/mock-lab/labs/tempo/proxymock/results/baseline/functional"],"in-directory":["/Users/matthewleray/s2/mock-lab/labs/tempo/proxymock/results/candidate/functional"]}
 Report every stable-field difference; matching status or schema is insufficient.
 
 Parse candidate/functional/window.json and pass its start and end directly and

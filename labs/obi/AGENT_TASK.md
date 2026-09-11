@@ -1,6 +1,6 @@
 # OBI + proxymock investigation task
 
-Work in `/Users/matthewleray/s2/mock-lab/obi`. Do not edit the application.
+Work in `/Users/matthewleray/s2/mock-lab/labs/obi`. Do not edit the application.
 
 1. Read `proxymock/recording/window.json`. Report `capture_start` and
    `capture_end` as the exact recording boundaries. Pass `query_start` and

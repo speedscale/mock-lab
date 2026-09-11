@@ -36,14 +36,14 @@ features.
 ## 1. Start the zero-code lab
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/obi
+cd /Users/matthewleray/s2/mock-lab/labs/obi
 make up
 ```
 
 In another terminal keep Grafana, Tempo, and Prometheus forwarded:
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/obi
+cd /Users/matthewleray/s2/mock-lab/labs/obi
 make forward
 ```
 
@@ -53,7 +53,7 @@ credentials. Tempo is at port 3202 and Prometheus at port 19090.
 ## 2. Record one slow boundary and its exact window
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/obi
+cd /Users/matthewleray/s2/mock-lab/labs/obi
 make capture RECORDING_DIR=proxymock/recording
 ```
 
@@ -63,7 +63,7 @@ It writes nanosecond capture boundaries plus a conservative whole-second query
 interval to:
 
 ```text
-/Users/matthewleray/s2/mock-lab/obi/proxymock/recording/window.json
+/Users/matthewleray/s2/mock-lab/labs/obi/proxymock/recording/window.json
 ```
 
 Grafana MCP 0.14.0 rejects fractional RFC3339 values. The script therefore
@@ -75,9 +75,9 @@ timestamp by hand. OBI's `ebpf.wakeup_len` is pinned to `1`, because the default
 ## 3. Connect Grafana and proxymock MCP
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/obi
+cd /Users/matthewleray/s2/mock-lab/labs/obi
 codex mcp add proxymock -- proxymock mcp run \
-  --work-dir /Users/matthewleray/s2/mock-lab/obi
+  --work-dir /Users/matthewleray/s2/mock-lab/labs/obi
 codex mcp add grafana -- docker run --rm -i \
   --add-host host.docker.internal:host-gateway \
   -e GRAFANA_URL=http://host.docker.internal:3002 \
@@ -95,7 +95,7 @@ tools proxied through the provisioned datasource.
 ## 4. Replay behavior independently of telemetry
 
 ```shell
-cd /Users/matthewleray/s2/mock-lab/obi
+cd /Users/matthewleray/s2/mock-lab/labs/obi
 make functional-replay \
   RECORDING_DIR=proxymock/recording \
   RESULTS_DIR=proxymock/results/baseline

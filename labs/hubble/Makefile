@@ -1,18 +1,22 @@
-.PHONY: test build up forward down capture functional-replay load-replay verify
+.PHONY: test build hubble-cli up forward down capture break fix probe flows functional-replay load-replay verify
 
 PROXYMOCK ?= proxymock
 RECORDING_DIR ?= proxymock/recording
-RESULTS_DIR ?= proxymock/results/baseline
+RESULTS_DIR ?= proxymock/results/candidate
+FAILURE_DIR ?= proxymock/failure
 
 test:
-	cd ../go && go test ./...
-	cd ../lab/server && go test ./...
+	cd ../../languages/go && go test ./...
+	cd ../../lab/server && go test ./...
 
 build:
 	mkdir -p bin
-	cd ../tempo && go build -o ../obi/bin/utc-now ./cmd/utc-now
+	cd ../tempo && go build -o ../hubble/bin/utc-now ./cmd/utc-now
 
-up: build
+hubble-cli:
+	./scripts/hubble-cli.sh
+
+up: build hubble-cli
 	./scripts/up.sh
 
 forward:
@@ -20,6 +24,18 @@ forward:
 
 capture: build
 	PROXYMOCK="$(PROXYMOCK)" RECORDING_DIR="$(abspath $(RECORDING_DIR))" ./scripts/capture.sh
+
+break:
+	./scripts/break.sh
+
+fix:
+	./scripts/fix.sh
+
+probe: build
+	OUT_DIR="$(abspath $(FAILURE_DIR))" ./scripts/probe.sh
+
+flows:
+	WINDOW_FILE="$(abspath $(WINDOW))" ./scripts/flows.sh
 
 functional-replay: build
 	PROXYMOCK="$(PROXYMOCK)" RECORDING_DIR="$(abspath $(RECORDING_DIR))" RESULTS_DIR="$(abspath $(RESULTS_DIR))" ./scripts/replay.sh functional
@@ -33,4 +49,4 @@ verify:
 	test -s "$(RESULTS_DIR)/load/window.json"
 
 down:
-	minikube delete -p "$${MINIKUBE_PROFILE:-obi-lab}"
+	minikube delete -p "$${MINIKUBE_PROFILE:-hubble-lab}"

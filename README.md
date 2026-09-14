@@ -7,7 +7,7 @@ records that call, then mocks it so the app runs and tests with **no network**.
 This repo also holds [other labs](#other-labs) and
 [agent skills](skills/README.md) that reuse the same recordings.
 
-Recorded traffic gives coding agents API examples to inspect and replay tests that expose incorrect assumptions. See [how runtime feedback improves AI coding](AI-CONTEXT.md).
+Recorded traffic gives coding agents real API examples to inspect, and replaying it exposes assumptions the code got wrong. See [how runtime feedback improves AI coding](AI-CONTEXT.md).
 
 ```mermaid
 flowchart LR

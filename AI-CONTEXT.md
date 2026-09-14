@@ -4,6 +4,15 @@ A coding agent can produce a change that compiles and passes its own unit tests 
 
 ## What the model knows before it runs anything
 
+```mermaid
+flowchart TB
+    W["Trained parameters"] --> M["Model"]
+    C["Current context"] --> M
+    M --> P["Proposed patch"]
+```
+
+*The model generates a patch from learned patterns and supplied context. Execution is a separate step.*
+
 A language model generates tokens using patterns encoded in its trained parameters and the context supplied with the current request. Those patterns support reasoning about control flow, types, algorithms, and likely program behavior. It does not normally look up your code in its training data and compare the two. Generating an explanation or a patch also does not execute the application. Token generation produces a candidate answer, not a measurement of runtime behavior. See [OpenAI's description of predicted completions](https://developers.openai.com/api/reference/cli/resources/completions).
 
 The distinction matters at service boundaries. Reading a client implementation can reveal which URL it calls and how it parses JSON. It cannot establish which payloads a deployed dependency actually returns, which configuration is active, or how the system behaves under a particular workload. Even complete source code does not supply the current database state, network conditions, or external service behavior.
@@ -11,6 +20,14 @@ The distinction matters at service boundaries. Reading a client implementation c
 A coding agent combines the model with tools that can read files, modify code, and execute commands. It can obtain runtime evidence by using those tools. Its conclusions are limited by the code and observations actually supplied to the model: a file it has not read, an error path it has not exercised, and a log it has not retrieved cannot directly inform the current response.
 
 ## The context window is the interface for new evidence
+
+```mermaid
+flowchart LR
+    F["Files"] -->|Read| S["Excerpts"]
+    S --> C["Input context"]
+```
+
+*Only content supplied to the model consumes input tokens. A recording on disk is not automatically in context.*
 
 The context window is the model's bounded token budget for one inference request. Tokens encode text, including code and tool output. Input, generated output, and reasoning tokens where applicable must fit within the model's limits. The input can contain:
 
@@ -31,17 +48,14 @@ The model's trained parameters are separate from this context. Supplying a recor
 **After the change, execution supplies feedback.** proxymock can serve captured downstream responses and replay recorded inbound requests against the modified application. The test runs outside the language model. Its response comparisons and failures can be returned as tool output and included in the next model request. The agent then has a specific discrepancy to investigate, rather than only its earlier explanation of why the patch should work.
 
 ```mermaid
-sequenceDiagram
-    participant M as Model<br/>Current context
-    participant T as Execution tools
-    Note over M: Task and source code<br/>Selected traffic examples
-    M->>T: Proposed patch and test command
-    Note over T: Run modified application<br/>with mocks and replay
-    T-->>M: Actual responses and test failures
-    Note over M: Next request includes results<br/>Revise the diagnosis and code
-    M->>T: Revised patch and another test
-    T-->>M: New execution results
+flowchart TB
+    M["Model"] --> P["Patch"]
+    P --> R["Replay"]
+    R --> D["Results"]
+    D -->|Next context| M
 ```
+
+*Execution results return to the model as new evidence. Replay runs against the modified application.*
 
 The coding tool executes the model's requested actions and returns their results. This feedback loop is the mechanism that makes new runtime observations available to the model. It changes the evidence for the next decision; it does not guarantee the model will interpret that evidence correctly. See [OpenAI's tool-call execution flow](https://developers.openai.com/api/docs/guides/function-calling).
 
@@ -54,6 +68,15 @@ The [Go implementation](languages/go/main.go) of `GET /api/stats` fetches `/v1/p
 ```
 
 Consider a hypothetical refactor that converts maturity values to lowercase. An agent might also generate a unit test expecting `"graduated"`, so that test passes. But the response field names have changed for existing clients.
+
+```mermaid
+flowchart TB
+    A["Recorded: Graduated"] --> D["Response diff"]
+    B["Modified: graduated"] --> D
+    D --> F["Contract changed"]
+```
+
+*Both responses can be HTTP 200. Comparing response bodies exposes the changed key.*
 
 Reading the recordings before editing exposes the existing casing. Running the modified app against the captured downstream data and comparing the replayed response body exposes the regression afterward: `by_maturity.Graduated` is missing and `by_maturity.graduated` has appeared. Both responses can still be HTTP 200, so a status-only check would miss it. That difference gives the agent a concrete reason to revisit the normalization and preserve the existing API contract, unless the requirements explicitly call for changing it.
 

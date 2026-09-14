@@ -45,51 +45,60 @@ As the conversation grows, the harness may select, summarize, or drop older mate
 
 Before editing, the model can ask the harness to read captured requests and responses. These show actual field names, value types, and calls between services. For example, a response might contain a null value where the model expected a string. That example gives it a reason to handle the null case.
 
-After editing, the harness can run the application with recorded responses as mocks and replay requests against it. A failed comparison tells the model what changed. That result enters the next request, so the model can use it to diagnose the failure and revise the code.
+After editing, the harness can run the application with recorded responses as mocks and replay requests against it. A failed comparison or assertion tells the model what went wrong. That result enters the next request, so the model can use it to diagnose the failure and revise the code.
 
 ```mermaid
 flowchart LR
     E["Model edit"] --> R["Replay"]
-    R --> D["Response diff"]
+    R --> D["Test results"]
     D --> C["Context"]
     C --> E
 ```
 
-*Feedback loop: the harness applies the edit, runs replay, and returns the response diff. The model uses that feedback to guide its next edit.*
+*Feedback loop: the harness applies the edit, runs replay, and returns the test results. The model uses that feedback to guide its next edit.*
 
 The model decides whether another edit is needed. This loop changes its context; its trained parameters stay the same. It is execution feedback, rather than a reinforcement-learning training step. See how tool results are returned in [OpenAI](https://developers.openai.com/api/docs/guides/function-calling) and [Anthropic](https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview).
 
-## An example in mock-lab
+## Example: a downstream service is unavailable
 
-The [Go app](languages/go/main.go) groups projects by maturity at `GET /api/stats`. Its [recorded API response](lab/proxymock/recording/localhost/2026-06-25_18-56-37.062363Z.md) contains:
+A storefront asks an inventory service for stock levels. If inventory is down, it should use the last good value and mark it as cached. If nothing is cached, it should return an error. This is the scenario in the [chaos lab](labs/chaos/README.md).
 
-```json
-{"by_maturity":{"Graduated":16,"Incubating":5,"Sandbox":3},"total":24}
-```
-
-Suppose an agent refactors the code and lowercases those keys. It also writes a test expecting `"graduated"`. The test passes, but a client looking for `"Graduated"` breaks.
+The lab includes a bug: the [HTTP client](labs/chaos/cmd/app/main.go) checks for connection errors but never checks the response status. A 503 with valid JSON is treated as success. Tests using only 200 responses would miss it.
 
 ```mermaid
 flowchart LR
-    A["Recorded: Graduated"] --> D["Response diff"]
-    B["Modified: graduated"] --> D
+    I["Inventory: 503"] --> S["Storefront"]
+    S --> F["False success"]
 ```
 
-Reading the recording would show the existing casing before the edit. Replay could catch the change afterward, even though both versions return HTTP 200.
+The lab starts with a healthy recording and injects 503 responses from inventory. The recorded body stays intact. The [saved evidence](labs/chaos/evidence/broken-storefront.jsonl) shows the storefront still returning `degraded:false` and `source:"inventory"`, even though the dependency failed. The outage is injected, not a failure found in the original capture.
 
-To run the recorded cases, start the app from `languages/go`:
+That gives the agent a concrete contradiction to investigate: inventory failed, but the storefront claims fresh data. The fix is to check the HTTP status before accepting the body, so the existing fallback can run.
+
+From `labs/chaos`, start the failure case:
 
 ```bash
-proxymock mock --in ../../lab/proxymock/recording -- go run .
+make mock-chaos
 ```
 
-In a second terminal, also from `languages/go`, run:
+In a second terminal, also from `labs/chaos`:
 
 ```bash
-proxymock replay --in ../../lab/proxymock/recording --test-against http://localhost:8080
+make baseline
+make chaos-evidence
 ```
 
-Replay writes results for each request to `replay-verdict.json` in its output directory. With the hypothetical lowercase change, the body diff would show a removed `Graduated` key and an added `graduated` key. The agent now has a specific failure to fix. The unchanged app should not show that difference.
+These commands print the storefront response and the injected inventory status. See the [lab prerequisites](labs/chaos/README.md#prerequisites) before running them.
+
+After the fix, stop `make mock-chaos` and use `make mock-flaky` to exercise both success and failure. Check these requirements:
+
+| Inventory response | Required storefront behavior |
+| --- | --- |
+| Success | Fresh stock, `source:"inventory"`, `degraded:false` |
+| Failure, with cached stock | Cached stock, `source:"cache"`, `degraded:true` |
+| Failure, empty cache | HTTP 503, `inventory unavailable` |
+
+A plain response diff against the healthy recording would miss this bug because the broken app returns the same successful body. The test must check the fallback requirements against the dependency's actual status. The harness returns those observations to the model, which can revise the fix and test again. Traffic makes the failure repeatable; the assertions define what correct behavior means.
 
 ## Choose useful traffic
 

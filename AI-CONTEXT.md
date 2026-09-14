@@ -6,13 +6,14 @@ An AI coding tool can write a change and a passing test that both get the API wr
 
 ```mermaid
 flowchart LR
-    W["Trained parameters"] --> M["Model"]
-    M --- H["Harness"]
+    U["User"] --> H["Harness"]
+    H --- M["Model"]
+    W["Trained parameters"] --> M
 ```
 
 The model generates code using patterns learned during training and the context you give it now. It can reason about how code should behave. That reasoning can still be wrong, and generating code does not run it.
 
-The **harness** is the software around the model. It builds each request, manages the conversation, and executes allowed tool calls. The model proposes edits and commands; the harness applies edits, runs commands, and sends the results back. Together, they form the coding agent.
+The **harness** is the software around the model. It combines your request with instructions, relevant files, and tool results. It manages the conversation and executes allowed tool calls. The model proposes edits and commands; the harness applies edits, runs commands, and sends the results back. Together, they form the coding agent.
 
 Reading an API client tells the model how the client expects a response to look. It does not tell the model what the API returns today, what is in the database, or which requests time out. The model can request commands through the harness to check those assumptions. Until it does, those details may be assumptions.
 
@@ -20,15 +21,23 @@ Reading an API client tells the model how the client expects a response to look.
 
 ```mermaid
 flowchart LR
-    F["Files"] --> H["Harness"]
-    H --> C["Model context"]
+    subgraph W["Context window"]
+        direction LR
+        I["Input tokens<br/>System + user instructions<br/>Conversation + files<br/>Tool definitions + results"]
+        O["Output tokens<br/>Reasoning, if used<br/>Text + tool calls"]
+        I ~~~ O
+    end
 ```
 
-The context window limits how much the model can process at once. It is measured in tokens: chunks of text or code. Your instructions, conversation, files read through tools, and command results all take up space. The budget also needs room for the response and, for reasoning models, reasoning tokens.
+The context window is the token budget for one model request. Tokens are chunks of text or code; images and other supported inputs also use tokens. **Input and generated output must fit within the model's context limit.** The diagram shows the parts of that budget, not their relative sizes.
 
-A file sitting in the repository is not automatically in context. The harness must supply its contents, usually after the model requests a file read. The same goes for recordings and test results.
+Input includes the system and developer instructions, your request, and the conversation so far. Your goals, constraints, examples, and attached files give the model user context. Selected source code, documentation, and traffic recordings add details about the application. Tool definitions tell the model what it can call; tool results tell it what those calls returned.
 
-Adding traffic gives the model more information for the current task. It does not retrain the model or enlarge the window. When the window fills, the harness may summarize or drop older material. See the context-window docs from [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://docs.claude.com/en/docs/build-with-claude/context-windows).
+Output includes the model's reply, generated code, and requests to call tools. For reasoning models, reasoning tokens also use the budget even when you cannot see them. Models can have a separate output limit too. More input leaves less room for output within the total context limit.
+
+The harness assembles these inputs. A file on disk uses no context space until its contents are supplied. After a tool runs, the harness includes the result in the next request. A failed replay therefore becomes new input that can change the model's next edit. The conversation grows across these requests, so the harness may need to select, summarize, or drop older material.
+
+Traffic shares this budget with everything else. It neither enlarges the window nor retrains the model. See the context-window docs from [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://docs.claude.com/en/docs/build-with-claude/context-windows).
 
 ## How traffic and test results help
 

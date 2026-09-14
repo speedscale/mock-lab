@@ -19,19 +19,22 @@ Reading an API client tells the model how the client expects a response to look.
 
 ## What the context window holds
 
-The context window is the token budget for one model request. Tokens are chunks of text or code; images and other supported inputs also use tokens. The table below summarizes the [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://platform.claude.com/docs/en/build-with-claude/context-windows) documentation; it is not a measured usage breakdown.
+The context window is the token budget for one model request. Tokens are chunks of text or code; images and other supported inputs also use tokens.
 
-| Content | Examples | Token budget |
-| --- | --- | --- |
-| System and developer instructions | Rules supplied by the platform and harness | Input |
-| User context | Your request, goals, constraints, and examples | Input |
-| Conversation history | Earlier messages and retained tool calls | Input |
-| Files and recordings | Selected code, documentation, attachments, and traffic | Input |
-| Tool definitions | Available tools and their arguments | Input |
-| Tool results | File contents, command output, and test results | Input |
-| Cached input | Reused parts of the prompt, such as unchanged instructions or history | Still input; counted once |
-| Reasoning | Internal reasoning generated for this request, when used | Output |
-| Response | Generated text, code, and tool calls | Output |
+This table combines the token accounting described by [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://platform.claude.com/docs/en/build-with-claude/context-windows) with measured input shares from [Liu et al., *Agentic Coding in the Wild*](https://arxiv.org/html/2608.00101v1), Section 5.1, Figure 11. The study covers 13.5 million GitHub Copilot sessions from the first week of June 2026.
+
+| Content | What it covers | Budget | Measured input share |
+| --- | --- | --- | --- |
+| Conversation history | Earlier conversation carried into the request | Input | 48% |
+| Function-call messages | Messages from tool interactions | Input | 28% |
+| System prompt | System-level instructions | Input | 14% |
+| Repository instructions and other context | Repository guidance and other supplied context | Input | 10% |
+| Finer input categories | User requests, developer rules, files, traffic, tool definitions, and test results | Input | Not separately reported |
+| Cached input | Reused portions of the input above | Input, counted once | Overlaps the rows above |
+| Reasoning | Internal reasoning generated for this request, when used | Output | Outside the input breakdown |
+| Response | Generated text, code, and tool calls | Output | Outside the input breakdown |
+
+The four percentages sum to 100% of input tokens in this Copilot study. The remaining rows explain accounting and detail the study does not separate; they are not additional shares. These are observed averages, not recommended allocations. The study does not measure whether adding traffic improves coding accuracy.
 
 **Cached tokens are a subset of input tokens, not extra capacity.** Prompt caching reuses work from an earlier request. A cache hit can reduce cost and latency, but those tokens still occupy the context window. For example, 20,000 cached input tokens plus 5,000 uncached input tokens occupy 25,000 tokens before output. See [OpenAI's prompt-caching guide](https://developers.openai.com/api/docs/guides/prompt-caching) and [Anthropic's context accounting](https://platform.claude.com/docs/en/build-with-claude/context-windows).
 
@@ -40,19 +43,6 @@ Input plus generated output, including reasoning, must fit within the context li
 The harness assembles the input. Files on disk take no context space until their contents are supplied; trained model parameters are outside this budget too. After a tool runs, its result can enter the next request as input. That is how a failed replay can inform the next edit.
 
 As the conversation grows, the harness may select, summarize, or drop older material. Caching does not prevent the window from filling. Traffic shares the same budget and does not retrain the model. See the context-window docs from [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://docs.claude.com/en/docs/build-with-claude/context-windows).
-
-### A measured example
-
-Liu et al.'s July 2026 preprint, [Agentic Coding in the Wild](https://arxiv.org/html/2608.00101v1), studies 13.5 million GitHub Copilot sessions from the first week of June 2026. Section 5.1, Figure 11 reports these average shares of **input tokens**:
-
-| Study category | Share |
-| --- | ---: |
-| Conversation history | 48% |
-| Function-call messages | 28% |
-| System prompt | 14% |
-| Repository instructions and other context | 10% |
-
-These are Copilot measurements, not recommended allocations or percentages of the full input/output budget. The categories differ from our table and do not isolate user requests, traffic, or test results. Cached tokens overlap these categories. The study measures workload composition; it does not establish that adding traffic improves coding accuracy.
 
 ## How traffic and test results help
 

@@ -19,7 +19,7 @@ Reading an API client tells the model how the client expects a response to look.
 
 ## What the context window holds
 
-The context window is the token budget for one model request. Tokens are chunks of text or code; images and other supported inputs also use tokens.
+The context window is the token budget for one model request. Tokens are chunks of text or code; images and other supported inputs also use tokens. The table below summarizes the [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://platform.claude.com/docs/en/build-with-claude/context-windows) documentation; it is not a measured usage breakdown.
 
 | Content | Examples | Token budget |
 | --- | --- | --- |
@@ -40,6 +40,19 @@ Input plus generated output, including reasoning, must fit within the context li
 The harness assembles the input. Files on disk take no context space until their contents are supplied; trained model parameters are outside this budget too. After a tool runs, its result can enter the next request as input. That is how a failed replay can inform the next edit.
 
 As the conversation grows, the harness may select, summarize, or drop older material. Caching does not prevent the window from filling. Traffic shares the same budget and does not retrain the model. See the context-window docs from [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://docs.claude.com/en/docs/build-with-claude/context-windows).
+
+### A measured example
+
+Liu et al.'s July 2026 preprint, [Agentic Coding in the Wild](https://arxiv.org/html/2608.00101v1), studies 13.5 million GitHub Copilot sessions from the first week of June 2026. Section 5.1, Figure 11 reports these average shares of **input tokens**:
+
+| Study category | Share |
+| --- | ---: |
+| Conversation history | 48% |
+| Function-call messages | 28% |
+| System prompt | 14% |
+| Repository instructions and other context | 10% |
+
+These are Copilot measurements, not recommended allocations or percentages of the full input/output budget. The categories differ from our table and do not isolate user requests, traffic, or test results. Cached tokens overlap these categories. The study measures workload composition; it does not establish that adding traffic improves coding accuracy.
 
 ## How traffic and test results help
 

@@ -62,6 +62,8 @@ The model decides whether another edit is needed. This loop changes its context;
 
 A storefront asks an inventory service for stock levels. If inventory is down, it should use the last good value and mark it as cached. If nothing is cached, it should return an error. This is the scenario in the [chaos lab](labs/chaos/README.md).
 
+This example uses `proxymock mock` with chaos injection and curl requests in place of the `proxymock replay` step shown above; the feedback loop is the same.
+
 The lab includes a bug: the [HTTP client](labs/chaos/cmd/app/main.go) checks for connection errors but never checks the response status. A 503 with valid JSON is treated as success. Tests using only 200 responses would miss it.
 
 ```mermaid

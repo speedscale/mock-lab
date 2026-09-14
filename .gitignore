@@ -2,55 +2,56 @@
 /lab/static/
 # scratch proxymock recordings from `proxymock record` in a language dir --
 # the committed per-language recording/ is the exception, everything else
-# (recorded-*, replayed-*, results/, .replay/) stays ignored
-/go/proxymock/*
-!/go/proxymock/recording/
-/node/proxymock/*
-!/node/proxymock/recording/
-/python/proxymock/*
-!/python/proxymock/recording/
-/java/proxymock/*
-!/java/proxymock/recording/
-/ruby/proxymock/*
-!/ruby/proxymock/recording/
-/dotnet/proxymock/*
-!/dotnet/proxymock/recording/
-/cpp/proxymock/*
-!/cpp/proxymock/recording/
+# (recorded-*, mocked-*, replayed-*, results/, .replay/) stays ignored
+/languages/go/proxymock/*
+!/languages/go/proxymock/recording/
+/languages/node/proxymock/*
+!/languages/node/proxymock/recording/
+/languages/python/proxymock/*
+!/languages/python/proxymock/recording/
+/languages/java/proxymock/*
+!/languages/java/proxymock/recording/
+/languages/ruby/proxymock/*
+!/languages/ruby/proxymock/recording/
+/languages/dotnet/proxymock/*
+!/languages/dotnet/proxymock/recording/
+/languages/cpp/proxymock/*
+!/languages/cpp/proxymock/recording/
 # scratch proxymock writes inside the committed per-language recordings
-/*/proxymock/recording/.replay/
-/*/proxymock/recording/*/.replay/
+/languages/*/proxymock/recording/.replay/
+/languages/*/proxymock/recording/*/.replay/
 # scratch proxymock writes into the committed shared workspace (lab/proxymock/)
 /lab/proxymock/results/
 /lab/proxymock/recording/.replay/
 /lab/proxymock/recording/localhost/.replay/
-/pyroscope/proxymock/recording/
-/pyroscope/proxymock/results/
-/pyroscope/bin/
-/pyroscope/.run/
-/pyroscope/proxymock.log
-/tempo/proxymock/recording/
-/tempo/proxymock/results/
-/tempo/bin/
-/tempo/.run/
-/tempo/proxymock.log
-/obi/bin/
-/obi/proxymock/
-/obi/proxymock.log
+# companion labs under labs/ -- per-lab scratch proxymock output and binaries
+/labs/pyroscope/proxymock/recording/
+/labs/pyroscope/proxymock/results/
+/labs/pyroscope/bin/
+/labs/pyroscope/.run/
+/labs/pyroscope/proxymock.log
+/labs/tempo/proxymock/recording/
+/labs/tempo/proxymock/results/
+/labs/tempo/bin/
+/labs/tempo/.run/
+/labs/tempo/proxymock.log
+/labs/obi/bin/
+/labs/obi/proxymock/
+/labs/obi/proxymock.log
+/labs/prometheus/proxymock/
+/labs/prometheus/bin/
+/labs/prometheus/proxymock.log
 # python bytecode
 __pycache__/
 # build artifacts
 /mock-lab
 *.test
 *.out
-dotnet/bin/
-dotnet/obj/
+/languages/dotnet/bin/
+/languages/dotnet/obj/
 node_modules/
-/go/go
+/languages/go/go
 /lab/server/server
-cpp/app
+/languages/cpp/app
 
 .claude/worktrees
-/prometheus/proxymock/
-/prometheus/bin/
-/prometheus/proxymock.log

@@ -7,6 +7,30 @@ records that call, then mocks it so the app runs and tests with **no network**.
 This repo also holds [other labs](#other-labs) and
 [agent skills](skills/README.md) that reuse the same recordings.
 
+```mermaid
+flowchart LR
+    subgraph clients["Clients"]
+        c["curl / tests / replay"]
+    end
+
+    subgraph app["App :8080"]
+        direction TB
+        go[Go]
+        node["Node.js"]
+        python[Python]
+        java[Java]
+        ruby[Ruby]
+        dotnet[".NET"]
+        cpp["C++"]
+    end
+
+    subgraph backends["Backends"]
+        api["CNCF projects API"]
+    end
+
+    clients --> app --> backends
+```
+
 ## Try it in GitHub Codespaces
 
 [![Open in GitHub Codespaces](.github/codespaces-badge.svg)](https://codespaces.new/speedscale/mock-lab)

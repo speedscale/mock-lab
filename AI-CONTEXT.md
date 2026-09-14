@@ -21,20 +21,16 @@ Reading an API client tells the model how the client expects a response to look.
 
 The context window is the token budget for one model request. Tokens are chunks of text or code; images and other supported inputs also use tokens.
 
-This table combines the token accounting described by [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://platform.claude.com/docs/en/build-with-claude/context-windows) with measured input shares from [Liu et al., *Agentic Coding in the Wild*](https://arxiv.org/html/2608.00101v1), Section 5.1, Figure 11. The study covers 13.5 million GitHub Copilot sessions from the first week of June 2026.
+[Liu et al., *Agentic Coding in the Wild*](https://arxiv.org/html/2608.00101v1), Section 5.1, Figure 11, reports these average input-token shares across 13.5 million GitHub Copilot sessions from the first week of June 2026:
 
-| Content | What it covers | Budget | Measured input share |
-| --- | --- | --- | --- |
-| Conversation history | Earlier conversation carried into the request | Input | 48% |
-| Function-call messages | Messages from tool interactions | Input | 28% |
-| System prompt | System-level instructions | Input | 14% |
-| Repository instructions and other context | Repository guidance and other supplied context | Input | 10% |
-| Finer input categories | User requests, developer rules, files, traffic, tool definitions, and test results | Input | Not separately reported |
-| Cached input | Reused portions of the input above | Input, counted once | Overlaps the rows above |
-| Reasoning | Internal reasoning generated for this request, when used | Output | Outside the input breakdown |
-| Response | Generated text, code, and tool calls | Output | Outside the input breakdown |
+| Content | Share of input tokens |
+| --- | ---: |
+| Conversation history | 48% |
+| Function-call messages | 28% |
+| System prompt | 14% |
+| Repository instructions and other context | 10% |
 
-The four percentages sum to 100% of input tokens in this Copilot study. The remaining rows explain accounting and detail the study does not separate; they are not additional shares. These are observed averages, not recommended allocations. The study does not measure whether adding traffic improves coding accuracy.
+These are measured Copilot averages, not recommended allocations. They exclude output and do not isolate traffic or test results.
 
 **Cached tokens are a subset of input tokens, not extra capacity.** Prompt caching reuses work from an earlier request. A cache hit can reduce cost and latency, but those tokens still occupy the context window. For example, 20,000 cached input tokens plus 5,000 uncached input tokens occupy 25,000 tokens before output. See [OpenAI's prompt-caching guide](https://developers.openai.com/api/docs/guides/prompt-caching) and [Anthropic's context accounting](https://platform.claude.com/docs/en/build-with-claude/context-windows).
 

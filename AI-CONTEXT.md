@@ -7,7 +7,7 @@ An AI coding tool can write a change and a passing test that both get the API wr
 ```mermaid
 flowchart LR
     W["Trained parameters"] --> M["Model"]
-    M <--> H["Harness"]
+    M --- H["Harness"]
 ```
 
 The model generates code using patterns learned during training and the context you give it now. It can reason about how code should behave. That reasoning can still be wrong, and generating code does not run it.
@@ -38,8 +38,8 @@ After editing, the harness can run the application with recorded responses as mo
 
 ```mermaid
 flowchart LR
-    M["Model"] <--> H["Harness"]
-    H <--> R["Replay tests"]
+    M["Model"] --- H["Harness"]
+    H --- R["Replay tests"]
 ```
 
 *The harness connects the model to execution. Test results become context for the next decision.*

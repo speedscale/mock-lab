@@ -2,50 +2,58 @@
 
 An AI coding tool can write a change and a passing test that both get the API wrong. Recorded traffic gives it real requests and responses to work from. Replay checks what the changed code actually does with them.
 
-## What the model knows
+## The model and the harness
 
 ```mermaid
 flowchart TB
     W["Trained parameters"] --> M["Model"]
-    C["Current context"] --> M
-    M --> P["Proposed patch"]
+    H["Harness"] -->|Context| M
+    M -->|Edits and tool calls| H
 ```
 
 The model generates code using patterns learned during training and the context you give it now. It can reason about how code should behave. That reasoning can still be wrong, and generating code does not run it.
 
-Reading an API client tells the model how the client expects a response to look. It does not tell the model what the API returns today, what is in the database, or which requests time out. A coding tool can run commands and read the results to answer those questions. Until it does, those details may be assumptions.
+The **harness** is the software around the model. It builds each request, manages the conversation, and executes allowed tool calls. The model proposes edits and commands; the harness applies edits, runs commands, and sends the results back. Together, they form the coding agent.
+
+Reading an API client tells the model how the client expects a response to look. It does not tell the model what the API returns today, what is in the database, or which requests time out. The model can request commands through the harness to check those assumptions. Until it does, those details may be assumptions.
 
 ## What the context window holds
 
 ```mermaid
 flowchart LR
-    F["Files"] -->|Read| S["Excerpts"]
-    S --> C["Input context"]
+    F["Files"] -->|Read| H["Harness"]
+    H -->|Selected content| C["Model context"]
 ```
 
-The context window limits how much the model can process at once. It is measured in tokens: chunks of text or code. Your instructions, conversation, files read by the tool, and command results all take up space. The budget also needs room for the response and, for reasoning models, reasoning tokens.
+The context window limits how much the model can process at once. It is measured in tokens: chunks of text or code. Your instructions, conversation, files read through tools, and command results all take up space. The budget also needs room for the response and, for reasoning models, reasoning tokens.
 
-A file sitting in the repository is not automatically in context. The tool has to read it and supply its contents to the model. The same goes for recordings and test results.
+A file sitting in the repository is not automatically in context. The harness must supply its contents, usually after the model requests a file read. The same goes for recordings and test results.
 
-Adding traffic gives the model more information for the current task. It does not retrain the model or enlarge the window. When the window fills, the tool may summarize or drop older material. See the context-window docs from [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://docs.claude.com/en/docs/build-with-claude/context-windows).
+Adding traffic gives the model more information for the current task. It does not retrain the model or enlarge the window. When the window fills, the harness may summarize or drop older material. See the context-window docs from [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://docs.claude.com/en/docs/build-with-claude/context-windows).
 
 ## How traffic and test results help
 
-Before editing, the tool can read captured requests and responses. These show actual field names, value types, and calls between services. For example, a response might contain a null value where the model expected a string. That example gives it a reason to handle the null case.
+Before editing, the model can ask the harness to read captured requests and responses. These show actual field names, value types, and calls between services. For example, a response might contain a null value where the model expected a string. That example gives it a reason to handle the null case.
 
-After editing, the tool can run the application with recorded responses as mocks and replay requests against it. A failed comparison tells the model what changed. That result enters the next request, so the model can use it to diagnose the failure and revise the code.
+After editing, the harness can run the application with recorded responses as mocks and replay requests against it. A failed comparison tells the model what changed. That result enters the next request, so the model can use it to diagnose the failure and revise the code.
 
 ```mermaid
-flowchart TB
-    E["Edit code"] --> R["Run replay"]
-    R --> C["Compare responses"]
-    C --> F["Add differences to context"]
-    F -->|Guide the next edit| E
+sequenceDiagram
+    participant M as Model
+    participant H as Harness
+    participant A as Application
+    M->>H: Edit and test
+    H->>H: Apply edit
+    H->>A: Run replay
+    A-->>H: Responses
+    Note over H: Compare responses
+    H-->>M: Results in context
+    M->>H: Next edit
 ```
 
-*Feedback loop: observed differences help the agent decide what to change next.*
+*The harness connects the model to execution. Test results become context for the next decision.*
 
-The application runs outside the model. The coding tool returns its results to the model as context. This is how the agent gets feedback about its work. See how tool results are returned in [OpenAI](https://developers.openai.com/api/docs/guides/function-calling) and [Anthropic](https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview).
+The harness runs replay and collects its response comparisons. The model reads that feedback and decides whether another edit is needed. See how tool results are returned in [OpenAI](https://developers.openai.com/api/docs/guides/function-calling) and [Anthropic](https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview).
 
 ## An example in mock-lab
 

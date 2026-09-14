@@ -7,8 +7,7 @@ An AI coding tool can write a change and a passing test that both get the API wr
 ```mermaid
 flowchart TB
     W["Trained parameters"] --> M["Model"]
-    H["Harness"] -->|Context| M
-    M -->|Edits and tool calls| H
+    M <--> H["Harness"]
 ```
 
 The model generates code using patterns learned during training and the context you give it now. It can reason about how code should behave. That reasoning can still be wrong, and generating code does not run it.
@@ -21,8 +20,8 @@ Reading an API client tells the model how the client expects a response to look.
 
 ```mermaid
 flowchart LR
-    F["Files"] -->|Read| H["Harness"]
-    H -->|Selected content| C["Model context"]
+    F["Files"] --> H["Harness"]
+    H --> C["Model context"]
 ```
 
 The context window limits how much the model can process at once. It is measured in tokens: chunks of text or code. Your instructions, conversation, files read through tools, and command results all take up space. The budget also needs room for the response and, for reasoning models, reasoning tokens.
@@ -38,17 +37,9 @@ Before editing, the model can ask the harness to read captured requests and resp
 After editing, the harness can run the application with recorded responses as mocks and replay requests against it. A failed comparison tells the model what changed. That result enters the next request, so the model can use it to diagnose the failure and revise the code.
 
 ```mermaid
-sequenceDiagram
-    participant M as Model
-    participant H as Harness
-    participant A as Application
-    M->>H: Edit and test
-    H->>H: Apply edit
-    H->>A: Run replay
-    A-->>H: Responses
-    Note over H: Compare responses
-    H-->>M: Results in context
-    M->>H: Next edit
+flowchart LR
+    M["Model"] <--> H["Harness"]
+    H <--> R["Replay tests"]
 ```
 
 *The harness connects the model to execution. Test results become context for the next decision.*

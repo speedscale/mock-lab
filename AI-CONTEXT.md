@@ -49,13 +49,15 @@ After editing, the harness can run the application with recorded responses as mo
 
 ```mermaid
 flowchart LR
-    M["Model"] --- H["Harness"]
-    H --- R["Replay tests"]
+    E["Model edit"] --> R["Replay"]
+    R --> D["Response diff"]
+    D --> C["Context"]
+    C --> E
 ```
 
-*The harness connects the model to execution. Test results become context for the next decision.*
+*Feedback loop: the harness applies the edit, runs replay, and returns the response diff. The model uses that feedback to guide its next edit.*
 
-The harness runs replay and collects its response comparisons. The model reads that feedback and decides whether another edit is needed. See how tool results are returned in [OpenAI](https://developers.openai.com/api/docs/guides/function-calling) and [Anthropic](https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview).
+The model decides whether another edit is needed. This loop changes its context; its trained parameters stay the same. It is execution feedback, rather than a reinforcement-learning training step. See how tool results are returned in [OpenAI](https://developers.openai.com/api/docs/guides/function-calling) and [Anthropic](https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview).
 
 ## An example in mock-lab
 

@@ -19,25 +19,27 @@ Reading an API client tells the model how the client expects a response to look.
 
 ## What the context window holds
 
-```mermaid
-flowchart LR
-    subgraph W["Context window"]
-        direction LR
-        I["Input tokens<br/>System + user instructions<br/>Conversation + files<br/>Tool definitions + results"]
-        O["Output tokens<br/>Reasoning, if used<br/>Text + tool calls"]
-        I ~~~ O
-    end
-```
+The context window is the token budget for one model request. Tokens are chunks of text or code; images and other supported inputs also use tokens.
 
-The context window is the token budget for one model request. Tokens are chunks of text or code; images and other supported inputs also use tokens. **Input and generated output must fit within the model's context limit.** The diagram shows the parts of that budget, not their relative sizes.
+| Content | Examples | Token budget |
+| --- | --- | --- |
+| System and developer instructions | Rules supplied by the platform and harness | Input |
+| User context | Your request, goals, constraints, and examples | Input |
+| Conversation history | Earlier messages and retained tool calls | Input |
+| Files and recordings | Selected code, documentation, attachments, and traffic | Input |
+| Tool definitions | Available tools and their arguments | Input |
+| Tool results | File contents, command output, and test results | Input |
+| Cached input | Reused parts of the prompt, such as unchanged instructions or history | Still input; counted once |
+| Reasoning | Internal reasoning generated for this request, when used | Output |
+| Response | Generated text, code, and tool calls | Output |
 
-Input includes the system and developer instructions, your request, and the conversation so far. Your goals, constraints, examples, and attached files give the model user context. Selected source code, documentation, and traffic recordings add details about the application. Tool definitions tell the model what it can call; tool results tell it what those calls returned.
+**Cached tokens are a subset of input tokens, not extra capacity.** Prompt caching reuses work from an earlier request. A cache hit can reduce cost and latency, but those tokens still occupy the context window. For example, 20,000 cached input tokens plus 5,000 uncached input tokens occupy 25,000 tokens before output. See [OpenAI's prompt-caching guide](https://developers.openai.com/api/docs/guides/prompt-caching) and [Anthropic's context accounting](https://platform.claude.com/docs/en/build-with-claude/context-windows).
 
-Output includes the model's reply, generated code, and requests to call tools. For reasoning models, reasoning tokens also use the budget even when you cannot see them. Models can have a separate output limit too. More input leaves less room for output within the total context limit.
+Input plus generated output, including reasoning, must fit within the context limit. Models can also have a separate output limit. More input leaves less room for output within the total budget.
 
-The harness assembles these inputs. A file on disk uses no context space until its contents are supplied. After a tool runs, the harness includes the result in the next request. A failed replay therefore becomes new input that can change the model's next edit. The conversation grows across these requests, so the harness may need to select, summarize, or drop older material.
+The harness assembles the input. Files on disk take no context space until their contents are supplied; trained model parameters are outside this budget too. After a tool runs, its result can enter the next request as input. That is how a failed replay can inform the next edit.
 
-Traffic shares this budget with everything else. It neither enlarges the window nor retrains the model. See the context-window docs from [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://docs.claude.com/en/docs/build-with-claude/context-windows).
+As the conversation grows, the harness may select, summarize, or drop older material. Caching does not prevent the window from filling. Traffic shares the same budget and does not retrain the model. See the context-window docs from [OpenAI](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window) and [Anthropic](https://docs.claude.com/en/docs/build-with-claude/context-windows).
 
 ## How traffic and test results help
 

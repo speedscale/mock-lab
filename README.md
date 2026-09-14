@@ -7,6 +7,8 @@ records that call, then mocks it so the app runs and tests with **no network**.
 This repo also holds [other labs](#other-labs) and
 [agent skills](skills/README.md) that reuse the same recordings.
 
+Captured traffic gives coding agents concrete behavior to inspect and replay. See [why traffic helps an AI coding agent](AI-CONTEXT.md) for a short explanation and diagram.
+
 ```mermaid
 flowchart LR
     subgraph clients["Clients"]

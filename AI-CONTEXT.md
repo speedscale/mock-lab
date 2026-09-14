@@ -5,7 +5,7 @@ An AI coding tool can write a change and a passing test that both get the API wr
 ## The model and the harness
 
 ```mermaid
-flowchart TB
+flowchart LR
     W["Trained parameters"] --> M["Model"]
     M <--> H["Harness"]
 ```
@@ -57,10 +57,9 @@ The [Go app](languages/go/main.go) groups projects by maturity at `GET /api/stat
 Suppose an agent refactors the code and lowercases those keys. It also writes a test expecting `"graduated"`. The test passes, but a client looking for `"Graduated"` breaks.
 
 ```mermaid
-flowchart TB
+flowchart LR
     A["Recorded: Graduated"] --> D["Response diff"]
     B["Modified: graduated"] --> D
-    D --> F["Contract changed"]
 ```
 
 Reading the recording would show the existing casing before the edit. Replay could catch the change afterward, even though both versions return HTTP 200.

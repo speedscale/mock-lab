@@ -37,11 +37,13 @@ After editing, the tool can run the application with recorded responses as mocks
 
 ```mermaid
 flowchart TB
-    M["Model"] --> P["Patch"]
-    P --> R["Replay"]
-    R --> D["Results"]
-    D -->|Next context| M
+    E["Edit code"] --> R["Run replay"]
+    R --> C["Compare responses"]
+    C --> F["Add differences to context"]
+    F -->|Guide the next edit| E
 ```
+
+*Feedback loop: observed differences help the agent decide what to change next.*
 
 The application runs outside the model. The coding tool returns its results to the model as context. This is how the agent gets feedback about its work. See how tool results are returned in [OpenAI](https://developers.openai.com/api/docs/guides/function-calling) and [Anthropic](https://docs.claude.com/en/docs/agents-and-tools/tool-use/overview).
 

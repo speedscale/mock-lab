@@ -6,19 +6,14 @@ Recorded requests and responses document runtime behavior: payload formats, stat
 
 A context window is the maximum number of tokens a model can process in a single inference request. Tokens are units produced by encoding text, including source code. The token budget covers the input and generated output, including reasoning tokens for models that use them. See [OpenAI's context-window documentation](https://developers.openai.com/api/docs/guides/conversation-state#managing-the-context-window).
 
-```text
-Context window: total token budget
-+--------------------------------------------+
-| Input                                      |
-|                                            |
-| Instructions and conversation history      |
-| Source code and documentation excerpts     |
-| Tool results, including selected traffic   |
-+--------------------------------------------+
-| Capacity for generated tokens              |
-|                                            |
-| Model response and reasoning, if applicable|
-+--------------------------------------------+
+```mermaid
+flowchart TB
+    subgraph context["Context window: total token budget"]
+        direction TB
+        input["INPUT<br/>Instructions and conversation history<br/>Source code and documentation<br/>Tool results and selected traffic"]
+        output["GENERATED TOKENS<br/>Model response<br/>Reasoning, where applicable"]
+        input ~~~ output
+    end
 ```
 
 The diagram shows categories, not relative sizes. Repository files and recordings consume input tokens only when their contents are included in the model request, for example through a file-read tool. Adding traffic consumes the existing token budget; it does not increase the context limit or update the model's weights.

@@ -91,10 +91,13 @@ One script drives the whole demo — the 5 read endpoints plus the OAuth + order
 between calls so you can watch each one land in `proxymock web` (set `DELAY=0` to skip the pause).
 Step 5 can also be run **from the proxymock web UI** instead of the `proxymock replay` command.
 
-Go, Python, Ruby, Java, .NET, and C++ all work with `proxymock record` out of the box — proxymock
-injects the proxy and TLS settings each runtime understands (for Java, via `JAVA_TOOL_OPTIONS`).
-**Node is the exception:** its `fetch` ignores proxy env vars until Node 24 (backported to 22.21),
-so set `NODE_USE_ENV_PROXY=1` and `NODE_EXTRA_CA_CERTS` first — see [languages/node/README.md](languages/node/README.md).
+Go, Python, Ruby, .NET, and C++ all work with `proxymock record` out of the box — proxymock
+injects the proxy and TLS settings each runtime understands. **Java** ignores `HTTP_PROXY`;
+set `JAVA_TOOL_OPTIONS` with `-DsocksProxyHost` / `-DsocksProxyPort` and the proxymock
+truststore (`proxymock admin certs --jks`) — see [languages/java/README.md](languages/java/README.md).
+**Node** is the other exception: its `fetch` ignores proxy env vars until Node 24 (backported
+to 22.21), so set `NODE_USE_ENV_PROXY=1` and `NODE_EXTRA_CA_CERTS` first — see
+[languages/node/README.md](languages/node/README.md).
 
 ## Auth handshake + the two moving IDs
 

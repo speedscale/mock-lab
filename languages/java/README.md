@@ -16,6 +16,14 @@ java App.java
 > First time only: install proxymock and run `proxymock init --api-key <key>` once (free key at [app.speedscale.com/signup](https://app.speedscale.com/signup)). In a Codespace the CLI is preinstalled.
 
 ```shell
+# Java ignores HTTP_PROXY/HTTPS_PROXY. Point the JVM at proxymock's SOCKS
+# proxy and trust the proxymock CA — needed for both record and mock (not for replay).
+# First time only, with JAVA_HOME set: proxymock admin certs --jks
+export JAVA_TOOL_OPTIONS="${JAVA_TOOL_OPTIONS:-} \
+  -DsocksProxyHost=localhost -DsocksProxyPort=4140 -DsocksProxyVersion=5 \
+  -Djavax.net.ssl.trustStore=$HOME/.speedscale/certs/cacerts.jks \
+  -Djavax.net.ssl.trustStorePassword=changeit"
+
 proxymock record -- java App.java                # 1. record the downstream calls
 ../../lab/tests/run_tests.sh --recording            # 2. second terminal: drive every endpoint
 proxymock web                                    # 3. browse the recorded traffic (:7788)
@@ -23,9 +31,12 @@ proxymock mock -- java App.java                   # 4. serve the downstream from
 proxymock replay --test-against http://localhost:8080   # 5. replay (or use Replay in proxymock web)
 ```
 
-No extra config needed: when `proxymock record` wraps the JVM it injects `JAVA_TOOL_OPTIONS`
-with the `-D` proxy flags and a CA truststore, so `java.net.http.HttpClient` routes through
-proxymock automatically.
+Unlike the other languages, Java does not honor `HTTP_PROXY`/`HTTPS_PROXY`.
+`-DsocksProxyHost` and `-DsocksProxyPort` route `java.net.http.HttpClient` through
+proxymock; the truststore flags point the JVM at proxymock's CA (`proxymock admin
+certs --jks`, needs `JAVA_HOME`). For an IDE, put the same `-D` arguments in the
+application's VM options. See the
+[language reference](https://docs.speedscale.com/proxymock/getting-started/language-reference/).
 
 ## Auth flow (two moving IDs)
 

@@ -1,8 +1,9 @@
 // proxymock CNCF demo app (Java, single-file). Run with: java App.java
 //
 // Exposes a small HTTP API on :8080 and fulfills each request by calling the CNCF
-// downstream API. java.net.http.HttpClient honors the JVM proxy flags
-// (-Dhttp.proxyHost / -Dhttp.proxyPort), so proxymock can record/mock/replay.
+// downstream API. java.net.http.HttpClient honors JVM SOCKS and HTTP proxy flags
+// (-DsocksProxyHost / -Dhttp.proxyHost) plus a truststore for proxymock's CA —
+// see java/README.md.
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;

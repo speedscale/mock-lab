@@ -17,16 +17,9 @@ flowchart LR
 
     subgraph app["App :8080"]
         direction TB
-        go[Go]
-        node["Node.js"]
-        python[Python]
-        java[Java]
-        kotlin[Kotlin]
-        ruby[Ruby]
-        dotnet[".NET"]
-        cpp["C++"]
-        php[PHP]
-        rust[Rust]
+        go[Go] ~~~ node["Node.js"] ~~~ python[Python] ~~~ java[Java] ~~~ kotlin[Kotlin]
+        ruby[Ruby] ~~~ dotnet[".NET"] ~~~ cpp["C++"] ~~~ php[PHP] ~~~ rust[Rust]
+        go ~~~ ruby
     end
 
     subgraph backends["Backends"]

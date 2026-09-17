@@ -1,6 +1,6 @@
 # labs/
 
-Companion scenarios. Each directory has its own README and is independent of the seven-language CNCF-projects demo under [`languages/`](../languages/).
+Companion scenarios. Each directory has its own README and is independent of the ten-language CNCF-projects demo under [`languages/`](../languages/).
 
 | Lab | What it demonstrates |
 | --- | --- |

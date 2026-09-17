@@ -11,29 +11,7 @@ Recorded traffic gives coding agents real API examples to inspect, and replaying
 
 ```mermaid
 flowchart LR
-    subgraph clients["Clients"]
-        c["curl / tests / replay"]
-    end
-
-    subgraph app["App :8080"]
-        direction TB
-        go[Go]
-        node["Node.js"]
-        python[Python]
-        java[Java]
-        kotlin[Kotlin]
-        ruby[Ruby]
-        dotnet[".NET"]
-        cpp["C++"]
-        php[PHP]
-        rust[Rust]
-    end
-
-    subgraph backends["Backends"]
-        api["CNCF projects API"]
-    end
-
-    clients --> app --> backends
+    clients["curl / tests / replay"] --> app["App :8080"] --> api["CNCF projects API"]
 ```
 
 ## Try it in GitHub Codespaces

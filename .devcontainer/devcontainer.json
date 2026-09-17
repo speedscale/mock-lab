@@ -7,8 +7,10 @@
         "ghcr.io/devcontainers/features/python:1": { "version": "3.12" },
         "ghcr.io/devcontainers/features/java:1": { "version": "17" },
         "ghcr.io/devcontainers/features/ruby:1": { "version": "3.2" },
-        "ghcr.io/devcontainers/features/dotnet:2": { "version": "8.0" }
+        "ghcr.io/devcontainers/features/dotnet:2": { "version": "8.0" },
+        "ghcr.io/devcontainers/features/php:1": { "version": "8.3" },
+        "ghcr.io/devcontainers/features/rust:1": {}
     },
     "forwardPorts": [8080, 8090, 7788],
-    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y build-essential libcurl4-openssl-dev && sudo curl -sL \"https://downloads.speedscale.com/proxymock/proxymock-linux-$(dpkg --print-architecture)\" -o /usr/local/bin/proxymock && sudo chmod +x /usr/local/bin/proxymock"
+    "postCreateCommand": "sudo apt-get update && sudo apt-get install -y build-essential libcurl4-openssl-dev unzip && sudo curl -sL \"https://github.com/JetBrains/kotlin/releases/download/v2.4.10/kotlin-compiler-2.4.10.zip\" -o /tmp/kotlin.zip && sudo unzip -qo /tmp/kotlin.zip -d /usr/local && sudo ln -sfn /usr/local/kotlinc/bin/kotlinc /usr/local/bin/kotlinc && sudo curl -sL \"https://downloads.speedscale.com/proxymock/proxymock-linux-$(dpkg --print-architecture)\" -o /usr/local/bin/proxymock && sudo chmod +x /usr/local/bin/proxymock"
 }

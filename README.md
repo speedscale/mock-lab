@@ -1,7 +1,7 @@
 # mock-lab
 
 Demo apps for the [proxymock](https://docs.speedscale.com/proxymock/) quickstart — the same
-small app in seven languages. Each one calls a CNCF projects API as its downstream; proxymock
+small app in ten languages. Each one calls a CNCF projects API as its downstream; proxymock
 records that call, then mocks it so the app runs and tests with **no network**.
 
 This repo also holds [other labs](#other-labs) and
@@ -21,9 +21,12 @@ flowchart LR
         node["Node.js"]
         python[Python]
         java[Java]
+        kotlin[Kotlin]
         ruby[Ruby]
         dotnet[".NET"]
         cpp["C++"]
+        php[PHP]
+        rust[Rust]
     end
 
     subgraph backends["Backends"]
@@ -37,7 +40,7 @@ flowchart LR
 
 [![Open in GitHub Codespaces](.github/codespaces-badge.svg)](https://codespaces.new/speedscale/mock-lab)
 
-One click — all seven runtimes and the `proxymock` CLI are preinstalled. Run
+One click — all ten runtimes and the `proxymock` CLI are preinstalled. Run
 `proxymock init --api-key <key>` once to activate it (free key at
 [app.speedscale.com/signup](https://app.speedscale.com/signup)).
 
@@ -49,9 +52,12 @@ One click — all seven runtimes and the `proxymock` CLI are preinstalled. Run
 | [Node.js](languages/node/README.md) | `cd languages/node && node index.js` | [`languages/node/proxymock/recording`](languages/node/proxymock/recording) |
 | [Python](languages/python/README.md) | `cd languages/python && python3 app.py` | [`languages/python/proxymock/recording`](languages/python/proxymock/recording) |
 | [Java](languages/java/README.md) | `cd languages/java && java App.java` | [`languages/java/proxymock/recording`](languages/java/proxymock/recording) |
+| [Kotlin](languages/kotlin/README.md) | `cd languages/kotlin && kotlinc App.kt -include-runtime -d app.jar && java -jar app.jar` | [`languages/kotlin/proxymock/recording`](languages/kotlin/proxymock/recording) |
 | [Ruby](languages/ruby/README.md) | `cd languages/ruby && ruby app.rb` | [`languages/ruby/proxymock/recording`](languages/ruby/proxymock/recording) |
 | [.NET](languages/dotnet/README.md) | `cd languages/dotnet && dotnet run` | [`languages/dotnet/proxymock/recording`](languages/dotnet/proxymock/recording) |
 | [C++](languages/cpp/README.md) | `cd languages/cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app` | [`languages/cpp/proxymock/recording`](languages/cpp/proxymock/recording) |
+| [PHP](languages/php/README.md) | `cd languages/php && php app.php` | [`languages/php/proxymock/recording`](languages/php/proxymock/recording) |
+| [Rust](languages/rust/README.md) | `cd languages/rust && cargo run` | [`languages/rust/proxymock/recording`](languages/rust/proxymock/recording) |
 
 Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWNSTREAM_URL`
 (default `https://demo-api.trafficreplay.com`).
@@ -91,10 +97,14 @@ One script drives the whole demo — the 5 read endpoints plus the OAuth + order
 between calls so you can watch each one land in `proxymock web` (set `DELAY=0` to skip the pause).
 Step 5 can also be run **from the proxymock web UI** instead of the `proxymock replay` command.
 
-Go, Python, Ruby, .NET, and C++ all work with `proxymock record` out of the box — proxymock
-injects the proxy and TLS settings each runtime understands. **Java** ignores `HTTP_PROXY`;
+Go, Python, Ruby, .NET, C++, PHP, and Rust all work with `proxymock record` out of the box — proxymock
+injects the proxy and TLS settings each runtime understands. C++, PHP, and Rust all load
+`SSL_CERT_FILE` into the HTTP client because libcurl/rustls do not read that env var on their own.
+**Java and Kotlin** ignore `HTTP_PROXY`;
 set `JAVA_TOOL_OPTIONS` with `-DsocksProxyHost` / `-DsocksProxyPort` and the proxymock
-truststore (`proxymock admin certs --jks`) — see [languages/java/README.md](languages/java/README.md).
+truststore (`proxymock admin certs --jks`) — see [languages/java/README.md](languages/java/README.md)
+and [languages/kotlin/README.md](languages/kotlin/README.md). Kotlin is the same JVM capture
+path as Java, not a second one.
 **Node** is the other exception: its `fetch` ignores proxy env vars until Node 24 (backported
 to 22.21), so set `NODE_USE_ENV_PROXY=1` and `NODE_EXTRA_CA_CERTS` first — see
 [languages/node/README.md](languages/node/README.md).
@@ -127,7 +137,7 @@ quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow to
 
 There are two, and they answer different questions.
 
-[`lab/proxymock/recording`](lab/proxymock/recording) is the **shared cross-language fixture**. It ships with the smart-replace blueprint, replays 0% failed against *any* of the seven apps, and is what the [`skills/`](skills/) proof scripts run against. Use it when the language does not matter and you want the auth flow to chain cleanly.
+[`lab/proxymock/recording`](lab/proxymock/recording) is the **shared cross-language fixture**. It ships with the smart-replace blueprint, replays 0% failed against *any* of the ten apps, and is what the [`skills/`](skills/) proof scripts run against. Use it when the language does not matter and you want the auth flow to chain cleanly.
 
 `languages/<lang>/proxymock/recording` is the **per-runtime one**: one recording per language, each captured from that language's own server. Use it when you care how a specific runtime actually behaves on the wire. Every language dir has one, so `proxymock/` next to the app is also the layout you get from a plain `proxymock record` in that directory. That is the convention, not a special case.
 
@@ -146,7 +156,7 @@ Use `localhost`, not `127.0.0.1`, because the recorded signature keys on the hos
 
 ### What actually differs between runtimes
 
-The seven apps serve identical endpoints with identical JSON, so the interesting difference is what each HTTP server adds on its own. Measured from the committed recordings, `GET /` on each:
+The ten apps serve identical endpoints with identical JSON, so the interesting difference is what each HTTP server adds on its own. Measured from the committed recordings, `GET /` on each:
 
 | Language | Server implementation | Response headers recorded | `Server` banner | `Content-Type` |
 | --- | --- | --- | --- | --- |
@@ -154,21 +164,24 @@ The seven apps serve identical endpoints with identical JSON, so the interesting
 | Node.js | `node:http` | `Connection`, `Content-Type`, `Date`, `Keep-Alive` | none | `application/json` |
 | Python | `http.server` | `Content-Type`, `Date`, `Server` | `BaseHTTP/0.6 Python/3.14.6` | `application/json` |
 | Java | `com.sun.net.httpserver` | `Content-Type`, `Date` | none | `application/json` |
+| Kotlin | `com.sun.net.httpserver` | `Content-Type`, `Date` | none | `application/json` |
 | Ruby | raw `TCPServer` | `Content-Type` | none | `application/json` |
 | .NET | Kestrel | `Content-Type`, `Date`, `Server` | `Kestrel` | `application/json; charset=utf-8` |
 | C++ | raw POSIX sockets | `Content-Type` | none | `application/json` |
+| PHP | raw `stream_socket_server` | `Content-Type` | none | `application/json` |
+| Rust | raw `TcpListener` | `Content-Type` | none | `application/json` |
 
-Three things fall out of that table. Only **Python and .NET announce themselves** with a `Server` header, and .NET's is the bare product name while Python's carries both the handler and the interpreter version, so a Python recording pins the patch release it was captured on. **Ruby and C++ emit neither `Date` nor `Server`**, because both hand-write the status line and headers into the socket rather than going through a server library; a library adds `Date` for you, a `printf` does not. And **.NET is the only one that appends `charset=utf-8`** to `Content-Type`, which matters because a strict content-type assertion tuned on one runtime will fail on Kestrel.
+Three things fall out of that table. Only **Python and .NET announce themselves** with a `Server` header, and .NET's is the bare product name while Python's carries both the handler and the interpreter version, so a Python recording pins the patch release it was captured on. **Ruby, C++, PHP, and Rust emit neither `Date` nor `Server`**, because they hand-write the status line and headers into the socket rather than going through a server library; a library adds `Date` for you, a `printf` does not. **Java and Kotlin are the same capture**: both use `com.sun.net.httpserver`, so the recorded headers match. And **.NET is the only one that appends `charset=utf-8`** to `Content-Type`, which matters because a strict content-type assertion tuned on one runtime will fail on Kestrel.
 
 Node is the only runtime that records connection-management headers (`Connection: keep-alive` plus `Keep-Alive: timeout=5`).
 
-Two things that are **not** differences, worth stating because they look like they should be. Status lines are identical everywhere (`200 OK` and `201 Created`, same spelling, same casing), and `Date`, wherever present, is the same RFC 7231 IMF-fixdate format. Header ordering and message framing are **not observable** from an RRPair at all: proxymock stores headers alphabetically, and no `Content-Length` or `Transfer-Encoding` survives capture in any recording here, including the outbound ones from the real remote server. Ruby and C++ both write a `Content-Length` that the recording does not keep. So do not use these files to reason about framing.
+Two things that are **not** differences, worth stating because they look like they should be. Status lines are identical everywhere (`200 OK` and `201 Created`, same spelling, same casing), and `Date`, wherever present, is the same RFC 7231 IMF-fixdate format. Header ordering and message framing are **not observable** from an RRPair at all: proxymock stores headers alphabetically, and no `Content-Length` or `Transfer-Encoding` survives capture in any recording here, including the outbound ones from the real remote server. Ruby, C++, PHP, and Rust all write a `Content-Length` that the recording does not keep. So do not use these files to reason about framing.
 
 The Go app also has an opt-in telemetry beacon (`EMIT_TELEMETRY=1`) for mock match-rate tuning — see [languages/go/README.md](languages/go/README.md#run).
 
 ## Other labs
 
-Companion scenarios live under [`labs/`](labs/). Each is its own subdirectory with a README. They are not the seven-language demo; they pair proxymock with a specific tool so an agent can diagnose a planted issue from real evidence.
+Companion scenarios live under [`labs/`](labs/). Each is its own subdirectory with a README. They are not the ten-language demo; they pair proxymock with a specific tool so an agent can diagnose a planted issue from real evidence.
 
 | Lab | What it demonstrates |
 | --- | --- |

@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     # stats-project-count and category-totals are demo fixtures: each carries a
-    # deliberate bug in all seven apps so the quality-loop demo has something
+    # deliberate bug in all ten apps so the quality-loop demo has something
     # real to find. category-totals returns 500, which this suite correctly
     # fails on, so running CI there is permanent red noise. Neither branch is
     # ever merged. To see the contrast the demo is about, run
@@ -28,9 +28,12 @@ jobs:
           - { lang: node,   start: "node languages/node/index.js" }
           - { lang: python, start: "python3 languages/python/app.py" }
           - { lang: java,   start: "java languages/java/App.java" }
+          - { lang: kotlin, start: "cd languages/kotlin && kotlinc App.kt -include-runtime -d app.jar && java -jar app.jar" }
           - { lang: ruby,   start: "ruby languages/ruby/app.rb" }
           - { lang: dotnet, start: "dotnet run --project languages/dotnet/demo.csproj" }
           - { lang: cpp,    start: "cd languages/cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app" }
+          - { lang: php,    start: "php languages/php/app.php" }
+          - { lang: rust,   start: "./languages/rust/target/release/app" }
     steps:
       - uses: actions/checkout@v4
 
@@ -47,11 +50,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - if: matrix.lang == 'java'
+      - if: matrix.lang == 'java' || matrix.lang == 'kotlin'
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
+      - if: matrix.lang == 'kotlin'
+        run: |
+          curl -fsSL https://github.com/JetBrains/kotlin/releases/download/v2.4.10/kotlin-compiler-2.4.10.zip -o /tmp/kotlin.zip
+          sudo unzip -q /tmp/kotlin.zip -d /usr/local
+          echo /usr/local/kotlinc/bin >> "$GITHUB_PATH"
       - if: matrix.lang == 'ruby'
         uses: ruby/setup-ruby@v1
         with:
@@ -62,6 +70,16 @@ jobs:
           dotnet-version: "8.0"
       - if: matrix.lang == 'cpp'
         run: sudo apt-get update && sudo apt-get install -y build-essential libcurl4-openssl-dev
+      - if: matrix.lang == 'php'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: curl
+          coverage: none
+      - if: matrix.lang == 'rust'
+        uses: dtolnay/rust-toolchain@stable
+      - if: matrix.lang == 'rust'
+        run: cargo build --release --manifest-path languages/rust/Cargo.toml
 
       - name: validate ${{ matrix.lang }} app against the reference downstream
         run: |
@@ -73,7 +91,7 @@ jobs:
 
           # 2. the demo app, pointed at it
           DOWNSTREAM_URL=http://localhost:8090 PORT=8080 ${{ matrix.start }} >/tmp/app.log 2>&1 &
-          for i in $(seq 1 60); do curl -sf localhost:8080/ >/dev/null && break; sleep 1; done
+          for i in $(seq 1 90); do curl -sf localhost:8080/ >/dev/null && break; sleep 1; done
 
           # 3. drive the whole API (read endpoints + oauth/order flow); the script
           #    asserts 24 projects and that the auth flow returns a token + order.

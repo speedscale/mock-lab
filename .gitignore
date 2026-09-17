@@ -17,6 +17,15 @@
 !/languages/dotnet/proxymock/recording/
 /languages/cpp/proxymock/*
 !/languages/cpp/proxymock/recording/
+/languages/php/proxymock/*
+!/languages/php/proxymock/recording/
+/languages/kotlin/proxymock/*
+!/languages/kotlin/proxymock/recording/
+/languages/kotlin/*.jar
+/languages/kotlin/*.class
+/languages/rust/proxymock/*
+!/languages/rust/proxymock/recording/
+/languages/rust/target/
 # scratch proxymock writes inside the committed per-language recordings
 /languages/*/proxymock/recording/.replay/
 /languages/*/proxymock/recording/*/.replay/

@@ -4,8 +4,8 @@ Demo apps for the [proxymock](https://docs.speedscale.com/proxymock/) quickstart
 small app in ten languages. Each one calls a CNCF projects API as its downstream; proxymock
 records that call, then mocks it so the app runs and tests with **no network**.
 
-This repo also holds [other labs](#other-labs) and
-[agent skills](skills/README.md) that reuse the same recordings.
+This repo also holds [other labs](#other-labs) and is the fixture for the
+[proxymock agent skills](https://github.com/speedscale/skills) that reuse the same recordings.
 
 Recorded traffic gives coding agents real API examples to inspect, and replaying it exposes assumptions the code got wrong. See [how runtime feedback improves AI coding](AI-CONTEXT.md).
 
@@ -130,7 +130,7 @@ quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow to
 
 There are two, and they answer different questions.
 
-[`lab/proxymock/recording`](lab/proxymock/recording) is the **shared cross-language fixture**. It ships with the smart-replace blueprint, replays 0% failed against *any* of the ten apps, and is what the [`skills/`](skills/) proof scripts run against. Use it when the language does not matter and you want the auth flow to chain cleanly.
+[`lab/proxymock/recording`](lab/proxymock/recording) is the **shared cross-language fixture**. It ships with the smart-replace blueprint, replays 0% failed against *any* of the ten apps, and is what the [agent skills'](https://github.com/speedscale/skills) proof scripts run against. Use it when the language does not matter and you want the auth flow to chain cleanly.
 
 `languages/<lang>/proxymock/recording` is the **per-runtime one**: one recording per language, each captured from that language's own server. Use it when you care how a specific runtime actually behaves on the wire. Every language dir has one, so `proxymock/` next to the app is also the layout you get from a plain `proxymock record` in that directory. That is the convention, not a special case.
 
@@ -188,9 +188,12 @@ Companion scenarios live under [`labs/`](labs/). Each is its own subdirectory wi
 
 ## Agent skills
 
-[`skills/`](skills/README.md) is the proxymock agent-skills pack: regression, verify-fix, chaos,
-contract testing, load, replay tuning, and more. They run against `lab/proxymock/recording` and
-need no Speedscale Cloud account. Start with [`quality-loop`](skills/quality-loop/SKILL.md).
+The proxymock agent-skills pack (regression, verify-fix, chaos, contract testing, load, replay
+tuning, and more) now lives at [github.com/speedscale/skills](https://github.com/speedscale/skills)
+with the rest of Speedscale's skills. The skills still run against `lab/proxymock/recording` and
+need no Speedscale Cloud account; start with
+[`quality-loop`](https://github.com/speedscale/skills/blob/main/skills/quality-loop/SKILL.md).
+Their proof scripts find this repo through `MOCK_LAB_DIR`; see [`skills/README.md`](skills/README.md).
 
 ## The downstream API
 

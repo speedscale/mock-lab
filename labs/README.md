@@ -11,5 +11,6 @@ Companion scenarios. Each directory has its own README and is independent of the
 | [hubble](hubble/README.md) | a request timeout caused by a Cilium network policy, not the application |
 | [obi](obi/README.md) | eBPF instrumentation of an opaque service with no OpenTelemetry SDK |
 | [chaos](chaos/README.md) | a scoped chaos rule that forces the storefront's unused inventory-fallback path to run |
+| [startup-mock](startup-mock/README.md) | a startup dependency call whose recorded query signature has an extra request ID |
 
 The shared CNCF fixture (`server/`, recordings, OpenAPI spec) stays in [`lab/`](../lab/), one level up.

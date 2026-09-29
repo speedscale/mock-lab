@@ -1,0 +1,28 @@
+{
+  "id": "6f233506-a1e8-45ae-a7d8-055c6cf6b121",
+  "name": "Ignore captured request ID at startup",
+  "tokenizeConfig": {
+    "name": "Ignore captured request ID at startup",
+    "id": "6f233506-a1e8-45ae-a7d8-055c6cf6b121",
+    "responder": [
+      {
+        "filters": {
+          "filters": [
+            {
+              "include": true,
+              "detectedLocation": "/bootstrap/config"
+            }
+          ]
+        },
+        "extractor": {"type": "empty"},
+        "transforms": [
+          {
+            "type": "delete_sig",
+            "config": {"key": "http:queryparams:requestId"}
+          }
+        ]
+      }
+    ]
+  },
+  "active": true
+}

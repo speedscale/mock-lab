@@ -1,0 +1,5 @@
+/bin/
+/.run/
+proxymock/results/
+proxymock/recording/proxymock.log
+proxymock/recording/.proxymock-output

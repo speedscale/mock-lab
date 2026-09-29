@@ -1,0 +1,16 @@
+{
+  "id": "846714bc-4a8a-4a5e-a396-4ba730355839",
+  "name": "Ignore recorded stateRevision at startup",
+  "tokenizeConfig": {
+    "name": "Ignore recorded stateRevision at startup",
+    "id": "846714bc-4a8a-4a5e-a396-4ba730355839",
+    "responder": [
+      {
+        "filters": {"filters": [{"include": true, "detectedLocation": "/api/v1/buckets/demo/values"}]},
+        "extractor": {"type": "empty"},
+        "transforms": [{"type": "delete_sig", "config": {"key": "http:queryparams:stateRevision"}}]
+      }
+    ]
+  },
+  "active": true
+}

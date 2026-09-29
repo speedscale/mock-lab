@@ -185,6 +185,7 @@ Companion scenarios live under [`labs/`](labs/). Each is its own subdirectory wi
 | [hubble](labs/hubble/README.md) | a request timeout caused by a Cilium network policy, not the application |
 | [obi](labs/obi/README.md) | eBPF instrumentation of an opaque service with no OpenTelemetry SDK |
 | [chaos](labs/chaos/README.md) | a scoped chaos rule that forces the storefront's unused inventory-fallback path to run |
+| [startup-mock](labs/startup-mock/README.md) | a startup dependency mock that matches after a recorded query parameter disappears |
 
 ## Agent skills
 

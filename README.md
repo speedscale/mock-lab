@@ -137,6 +137,15 @@ proxymock coverage --spec lab/app-openapi.yaml --in lab/proxymock/recording --js
 
 The report counts observed operations, response statuses, and JSON response properties, then ranks the missing cases. The committed recording exercises the success paths but leaves error statuses such as 400, 401, 404, and 502 uncovered. The metric is recording/schema coverage; it does not say whether the app passed an assertion.
 
+The same coverage calculation can gate a local replay through the [schema-coverage test config](lab/proxymock/testconfigs/schema-coverage.json). Start the app and its recorded downstream mock as in the quickstart, then run this from the app directory:
+
+```shell
+cd languages/go
+proxymock replay --in ../../lab/proxymock/recording --test-against http://localhost:8080 --test-config schema-coverage --spec ../../lab/app-openapi.yaml
+```
+
+The config keeps the normal response assertions and adds goals for 100% operation and status coverage. The operation goal passes on this fixture; the status goal fails until more error responses are recorded. The goal verdict includes the detailed coverage report in JSON.
+
 ## Two kinds of committed recording
 
 There are two, and they answer different questions.

@@ -126,6 +126,17 @@ Replay passes 0% failed — the blueprint (`res_body → json_path → smart_rep
 `access_token` and `order_id`) re-chains both IDs. To record your own and watch it happen, use the
 quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow too).
 
+## Measure recording coverage against the app spec
+
+The shared recording has eight inbound app calls and five outbound dependency calls. [`lab/app-openapi.yaml`](lab/app-openapi.yaml) describes the app's inbound routes; [`lab/openapi.yaml`](lab/openapi.yaml) describes the downstream API. Run coverage from this repo's root:
+
+```shell
+proxymock coverage --spec lab/app-openapi.yaml --in lab/proxymock/recording
+proxymock coverage --spec lab/app-openapi.yaml --in lab/proxymock/recording --json
+```
+
+The report counts observed operations, response statuses, and JSON response properties, then ranks the missing cases. The committed recording exercises the success paths but leaves error statuses such as 400, 401, 404, and 502 uncovered. The metric is recording/schema coverage; it does not say whether the app passed an assertion.
+
 ## Two kinds of committed recording
 
 There are two, and they answer different questions.

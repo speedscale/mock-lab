@@ -128,11 +128,11 @@ quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow to
 
 ## Measure recording coverage against the app spec
 
-The shared recording has eight inbound app calls and five outbound dependency calls. [`lab/app-openapi.yaml`](lab/app-openapi.yaml) describes the app's inbound routes; [`lab/openapi.yaml`](lab/openapi.yaml) describes the downstream API. Run coverage from this repo's root:
+The shared recording has eight inbound app calls and five outbound dependency calls. [`lab/proxymock/openapi.yaml`](lab/proxymock/openapi.yaml) describes the app's inbound routes; [`lab/openapi.yaml`](lab/openapi.yaml) describes the downstream API. The app spec lives in the proxymock workspace and travels with the recording when pushed as a snapshot. Run coverage from this repo's root:
 
 ```shell
-proxymock coverage --spec lab/app-openapi.yaml --in lab/proxymock/recording
-proxymock coverage --spec lab/app-openapi.yaml --in lab/proxymock/recording --json
+proxymock coverage --in lab/proxymock/recording
+proxymock coverage --in lab/proxymock/recording --json
 ```
 
 The report counts observed operations, response statuses, and JSON response properties, then ranks the missing cases. The committed recording exercises the success paths but leaves error statuses such as 400, 401, 404, and 502 uncovered. The metric is recording/schema coverage; it does not say whether the app passed an assertion.
@@ -141,7 +141,7 @@ The same coverage calculation can gate a local replay through the [schema-covera
 
 ```shell
 cd languages/go
-proxymock replay --in ../../lab/proxymock/recording --test-against http://localhost:8080 --test-config schema-coverage --spec ../../lab/app-openapi.yaml
+proxymock replay --in ../../lab/proxymock/recording --test-against http://localhost:8080 --test-config schema-coverage
 ```
 
 The config keeps the normal response assertions and adds goals for 100% operation and status coverage. The operation goal passes on this fixture; the status goal fails until more error responses are recorded. The goal verdict includes the detailed coverage report in JSON.

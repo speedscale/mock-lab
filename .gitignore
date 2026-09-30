@@ -50,6 +50,12 @@
 /labs/prometheus/proxymock/
 /labs/prometheus/bin/
 /labs/prometheus/proxymock.log
+# agent tutorial app -- scratch proxymock workspaces, venvs and build output
+/tutorial/*/proxymock/
+/tutorial/*/proxymock.log
+/tutorial/go/bin/
+/tutorial/python/.venv/
+/tutorial/java/target/
 # python bytecode
 __pycache__/
 # build artifacts

@@ -37,6 +37,10 @@ One click — all ten runtimes and the `proxymock` CLI are preinstalled. Run
 `proxymock init --api-key <key>` once to activate it (free key at
 [app.speedscale.com/signup](https://app.speedscale.com/signup)).
 
+## Agent tutorial app
+
+[`tutorial/`](tutorial/) holds the app behind the proxymock getting-started tutorial, where a coding agent records traffic, tunes the tests and the mocks, and runs a regression test and a performance test. It is a small orders service with Postgres and the CNCF projects API as dependencies, written the same way in [Go](tutorial/go/), [Java](tutorial/java/), [Python](tutorial/python/) and [Node.js](tutorial/node/), with planted problems for each chapter to find. Start with [tutorial/README.md](tutorial/README.md).
+
 ## Pick your language
 
 | Language | Run | Its own recording |

@@ -128,7 +128,7 @@ quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow to
 
 ## Measure recording coverage against the app spec
 
-The shared recording has eight inbound app calls and five outbound dependency calls. [`lab/proxymock/applications/my-app/openapi.yaml`](lab/proxymock/applications/my-app/openapi.yaml) describes the app's inbound routes; [`lab/openapi.yaml`](lab/openapi.yaml) describes the downstream API. The app spec lives in the proxymock workspace under the recorded `my-app` workload and travels with the recording when pushed as a snapshot. Run coverage from this repo's root:
+The shared recording has eight inbound app calls and five outbound dependency calls. [`lab/proxymock/applications/my-app.openapi.yaml`](lab/proxymock/applications/my-app.openapi.yaml) describes the app's inbound routes; [`lab/openapi.yaml`](lab/openapi.yaml) describes the downstream API. The app spec is named for the recorded `my-app` workload and travels with the recording when pushed as a snapshot. Run coverage from this repo's root:
 
 ```shell
 proxymock coverage --in lab/proxymock/recording

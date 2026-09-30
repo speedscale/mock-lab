@@ -54,7 +54,7 @@ proxymock mock --in ./proxymock \
   -- go run .
 ```
 
-Then drive the API (`curl localhost:8080/api/projects`) a few times and watch the app's own log. The
+Then start the dashboard (`cd ../../lab/dashboard && go run .`, http://127.0.0.1:8091), leave the endpoint on App, and click All projects a few times while you watch the app's own log. The
 retry loop reports what it saw, and the `X-Speedscale-Chaos` header names the effects that fired and
 the rule that fired them, so a perturbed attempt is distinguishable from an ordinary upstream error:
 
@@ -93,7 +93,7 @@ naming the effects, and the chaos-only filter narrows the grid to just the pertu
 
 ```shell
 proxymock record -- go run .                     # 1. record the downstream calls
-../../lab/tests/run_tests.sh --recording            # 2. second terminal: drive every endpoint
+cd ../../lab/dashboard && go run .               # 2. second terminal: http://127.0.0.1:8091, switch to Record
 proxymock web                                    # 3. browse the recorded traffic (:7788)
 proxymock mock -- go run .                        # 4. serve the downstream from the recording
 proxymock replay --test-against http://localhost:8080   # 5. replay (or use Replay in proxymock web)
@@ -104,6 +104,6 @@ proxymock replay --test-against http://localhost:8080   # 5. replay (or use Repl
 
 ## Auth flow (two moving IDs)
 
-This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. The quickstart's `../../lab/tests/run_tests.sh` drives this flow too. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see the [root README](../../README.md#auth-handshake--the-two-moving-ids) and [`../../lab/proxymock/`](../../lab/proxymock/) for the ready-to-run recording + blueprint.
+This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. The dashboard in step 2 drives this flow too — set the endpoint switch to Record, then click through the calls. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see the [root README](../../README.md#auth-handshake--the-two-moving-ids) and [`../../lab/proxymock/`](../../lab/proxymock/) for the ready-to-run recording + blueprint.
 
 Endpoints and the API contract: see the [root README](../../README.md) and [`openapi.yaml`](../../lab/openapi.yaml).

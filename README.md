@@ -126,6 +126,26 @@ Replay passes 0% failed — the blueprint (`res_body → json_path → smart_rep
 `access_token` and `order_id`) re-chains both IDs. To record your own and watch it happen, use the
 quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow too).
 
+## Measure recording coverage against the app spec
+
+The shared recording has eight inbound app calls and five outbound dependency calls. [`lab/proxymock/applications/my-app.openapi.yaml`](lab/proxymock/applications/my-app.openapi.yaml) describes the app's inbound routes; [`lab/openapi.yaml`](lab/openapi.yaml) describes the downstream API. The app spec is named for the recorded `my-app` workload and travels with the recording when pushed as a snapshot. Run coverage from this repo's root:
+
+```shell
+proxymock coverage --in lab/proxymock/recording
+proxymock coverage --in lab/proxymock/recording --json
+```
+
+The report counts observed operations, response statuses, and JSON response properties, then ranks the missing cases. The committed recording exercises the success paths but leaves error statuses such as 400, 401, 404, and 502 uncovered. The metric is recording/schema coverage; it does not say whether the app passed an assertion.
+
+The same coverage calculation can gate a local replay through the [schema-coverage test config](lab/proxymock/testconfigs/schema-coverage.json). Start the app and its recorded downstream mock as in the quickstart, then run this from the app directory:
+
+```shell
+cd languages/go
+proxymock replay --in ../../lab/proxymock/recording --test-against http://localhost:8080 --test-config schema-coverage
+```
+
+The config keeps the normal response assertions and adds goals for 100% operation and status coverage. On the committed fixture, the local replay evaluates 16 response assertions across eight requests and passes all of them. Coverage is 8/8 operations, 8/19 response statuses, and 40/63 response fields. The operation goal passes and the status goal fails, so the command exits `1` as an example of a working coverage gate. The repository's CI workflow does not run this deliberately failing config. The goal verdict includes the detailed coverage report in JSON.
+
 ## Two kinds of committed recording
 
 There are two, and they answer different questions.

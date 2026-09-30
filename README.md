@@ -4,8 +4,8 @@ Demo apps for the [proxymock](https://docs.speedscale.com/proxymock/) quickstart
 small app in ten languages. Each one calls a CNCF projects API as its downstream; proxymock
 records that call, then mocks it so the app runs and tests with **no network**.
 
-This repo also holds [other labs](#other-labs) and is the fixture for the
-[proxymock agent skills](https://github.com/speedscale/skills) that reuse the same recordings.
+This repo also holds [other labs](#other-labs) and the [agent tutorial app](tutorial/), and is the
+fixture for the [proxymock agent skills](https://github.com/speedscale/skills) that reuse the same recordings.
 
 Recorded traffic gives coding agents real API examples to inspect, and replaying it exposes assumptions the code got wrong. See [how runtime feedback improves AI coding](AI-CONTEXT.md).
 
@@ -36,10 +36,6 @@ flowchart LR
 One click — all ten runtimes and the `proxymock` CLI are preinstalled. Run
 `proxymock init --api-key <key>` once to activate it (free key at
 [app.speedscale.com/signup](https://app.speedscale.com/signup)).
-
-## Agent tutorial app
-
-[`tutorial/`](tutorial/) holds the app behind the proxymock getting-started tutorial, where a coding agent records traffic, tunes the tests and the mocks, and runs a regression test and a performance test. It is a small orders service with Postgres and the CNCF projects API as dependencies, written the same way in [Go](tutorial/go/), [Java](tutorial/java/), [Python](tutorial/python/) and [Node.js](tutorial/node/), with planted problems for each chapter to find. Start with [tutorial/README.md](tutorial/README.md).
 
 ## Pick your language
 

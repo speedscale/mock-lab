@@ -144,7 +144,7 @@ cd languages/go
 proxymock replay --in ../../lab/proxymock/recording --test-against http://localhost:8080 --test-config schema-coverage
 ```
 
-The config keeps the normal response assertions and adds goals for 100% operation and status coverage. The operation goal passes on this fixture; the status goal fails until more error responses are recorded. The goal verdict includes the detailed coverage report in JSON.
+The config keeps the normal response assertions and adds goals for 100% operation and status coverage. On the committed fixture, the local replay evaluates 16 response assertions across eight requests and passes all of them. Coverage is 8/8 operations, 8/19 response statuses, and 40/63 response fields. The operation goal passes and the status goal fails, so the command exits `1` as an example of a working coverage gate. The repository's CI workflow does not run this deliberately failing config. The goal verdict includes the detailed coverage report in JSON.
 
 ## Two kinds of committed recording
 

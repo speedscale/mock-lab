@@ -14,6 +14,9 @@ support the demo apps and CI:
   suite; it's also the CI smoke test (which asserts the data). Run it from the repo root:
   `./lab/tests/run_tests.sh` (`--recording` to hit proxymock's inbound proxy, `DELAY=0` to skip
   the ~1s pause between calls).
+- **`dashboard/`** — the same calls, on a page. `cd dashboard && go run .` serves it at
+  `http://127.0.0.1:8091` (override with `DASHBOARD_PORT`). The switch sends calls to the app
+  on `:8080` or to proxymock's inbound proxy on `:4143`.
 - **`proxymock/`** — a committed recording + smart-replace blueprint, so `proxymock mock`/`replay`
   work offline against any language (`proxymock replay --in lab/proxymock/recording …`).
 - **`openapi.yaml`** — the contract for the downstream API.

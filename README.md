@@ -88,6 +88,14 @@ proxymock replay --test-against http://localhost:8080   # 5. replay it back at t
 
 One script drives the whole demo — the 5 read endpoints plus the OAuth + order flow — pausing ~1s
 between calls so you can watch each one land in `proxymock web` (set `DELAY=0` to skip the pause).
+The same calls are on a local page if you'd rather click:
+
+```shell
+cd lab/dashboard && go run .    # http://127.0.0.1:8091
+```
+
+The switch at the bottom sends each call to the app on `:8080`, or to proxymock's inbound proxy on
+`:4143` while a recording is running. On `:4143` the full run pauses a second between calls.
 Step 5 can also be run **from the proxymock web UI** instead of the `proxymock replay` command.
 
 Go, Python, Ruby, .NET, C++, PHP, and Rust all work with `proxymock record` out of the box — proxymock

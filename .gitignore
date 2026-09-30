@@ -67,6 +67,7 @@ __pycache__/
 node_modules/
 /languages/go/go
 /lab/server/server
+/lab/dashboard/dashboard
 /languages/cpp/app
 
 .claude/worktrees

@@ -105,7 +105,8 @@ jobs:
     - name: Start the reference downstream and the app
       run: |
         set -euo pipefail
-        (cd ../../lab/server && nohup go run . > /tmp/server.log 2>&1 &)
+        # The job-wide PORT=8080 is the app's; lab/server reads PORT too.
+        (cd ../../lab/server && PORT=8090 nohup go run . > /tmp/server.log 2>&1 &)
         for i in $(seq 1 60); do curl -sf localhost:8090/healthz > /dev/null && break; sleep 1; done
         export DEMO_API_URL=http://localhost:8090
         case "${{ matrix.lang }}" in

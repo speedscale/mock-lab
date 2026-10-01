@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -36,9 +37,6 @@ type stockResponse struct {
 	Source    string `json:"source"`
 }
 
-// lastKnown is the fallback cache: the most recent good answer per SKU.
-var lastKnown = map[string]stockLevel{}
-
 func main() {
 	addr := os.Getenv("APP_ADDR")
 	if addr == "" {
@@ -59,8 +57,18 @@ func main() {
 		Transport: &http.Transport{Proxy: proxyFromEnvironmentIncludingLocalhost},
 	}
 
+	handler := newHandler(client, inventoryURL)
+	log.Printf("storefront listening on %s, inventory at %s", addr, inventoryURL)
+	if err := http.ListenAndServe(addr, handler); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func newHandler(client *http.Client, inventoryURL string) http.Handler {
+	lastKnown := map[string]stockLevel{}
+	var cacheMu sync.RWMutex
 	mux := http.NewServeMux()
-	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.HandleFunc("/api/stock/", func(w http.ResponseWriter, r *http.Request) {
@@ -68,8 +76,9 @@ func main() {
 
 		level, err := fetchStock(client, inventoryURL, sku)
 		if err != nil {
-			// The fallback: serve the last good answer and say so.
+			cacheMu.RLock()
 			cached, ok := lastKnown[sku]
+			cacheMu.RUnlock()
 			if !ok {
 				log.Printf(`{"level":"error","sku":%q,"msg":"inventory unavailable and no cached level","err":%q}`, sku, err)
 				http.Error(w, `{"error":"inventory unavailable"}`, http.StatusServiceUnavailable)
@@ -86,7 +95,9 @@ func main() {
 			return
 		}
 
+		cacheMu.Lock()
 		lastKnown[sku] = level
+		cacheMu.Unlock()
 		writeJSON(w, stockResponse{
 			SKU:       level.SKU,
 			Available: level.Available,
@@ -95,11 +106,7 @@ func main() {
 			Source:    "inventory",
 		})
 	})
-
-	log.Printf("storefront listening on %s, inventory at %s", addr, inventoryURL)
-	if err := http.ListenAndServe(addr, mux); err != nil {
-		log.Fatal(err)
-	}
+	return mux
 }
 
 // fetchStock asks inventory for one SKU.

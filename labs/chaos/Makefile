@@ -1,4 +1,4 @@
-.PHONY: build capture mock mock-chaos mock-chaos-record mock-flaky web verify-mock verify baseline chaos-evidence clean
+.PHONY: build capture coverage mock mock-chaos mock-chaos-record mock-flaky mock-slow web verify-mock verify baseline chaos-evidence slow-evidence clean
 
 PROXYMOCK ?= proxymock
 RECORDING_DIR ?= proxymock/recording
@@ -13,6 +13,7 @@ SKUS ?= SSC-4110 SSC-4111 SSC-5200 SSC-5201 SSC-6100 SSC-7300
 CHAOS_SCOPE ?= (url CONTAINS "/v1/inventory")
 CHAOS_RULE ?= $(CHAOS_SCOPE): status=503,percent=100
 CHAOS_RULE_FLAKY ?= $(CHAOS_SCOPE): status=503,percent=50,seed=lab
+CHAOS_RULE_SLOW ?= $(CHAOS_SCOPE): latency=2s
 
 build:
 	mkdir -p bin
@@ -22,6 +23,12 @@ build:
 # Record one ordinary session with inventory healthy. Nothing rare happens.
 capture: build
 	RECORDING_DIR="$(RECORDING_DIR)" PROXYMOCK="$(PROXYMOCK)" ./scripts/capture.sh
+
+# Show line coverage for the HTTP client before running the behavioral failure case.
+coverage:
+	mkdir -p scratch
+	go test -coverprofile=scratch/coverage.out ./cmd/app
+	go tool cover -func=scratch/coverage.out | grep -E 'fetchStock|total:'
 
 # Serve the recorded inventory and run the storefront against it, untouched.
 mock: build
@@ -38,6 +45,11 @@ mock-chaos: build
 mock-flaky: build
 	$(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --no-out \
 		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE_FLAKY)' -- ./bin/app
+
+# Delay only inventory responses to test the storefront's latency budget.
+mock-slow: build
+	$(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --no-out \
+		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE_SLOW)' -- ./bin/app
 
 # Same as mock-chaos but WRITES the observed pairs, because proxymock web
 # reads them off disk. --no-out elsewhere keeps repeat runs from piling up
@@ -71,6 +83,11 @@ chaos-evidence: verify-mock
 	@curl --silent --show-error --proxy http://127.0.0.1:4140 --dump-header - \
 		"http://localhost:8090/v1/inventory/SSC-4110" \
 		| grep -E '^HTTP|^X-Speedscale-Chaos|^\{'
+
+# Measure one app response while its inventory dependency is slow.
+slow-evidence: verify-mock
+	@curl --silent --show-error --output /dev/null --write-out 'http=%{http_code} elapsed=%{time_total}s\n' \
+		"$(APP_URL)/api/stock/SSC-4110"
 
 verify: verify-mock baseline
 

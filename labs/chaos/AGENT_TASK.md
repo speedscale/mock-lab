@@ -4,8 +4,8 @@ Work in the `chaos` directory of your `mock-lab` clone. Do not edit the
 application until step 6.
 
 1. Run `make coverage`. Report the package statement coverage and `fetchStock`
-   function coverage. Read the tests and name the dependency behavior they do
-   not assert.
+   function coverage. Read the tests, list each dependency outcome they assert,
+   and say which realistic dependency failures they leave unchecked.
 
 2. Run `make capture`. Confirm the recording holds 6 inbound stock lookups and
    6 outbound inventory calls, and that **every** recorded inventory response
@@ -48,7 +48,7 @@ application until step 6.
    a harness-bound result, not the app's capacity.
 
 10. Re-run `make mock` with no chaos and confirm the six baseline answers are
-   byte-identical to step 2 of the README. A fix that changes the healthy path
+   byte-identical to the answers you recorded in step 3. A fix that changes the healthy path
    is out of scope.
 
 ## Constraints

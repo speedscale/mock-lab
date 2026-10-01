@@ -7,7 +7,7 @@ on:
     # real to find. category-totals returns 500, which this suite correctly
     # fails on, so running CI there is permanent red noise. Neither branch is
     # ever merged. To see the contrast the demo is about, run
-    # ./lab/tests/run_tests.sh locally: it passes on stats-project-count while
+    # ./shared/tests/run_tests.sh locally: it passes on stats-project-count while
     # the endpoint answers a wrong total, and fails on category-totals.
     branches-ignore:
       - stats-project-count
@@ -86,7 +86,7 @@ jobs:
           set -euo pipefail
 
           # 1. reference downstream (static CNCF API) on :8090
-          (cd lab/server && go run .) >/tmp/server.log 2>&1 &
+          (cd shared/server && go run .) >/tmp/server.log 2>&1 &
           for i in $(seq 1 30); do curl -sf localhost:8090/healthz >/dev/null && break; sleep 1; done
 
           # 2. the demo app, pointed at it
@@ -95,5 +95,5 @@ jobs:
 
           # 3. drive the whole API (read endpoints + oauth/order flow); the script
           #    asserts 24 projects and that the auth flow returns a token + order.
-          DELAY=0 PORT=8080 ./lab/tests/run_tests.sh
+          DELAY=0 PORT=8080 ./shared/tests/run_tests.sh
           echo "${{ matrix.lang }} app OK"

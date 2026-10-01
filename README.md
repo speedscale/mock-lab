@@ -1,57 +1,66 @@
 # mock-lab
 
-Demo apps for the [proxymock](https://docs.speedscale.com/proxymock/) quickstart — the same
-small app in ten languages. Each one calls a CNCF projects API as its downstream; proxymock
-records that call, then mocks it so the app runs and tests with **no network**.
+Runnable apps and exercises for learning [proxymock](https://docs.speedscale.com/proxymock/). Fork this repository to change an app, record its traffic, and test your changes by replaying that traffic.
 
-This repo also holds [other labs](labs/) and the [agent tutorial app](tutorial/), and is the
-fixture for the [proxymock agent skills](https://github.com/speedscale/skills) that reuse the same recordings.
+## Start with a small app
 
-Recorded traffic gives coding agents real API examples to inspect, and replaying it exposes assumptions the code got wrong. See [how runtime feedback improves AI coding](AI-CONTEXT.md).
+Pick a language. Each app runs on port 8080 and calls the same CNCF projects API. Its README walks through running, recording, mocking, and replaying it. Each app includes a complete proxymock workspace for trying the recorded examples offline.
 
-```mermaid
-flowchart LR
-    clients["curl, tests, replay"] --> app["Demo app :8080"] --> api["CNCF projects API"]
+| Language | Example |
+| --- | --- |
+| Go | [languages/go](languages/go/README.md) |
+| Node.js | [languages/node](languages/node/README.md) |
+| Python | [languages/python](languages/python/README.md) |
+| Java | [languages/java](languages/java/README.md) |
+| Kotlin | [languages/kotlin](languages/kotlin/README.md) |
+| Ruby | [languages/ruby](languages/ruby/README.md) |
+| .NET | [languages/dotnet](languages/dotnet/README.md) |
+| C++ | [languages/cpp](languages/cpp/README.md) |
+| PHP | [languages/php](languages/php/README.md) |
+| Rust | [languages/rust](languages/rust/README.md) |
+
+Go is a good starting point. Fork this repo on GitHub, clone your fork, and enter the app directory:
+
+```shell
+git clone https://github.com/<your-user>/mock-lab.git
+cd mock-lab/languages/go
+proxymock record -- go run .
 ```
 
-## Try it in GitHub Codespaces
+Install proxymock and run `proxymock init --api-key <key>` first. Get a free key at [app.speedscale.com/signup](https://app.speedscale.com/signup). Follow the Go README for sending traffic and replaying it. Start your editor or coding agent in the app directory; new recordings and results stay in that app's `proxymock/` workspace.
+
+### GitHub Codespaces
 
 [![Open in GitHub Codespaces](.github/codespaces-badge.svg)](https://codespaces.new/speedscale/mock-lab)
 
-One click — all ten runtimes and the `proxymock` CLI are preinstalled. Run
-`proxymock init --api-key <key>` once to activate it (free key at
-[app.speedscale.com/signup](https://app.speedscale.com/signup)).
+The runtimes and proxymock CLI are preinstalled. Activate proxymock with your API key, then enter `languages/go` or another language directory. To work in your own fork, create a Codespace from that fork.
 
-## Pick a language
+## Work through the agent tutorial
 
-Each app listens on `:8080` (`PORT`) and calls the downstream at `DOWNSTREAM_URL`
-(default `https://demo-api.trafficreplay.com`). How to run, record, mock, and
-replay is in that language's README. Java, Kotlin, and Node need extra proxy
-setup; the README for that language says how.
+The [tutorial app](tutorial/README.md) is a CNCF swag shop with an HTTP dependency and Postgres. Go, Java, Python, and Node implementations let an agent record traffic, tune mocks and tests, and run regression and performance tests. Start with the tutorial README for prerequisites and database setup.
 
-- [Go](languages/go/README.md)
-- [Node.js](languages/node/README.md)
-- [Python](languages/python/README.md)
-- [Java](languages/java/README.md)
-- [Kotlin](languages/kotlin/README.md)
-- [Ruby](languages/ruby/README.md)
-- [.NET](languages/dotnet/README.md)
-- [C++](languages/cpp/README.md)
-- [PHP](languages/php/README.md)
-- [Rust](languages/rust/README.md)
+## Try a specific lab
 
-## Projects and orders
+The [lab catalog](labs/README.md) has exercises for profiles, metrics, traces, logs, network policy, eBPF instrumentation, chaos, and contract testing. Each lab has its own setup and working directory.
 
-Every language serves the same two kinds of calls. **Project** calls list and look up CNCF projects. **Order** calls mint a token, create an order for a project, and read that order back. The token and the order id are new on every call.
+## Shared tools and recordings
 
-The downstream contract is [`lab/openapi.yaml`](lab/openapi.yaml). A shared recording in [`lab/proxymock/`](lab/proxymock/) includes the smart-replace blueprint that re-chains those two ids, so you can mock and replay offline against any language. Each language directory also keeps its own capture under `proxymock/recording`.
+The [shared tools](shared/README.md) provide a reference downstream API, a dashboard, and a traffic driver for the language apps. Their downstream contract is [shared/openapi.yaml](shared/openapi.yaml).
 
-## Where to go next
+The root [proxymock workspace](proxymock/README.md) holds the reusable baseline recording, app contract, smart-replace blueprint, and schema-coverage test configuration. Run its examples from the repository root. The language workspaces hold captures from their own runtimes.
 
-| You want | Go here |
-| --- | --- |
-| Run, record, mock, or replay one language | that language's README, above |
-| Drive the calls from a script or a page | [`lab/`](lab/README.md) — `lab/tests/run_tests.sh` and the dashboard |
-| Companion scenarios (profiles, traces, logs, chaos) | [`labs/`](labs/) |
-| The agent tutorial app | [`tutorial/`](tutorial/) |
-| Agent skills | [github.com/speedscale/skills](https://github.com/speedscale/skills). They still use `lab/proxymock/recording`. See [`skills/README.md`](skills/README.md). |
+## Agent skills
+
+Install the [Speedscale agent skills](https://github.com/speedscale/skills) into your agent:
+
+```shell
+npx skills add speedscale/skills
+```
+
+The skills' proof scripts use this repository's root recording:
+
+```shell
+MOCK_LAB_DIR="$PWD" /path/to/skills/skills/quality-loop/scripts/prove-quality-loop.sh
+```
+
+See [how runtime feedback improves AI coding](AI-CONTEXT.md) for using recordings as context and replay as a check on code changes.

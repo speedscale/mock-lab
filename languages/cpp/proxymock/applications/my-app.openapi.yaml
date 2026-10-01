@@ -1,0 +1,184 @@
+openapi: 3.0.3
+info:
+  title: mock-lab app API
+  version: "1.0.0"
+  description: Inbound API served by each language implementation in mock-lab.
+servers:
+  - url: http://localhost:8080
+paths:
+  /:
+    get:
+      summary: Service information
+      responses:
+        "200":
+          description: Service information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service: {type: string}
+                  downstream: {type: string}
+                  lang: {type: string}
+                  ts: {type: string}
+  /api/projects:
+    get:
+      summary: List CNCF projects
+      responses:
+        "200":
+          description: Projects
+          content:
+            application/json:
+              schema:
+                type: array
+                items: {$ref: "#/components/schemas/Project"}
+        "502": {$ref: "#/components/responses/DownstreamError"}
+  /api/projects/{id}:
+    get:
+      summary: Get a CNCF project
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Project
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Project"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "502": {$ref: "#/components/responses/DownstreamError"}
+  /api/categories:
+    get:
+      summary: List project categories
+      responses:
+        "200":
+          description: Categories
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name: {type: string}
+                    count: {type: integer}
+        "502": {$ref: "#/components/responses/DownstreamError"}
+  /api/stats:
+    get:
+      summary: Project counts by maturity
+      responses:
+        "200":
+          description: Counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total: {type: integer}
+                  by_maturity:
+                    type: object
+                    additionalProperties: {type: integer}
+        "502": {$ref: "#/components/responses/DownstreamError"}
+  /oauth/token:
+    post:
+      summary: Issue a temporary bearer token
+      responses:
+        "200":
+          description: Token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  access_token: {type: string}
+                  token_type: {type: string}
+                  expires_in: {type: integer}
+  /api/orders:
+    post:
+      summary: Create an order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [project]
+              properties:
+                project: {type: string}
+      responses:
+        "201":
+          description: Created order
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Order"}
+        "400": {$ref: "#/components/responses/BadRequest"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+        "502": {$ref: "#/components/responses/DownstreamError"}
+  /api/orders/{order_id}:
+    get:
+      summary: Get an order
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Order
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Order"}
+        "401": {$ref: "#/components/responses/Unauthorized"}
+        "404": {$ref: "#/components/responses/NotFound"}
+components:
+  schemas:
+    Project:
+      type: object
+      properties:
+        id: {type: string}
+        name: {type: string}
+        maturity: {type: string}
+        category: {type: string}
+        subcategory: {type: string}
+        description: {type: string}
+        repo: {type: string}
+        stars: {type: integer}
+        license: {type: string}
+        accepted: {type: string}
+        website: {type: string}
+    Order:
+      type: object
+      properties:
+        order_id: {type: string}
+        project: {type: string}
+        status: {type: string}
+        created: {type: string}
+    Error:
+      type: object
+      properties:
+        error: {type: string}
+        project: {type: string}
+  responses:
+    BadRequest:
+      description: Missing project
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    Unauthorized:
+      description: Missing or invalid token
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    NotFound:
+      description: Missing project or order
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}
+    DownstreamError:
+      description: Downstream request failed
+      content:
+        application/json:
+          schema: {$ref: "#/components/schemas/Error"}

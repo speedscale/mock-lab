@@ -8,9 +8,9 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/catalog-api .
 FROM golang:1.23.12-alpine3.22 AS fixture-build
 
 WORKDIR /src
-COPY lab/server/go.mod ./go.mod
-COPY lab/server/main.go ./main.go
-COPY lab/server/data ./data
+COPY shared/server/go.mod ./go.mod
+COPY shared/server/main.go ./main.go
+COPY shared/server/data ./data
 RUN CGO_ENABLED=0 go build -trimpath -ldflags='-s -w' -o /out/catalog-fixture .
 
 FROM scratch

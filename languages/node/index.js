@@ -40,6 +40,7 @@ const proxy = async (res, path) => {
 const server = http.createServer(async (req, res) => {
   const p = req.url;
   const m = req.method;
+  res.on("finish", () => console.log(`${m} ${p} -> ${res.statusCode}`));
   try {
     if (m === "POST" && p === "/oauth/token") {
       const token = randId("", 32);

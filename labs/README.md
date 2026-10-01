@@ -10,6 +10,7 @@ Companion scenarios. Each directory has its own README and is independent of the
 | [loki](loki/README.md) | a rare retry path that never fails the response contract — evidence is only in the logs |
 | [hubble](hubble/README.md) | a request timeout caused by a Cilium network policy, not the application |
 | [obi](obi/README.md) | eBPF instrumentation of an opaque service with no OpenTelemetry SDK |
+| [contract-testing](contract-testing/README.md) | Compare a deliberately invalid vendor capture with the clean baseline using an OpenAPI contract |
 | [chaos](chaos/README.md) | a scoped chaos rule that forces the storefront's unused inventory-fallback path to run |
 
-The shared CNCF fixture (`server/`, recordings, OpenAPI spec) stays in [`lab/`](../lab/), one level up.
+The reference API and traffic tools live in [shared/](../shared/README.md). The reusable baseline lives in the root [proxymock workspace](../proxymock/README.md).

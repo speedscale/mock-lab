@@ -8,7 +8,7 @@ info:
     CloudFront — deterministic, a frozen snapshot of the CNCF landscape. The
     beacon routes (/v1/track, /v1/feed, /v1/job/status, /v1/time, /v1/orders,
     /v1/auth/token, /v1/me) are served only by the live lab reference server
-    (lab/server); they are hit by the apps' opt-in telemetry beacon
+    (shared/server); they are hit by the apps' opt-in telemetry beacon
     (EMIT_TELEMETRY=1) and are intentionally non-deterministic — each exercises a
     distinct rotating-value pattern for the mock match-rate tuning demo.
 servers:

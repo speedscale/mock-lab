@@ -1,38 +1,68 @@
-# generated static export (rendered from lab/server/data, synced to S3)
-/lab/static/
+# generated static export (rendered from shared/server/data, synced to S3)
+/shared/static/
 # scratch proxymock recordings from `proxymock record` in a language dir --
-# the committed per-language recording/ is the exception, everything else
+# committed recordings and workspace documents are exceptions; everything else
 # (recorded-*, mocked-*, replayed-*, results/, .replay/) stays ignored
 /languages/go/proxymock/*
 !/languages/go/proxymock/recording/
+!/languages/go/proxymock/applications/
+!/languages/go/proxymock/blueprints/
+!/languages/go/proxymock/testconfigs/
 /languages/node/proxymock/*
 !/languages/node/proxymock/recording/
+!/languages/node/proxymock/applications/
+!/languages/node/proxymock/blueprints/
+!/languages/node/proxymock/testconfigs/
 /languages/python/proxymock/*
 !/languages/python/proxymock/recording/
+!/languages/python/proxymock/applications/
+!/languages/python/proxymock/blueprints/
+!/languages/python/proxymock/testconfigs/
 /languages/java/proxymock/*
 !/languages/java/proxymock/recording/
+!/languages/java/proxymock/applications/
+!/languages/java/proxymock/blueprints/
+!/languages/java/proxymock/testconfigs/
 /languages/ruby/proxymock/*
 !/languages/ruby/proxymock/recording/
+!/languages/ruby/proxymock/applications/
+!/languages/ruby/proxymock/blueprints/
+!/languages/ruby/proxymock/testconfigs/
 /languages/dotnet/proxymock/*
 !/languages/dotnet/proxymock/recording/
+!/languages/dotnet/proxymock/applications/
+!/languages/dotnet/proxymock/blueprints/
+!/languages/dotnet/proxymock/testconfigs/
 /languages/cpp/proxymock/*
 !/languages/cpp/proxymock/recording/
+!/languages/cpp/proxymock/applications/
+!/languages/cpp/proxymock/blueprints/
+!/languages/cpp/proxymock/testconfigs/
 /languages/php/proxymock/*
 !/languages/php/proxymock/recording/
+!/languages/php/proxymock/applications/
+!/languages/php/proxymock/blueprints/
+!/languages/php/proxymock/testconfigs/
 /languages/kotlin/proxymock/*
 !/languages/kotlin/proxymock/recording/
+!/languages/kotlin/proxymock/applications/
+!/languages/kotlin/proxymock/blueprints/
+!/languages/kotlin/proxymock/testconfigs/
 /languages/kotlin/*.jar
 /languages/kotlin/*.class
 /languages/rust/proxymock/*
 !/languages/rust/proxymock/recording/
+!/languages/rust/proxymock/applications/
+!/languages/rust/proxymock/blueprints/
+!/languages/rust/proxymock/testconfigs/
 /languages/rust/target/
 # scratch proxymock writes inside the committed per-language recordings
 /languages/*/proxymock/recording/.replay/
 /languages/*/proxymock/recording/*/.replay/
-# scratch proxymock writes into the committed shared workspace (lab/proxymock/)
-/lab/proxymock/results/
-/lab/proxymock/recording/.replay/
-/lab/proxymock/recording/localhost/.replay/
+# scratch proxymock writes into the committed root workspace
+/proxymock/results/
+/proxymock/recording/.replay/
+/proxymock/recording/localhost/.replay/
 # companion labs under labs/ -- per-lab scratch proxymock output and binaries
 /labs/pyroscope/proxymock/recording/
 /labs/pyroscope/proxymock/results/
@@ -66,8 +96,12 @@ __pycache__/
 /languages/dotnet/obj/
 node_modules/
 /languages/go/go
-/lab/server/server
-/lab/dashboard/dashboard
+/shared/server/server
+/shared/dashboard/dashboard
 /languages/cpp/app
 
 .claude/worktrees
+
+/labs/contract-testing/proxymock/results/
+/labs/contract-testing/proxymock/recording/.replay/
+/labs/contract-testing/proxymock/recording/*/.replay/

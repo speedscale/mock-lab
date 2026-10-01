@@ -4,9 +4,9 @@
 # records this, so you can view it in `proxymock web` and replay it.
 #
 # Run from the repo root:
-#   ./lab/tests/run_tests.sh                # hit the app directly on :8080 (set PORT to change)
-#   ./lab/tests/run_tests.sh --recording    # hit proxymock's inbound proxy on :4143
-#   DELAY=0 ./lab/tests/run_tests.sh        # no pause between calls (CI); DELAY defaults to 1s
+#   ./shared/tests/run_tests.sh                # hit the app directly on :8080 (set PORT to change)
+#   ./shared/tests/run_tests.sh --recording    # hit proxymock's inbound proxy on :4143
+#   DELAY=0 ./shared/tests/run_tests.sh        # no pause between calls (CI); DELAY defaults to 1s
 set -euo pipefail
 
 PORT="${PORT:-8080}"

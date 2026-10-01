@@ -33,6 +33,6 @@ to trust proxymock's TLS. Without that, the downstream call fails verification o
 
 ## Auth flow (two moving IDs)
 
-This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. The dashboard in step 2 drives this flow too — set the endpoint switch to Record, then click through the calls. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see the [root README](../../README.md#auth-handshake--the-two-moving-ids) and [`../../lab/proxymock/`](../../lab/proxymock/) for the ready-to-run recording + blueprint.
+This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. The dashboard in step 2 drives this flow too — set the endpoint switch to Record, then click through the calls. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see [`../../lab/proxymock/`](../../lab/proxymock/) for the ready-to-run recording + blueprint.
 
 Endpoints and the API contract: see the [root README](../../README.md) and [`openapi.yaml`](../../lab/openapi.yaml).

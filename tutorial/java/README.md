@@ -2,11 +2,10 @@
 
 The Java port of the proxymock getting-started shop: Spring Boot, JDBC and the JDK HTTP client.
 
-Prerequisites: JDK 21+ and Docker. Run every command below from `tutorial/java`.
+Prerequisites: JDK 21+ and `tutorial-db` for Postgres (see [Start the database](../README.md#start-the-database)). Run every command below from `tutorial/java`.
 
 ```sh
-# Start Postgres (from tutorial/)
-(cd .. && docker compose up -d)
+# Start Postgres first, in its own terminal: see ../README.md#start-the-database
 
 # Build (writes target/tutorial-orders.jar)
 ./mvnw -q package
@@ -24,7 +23,7 @@ java -jar target/tutorial-orders.jar
 Record it with proxymock, then drive traffic at proxymock's inbound port:
 
 ```sh
-DATABASE_URL=postgres://tutorial:tutorial@localhost:15432/tutorial?sslmode=disable proxymock record --map 15432=postgres://localhost:5432 -- java -jar target/tutorial-orders.jar
+DATABASE_URL=postgres://tutorial:tutorial@localhost:15432/tutorial?sslmode=disable proxymock record --map 15432=postgres://localhost:54329 -- java -jar target/tutorial-orders.jar
 ./mvnw -q compile exec:java -Dexec.args="http://localhost:4143"
 ```
 

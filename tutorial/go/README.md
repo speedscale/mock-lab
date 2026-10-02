@@ -5,15 +5,15 @@ The Go port of the proxymock getting-started service: a small CNCF swag shop bac
 ## Prerequisites
 
 * Go 1.25 or newer
-* Docker, for Postgres
+* `tutorial-db` for Postgres: see [Start the database](../README.md#start-the-database)
 * [proxymock](https://docs.speedscale.com/proxymock/) for the recording step
 
 ## Run it
 
-Start Postgres, from the `tutorial/` directory:
+Start the database in its own terminal, from the `tutorial/` directory (it runs until Ctrl-C):
 
 ```sh
-docker compose up -d
+go -C db run .
 ```
 
 Run the app, from `tutorial/go/`:
@@ -39,7 +39,7 @@ Configuration is by environment variables, listed in [`../contract/SPEC.md`](../
 ## Record it with proxymock
 
 ```sh
-DATABASE_URL=postgres://tutorial:tutorial@localhost:15432/tutorial?sslmode=disable proxymock record --map 15432=postgres://localhost:5432 -- go run .
+DATABASE_URL=postgres://tutorial:tutorial@localhost:15432/tutorial?sslmode=disable proxymock record --map 15432=postgres://localhost:54329 -- go run .
 ```
 
 Then, in a second terminal:

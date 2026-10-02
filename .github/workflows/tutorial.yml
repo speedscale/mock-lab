@@ -2,9 +2,9 @@ name: Tutorial app
 
 # The agent tutorial app (tutorial/) ships in four languages that must behave
 # the same. Each job audits the port's dependencies, runs its unit tests,
-# starts it against Postgres and the bundled reference downstream
-# (shared/server), drives the shared traffic sequence through it, and builds its
-# image. With an API key it also records the port under proxymock and checks
+# starts it against Postgres (from tutorial-db, as readers run it) and the
+# bundled reference downstream (shared/server), drives the shared traffic
+# sequence through it, and builds its image. With an API key it also records the port under proxymock and checks
 # the recording's shape against the Go reference.
 on:
   push:
@@ -29,22 +29,8 @@ jobs:
       fail-fast: false
       matrix:
         lang: [go, java, python, node]
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: tutorial
-          POSTGRES_PASSWORD: tutorial
-          POSTGRES_DB: tutorial
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U tutorial -d tutorial"
-          --health-interval 2s
-          --health-timeout 3s
-          --health-retries 30
     env:
-      DATABASE_URL: postgres://tutorial:tutorial@localhost:5432/tutorial?sslmode=disable
+      DATABASE_URL: postgres://tutorial:tutorial@localhost:54329/tutorial?sslmode=disable
       PORT: "8080"
     defaults:
       run:
@@ -52,17 +38,23 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Load schema
-      working-directory: tutorial
-      run: PGPASSWORD=tutorial psql -h localhost -U tutorial -d tutorial -v ON_ERROR_STOP=1 -f contract/schema.sql
-
-    # Go is always needed for the reference downstream in shared/server.
+    # Go is always needed for tutorial-db and the reference downstream in shared/server.
     - uses: actions/setup-go@v5
       with:
         go-version: "1.26"
         cache-dependency-path: |
           shared/server/go.sum
+          tutorial/db/go.sum
           tutorial/go/go.sum
+
+    - name: Start tutorial-db
+      working-directory: tutorial
+      run: |
+        set -euo pipefail
+        nohup go -C db run . > /tmp/tutorial-db.log 2>&1 &
+        for i in $(seq 1 120); do grep -q "ready on" /tmp/tutorial-db.log && break; sleep 1; done
+        cat /tmp/tutorial-db.log
+        grep -q "ready on localhost:54329" /tmp/tutorial-db.log
     - if: matrix.lang == 'java'
       uses: actions/setup-java@v4
       with:
@@ -163,7 +155,7 @@ jobs:
           node)   run="node server.js" ;;
         esac
         DATABASE_URL="postgres://tutorial:tutorial@localhost:15432/tutorial?sslmode=disable" \
-          nohup proxymock record --app-port 8080 --map 15432=postgres://localhost:5432 --out "$RUNNER_TEMP/rec" -- $run > record.log 2>&1 &
+          nohup proxymock record --app-port 8080 --map 15432=postgres://localhost:54329 --out "$RUNNER_TEMP/rec" -- $run > record.log 2>&1 &
         pm=$!
         # Probe the app directly and only open a socket to proxymock's inbound
         # port: a request through it would be recorded and break the shape.

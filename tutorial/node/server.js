@@ -8,7 +8,7 @@ const port = process.env.PORT || '8080'
 const version = process.env.APP_VERSION || 'v1'
 const slow = process.env.APP_SLOW === '1'
 const databaseUrl =
-  process.env.DATABASE_URL || 'postgres://tutorial:tutorial@localhost:5432/tutorial?sslmode=disable'
+  process.env.DATABASE_URL || 'postgres://tutorial:tutorial@localhost:54329/tutorial?sslmode=disable'
 const demoApiUrl = (process.env.DEMO_API_URL || 'https://demo-api.trafficreplay.com').replace(/\/+$/, '')
 
 installProxyDispatcher()

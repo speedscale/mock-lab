@@ -13,7 +13,7 @@ class DataSourceConfig {
 
     @Bean(destroyMethod = "close")
     DataSource dataSource(
-            @Value("${DATABASE_URL:postgres://tutorial:tutorial@localhost:5432/tutorial?sslmode=disable}") String url) {
+            @Value("${DATABASE_URL:postgres://tutorial:tutorial@localhost:54329/tutorial?sslmode=disable}") String url) {
         DatabaseUrl parsed = DatabaseUrl.parse(url);
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(parsed.jdbcUrl());

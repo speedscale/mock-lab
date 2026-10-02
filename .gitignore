@@ -105,3 +105,8 @@ node_modules/
 /labs/contract-testing/proxymock/results/
 /labs/contract-testing/proxymock/recording/.replay/
 /labs/contract-testing/proxymock/recording/*/.replay/
+
+# tutorial-db: its data and downloaded Postgres, and a downloaded helper binary
+/tutorial/.tutorial-db/
+/tutorial/tutorial-db
+/tutorial/tutorial-db.exe

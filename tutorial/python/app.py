@@ -274,7 +274,7 @@ def create_app(db=None, upstream=None, version: str | None = None, slow: bool | 
     async def lifespan(app: FastAPI):
         if app.state.db is None:
             app.state.db = Database(
-                os.environ.get("DATABASE_URL", "postgres://tutorial:tutorial@localhost:5432/tutorial?sslmode=disable")
+                os.environ.get("DATABASE_URL", "postgres://tutorial:tutorial@localhost:54329/tutorial?sslmode=disable")
             )
         if app.state.upstream is None:
             app.state.upstream = Upstream(os.environ.get("DEMO_API_URL", "https://demo-api.trafficreplay.com"))

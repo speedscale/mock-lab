@@ -13,7 +13,7 @@ A small CNCF swag shop. Customers order stickers and shirts of CNCF projects. Th
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PORT` | `8080` | HTTP listen port |
-| `DATABASE_URL` | `postgres://tutorial:tutorial@localhost:5432/tutorial?sslmode=disable` | Postgres URL, always in this `postgres://` form in every language (Java converts it to JDBC itself) |
+| `DATABASE_URL` | `postgres://tutorial:tutorial@localhost:54329/tutorial?sslmode=disable` | Postgres URL, always in this `postgres://` form in every language (Java converts it to JDBC itself) |
 | `DEMO_API_URL` | `https://demo-api.trafficreplay.com` | Base URL of the CNCF projects API, no trailing slash |
 | `APP_VERSION` | `v1` | `v2` turns on the planted regression |
 | `APP_SLOW` | `0` | `1` turns on the planted N+1 query |
@@ -29,7 +29,7 @@ proxymock starts the app with `http_proxy`/`https_proxy` (lowercase) pointing at
 * Python: `httpx` with `trust_env=True` (the default) reads the proxy variables. Pass `verify=` an `ssl.SSLContext` that loads the system defaults plus `SSL_CERT_FILE` when that variable is set.
 * Node: global `fetch` ignores proxy variables. When `https_proxy`/`HTTPS_PROXY` is set, install an `undici` `EnvHttpProxyAgent` as the global dispatcher and make outbound calls with `undici`'s own `fetch`. When `SSL_CERT_FILE` is set, pass `[...tls.rootCertificates, <that CA>]` as `ca` in `connect`, `requestTls` and `proxyTls`: for an HTTPS request through the proxy, undici verifies the target with `requestTls`, not `connect`.
 
-Postgres is recorded through `proxymock record --map <port>=postgres://localhost:5432` with `DATABASE_URL` pointed at the mapped port, so the database driver needs nothing special.
+Postgres runs from `tutorial-db` (see `db/`) on port 54329. It is recorded through `proxymock record --map <port>=postgres://localhost:54329` with `DATABASE_URL` pointed at the mapped port, so the database driver needs nothing special.
 
 ## Database access rules
 

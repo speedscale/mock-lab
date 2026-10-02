@@ -1,0 +1,96 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-02T00:29:27.739484Z",
+  "l7protocol": "http",
+  "duration": 1,
+  "elapsed": "0.000171s",
+  "tags": {
+    "captureMode": "proxy",
+    "decoded": "true",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "in",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "undefined",
+    "reverseProxyHost": "localhost",
+    "reverseProxyPort": "63407",
+    "sequence": "136",
+    "source": "goproxy"
+  },
+  "uuid": "JBVswHnnSiqR3jkjMVSIeA==",
+  "direction": "IN",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "POST",
+  "location": "/orders",
+  "status": "400",
+  "dlpModified": true,
+  "dlpRule": "orders-local",
+  "http": {
+    "req": {
+      "url": "/orders",
+      "uri": "/orders",
+      "version": "1.1",
+      "method": "POST",
+      "host": "localhost:63407",
+      "headers": {
+        "Accept-Encoding": [
+          "gzip"
+        ],
+        "Authorization": [
+          "Bearer ${{secret:runtime/TUTORIAL_AUTH_TOKEN}}"
+        ],
+        "Content-Length": [
+          "2"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Host": [
+          "localhost:63407"
+        ],
+        "User-Agent": [
+          "Go-http-client/1.1"
+        ]
+      },
+      "bodyBase64": "e30="
+    },
+    "res": {
+      "contentType": "application/json",
+      "statusCode": 400,
+      "statusMessage": "400 Bad Request",
+      "headers": {
+        "Content-Length": [
+          "32"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 02 Oct 2026 00:29:27 GMT"
+        ]
+      },
+      "bodyBase64": "eyJlcnJvciI6ImN1c3RvbWVyIGlzIHJlcXVpcmVkIn0="
+    }
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-02T00:29:27.709739Z",
+    "downstream": {
+      "established": "2026-10-02T00:29:27.708566Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63458,
+      "bytesSent": "1981"
+    },
+    "upstream": {
+      "established": "2026-10-02T00:29:27.709118Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63407,
+      "hostname": "localhost",
+      "bytesSent": "2840"
+    },
+    "direction": "INGRESS"
+  }
+}

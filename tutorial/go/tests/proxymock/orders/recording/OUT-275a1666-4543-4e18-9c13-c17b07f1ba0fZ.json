@@ -1,0 +1,76 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-02T00:29:27.723998Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000012s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "84",
+    "dbName": "tutorial",
+    "dbUser": "tutorial",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "undefined",
+    "sequence": "26",
+    "source": "goproxy"
+  },
+  "uuid": "J1oWZkVDThicE8F7B/G6Dw==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Describe Portal",
+  "location": "INSERT INTO order_items (order_id, project_id, name, quantity, unit_price_cents) VALUES ($1 :: uuid, $2, $3, $4, $5)",
+  "status": "OK",
+  "dlpModified": false,
+  "dlpRule": "orders-local",
+  "postgres": {
+    "request": {
+      "describe": {
+        "objectType": "OBJECT_TYPE_PORTAL",
+        "parseRequest": {
+          "query": "INSERT INTO order_items (order_id, project_id, name, quantity, unit_price_cents) VALUES ($1::uuid, $2, $3, $4, $5)",
+          "describedParameterOids": [
+            2950,
+            25,
+            25,
+            23,
+            23
+          ]
+        }
+      }
+    },
+    "response": {
+      "describe": {
+        "messages": [
+          {
+            "noData": {}
+          }
+        ]
+      }
+    }
+  },
+  "netinfo": {
+    "id": "3",
+    "startTime": "2026-10-02T00:29:27.719766Z",
+    "downstream": {
+      "established": "2026-10-02T00:29:27.712504Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63462,
+      "bytesSent": "508"
+    },
+    "upstream": {
+      "established": "2026-10-02T00:29:27.712663Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63410,
+      "hostname": "localhost",
+      "bytesSent": "204"
+    },
+    "direction": "EGRESS"
+  }
+}

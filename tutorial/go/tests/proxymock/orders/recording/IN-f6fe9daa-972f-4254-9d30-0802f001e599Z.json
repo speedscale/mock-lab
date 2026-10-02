@@ -1,0 +1,96 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-02T00:29:27.729286Z",
+  "l7protocol": "http",
+  "duration": 4,
+  "elapsed": "0.004141s",
+  "tags": {
+    "captureMode": "proxy",
+    "decoded": "true",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "in",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "undefined",
+    "reverseProxyHost": "localhost",
+    "reverseProxyPort": "63407",
+    "sequence": "84",
+    "source": "goproxy"
+  },
+  "uuid": "9v6dqpcvQlSdMAgC8AHlmQ==",
+  "direction": "IN",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "POST",
+  "location": "/orders",
+  "status": "201",
+  "dlpModified": true,
+  "dlpRule": "orders-local",
+  "http": {
+    "req": {
+      "url": "/orders",
+      "uri": "/orders",
+      "version": "1.1",
+      "method": "POST",
+      "host": "localhost:63407",
+      "headers": {
+        "Accept-Encoding": [
+          "gzip"
+        ],
+        "Authorization": [
+          "Bearer ${{secret:runtime/TUTORIAL_AUTH_TOKEN}}"
+        ],
+        "Content-Length": [
+          "71"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Host": [
+          "localhost:63407"
+        ],
+        "User-Agent": [
+          "Go-http-client/1.1"
+        ]
+      },
+      "bodyBase64": "eyJjdXN0b21lciI6ImZpeHR1cmUtYm9iIiwiaXRlbXMiOlt7InByb2plY3RfaWQiOiJmbHV4IiwicXVhbnRpdHkiOjF9XX0="
+    },
+    "res": {
+      "contentType": "application/json",
+      "statusCode": 201,
+      "statusMessage": "201 Created",
+      "headers": {
+        "Content-Length": [
+          "270"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 02 Oct 2026 00:29:27 GMT"
+        ]
+      },
+      "bodyBase64": "eyJpZCI6ImI5NGQ3MjM2LWVjM2MtNWZiYS1iMzJhLTJlYjc3NDE3ODcyOCIsImN1c3RvbWVyIjoiZml4dHVyZS1ib2IiLCJzdGF0dXMiOiJwbGFjZWQiLCJpdGVtcyI6W3sicHJvamVjdF9pZCI6ImZsdXgiLCJuYW1lIjoiRmx1eCIsInF1YW50aXR5IjoxLCJ1bml0X3ByaWNlX2NlbnRzIjo4MDB9XSwidG90YWxfY2VudHMiOjgwMCwiY3JlYXRlZF9hdCI6IjIwMjYtMTAtMDJUMDA6Mjk6MjcuNzI5WiIsImdlbmVyYXRlZF9hdCI6IjIwMjYtMTAtMDFUMTI6MDA6MDAuMDAwWiJ9"
+    }
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-02T00:29:27.709739Z",
+    "downstream": {
+      "established": "2026-10-02T00:29:27.708566Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63458,
+      "bytesSent": "847"
+    },
+    "upstream": {
+      "established": "2026-10-02T00:29:27.709118Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63407,
+      "hostname": "localhost",
+      "bytesSent": "1179"
+    },
+    "direction": "INGRESS"
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-02T00:29:27.728058Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000017s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "84",
+    "dbName": "tutorial",
+    "dbUser": "tutorial",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "undefined",
+    "sequence": "47",
+    "source": "goproxy"
+  },
+  "uuid": "kNdgy4dXS82Qk5GI67sepA==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Describe Prepared Statement",
+  "location": "SELECT project_id, name, quantity, unit_price_cents FROM order_items WHERE order_id = $1 :: uuid ORDER BY id",
+  "status": "OK",
+  "dlpModified": false,
+  "dlpRule": "orders-local",
+  "postgres": {
+    "request": {
+      "describe": {
+        "objectType": "OBJECT_TYPE_PREPARED_STATEMENT",
+        "parseRequest": {
+          "query": "SELECT project_id, name, quantity, unit_price_cents FROM order_items WHERE order_id = $1::uuid ORDER BY id"
+        }
+      }
+    },
+    "response": {
+      "describe": {
+        "messages": [
+          {
+            "parameterDescription": {
+              "parameterOids": [
+                2950
+              ]
+            }
+          },
+          {
+            "rowDescription": {
+              "fields": [
+                {
+                  "name": "project_id",
+                  "tableOid": 16395,
+                  "tableAttributeNumber": 3,
+                  "dataTypeOid": 25,
+                  "dataTypeSize": 4294967295,
+                  "typeModifier": -1
+                },
+                {
+                  "name": "name",
+                  "tableOid": 16395,
+                  "tableAttributeNumber": 4,
+                  "dataTypeOid": 25,
+                  "dataTypeSize": 4294967295,
+                  "typeModifier": -1
+                },
+                {
+                  "name": "quantity",
+                  "tableOid": 16395,
+                  "tableAttributeNumber": 5,
+                  "dataTypeOid": 23,
+                  "dataTypeSize": 4,
+                  "typeModifier": -1
+                },
+                {
+                  "name": "unit_price_cents",
+                  "tableOid": 16395,
+                  "tableAttributeNumber": 6,
+                  "dataTypeOid": 23,
+                  "dataTypeSize": 4,
+                  "typeModifier": -1
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "netinfo": {
+    "id": "3",
+    "startTime": "2026-10-02T00:29:27.719766Z",
+    "downstream": {
+      "established": "2026-10-02T00:29:27.712504Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63462,
+      "bytesSent": "832"
+    },
+    "upstream": {
+      "established": "2026-10-02T00:29:27.712663Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63410,
+      "hostname": "localhost",
+      "bytesSent": "625"
+    },
+    "direction": "EGRESS"
+  }
+}

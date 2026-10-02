@@ -5,13 +5,17 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
+	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func env(key, def string) string {
@@ -40,13 +44,29 @@ func main() {
 	defer store.Close()
 
 	app := &App{
-		Store:    store,
-		Upstream: NewUpstream(apiURL),
-		Version:  version,
-		Slow:     slow,
-		Now:      time.Now,
+		AuthToken: os.Getenv("TUTORIAL_AUTH_TOKEN"),
+		Store:     store,
+		Upstream:  NewUpstream(apiURL),
+		Version:   version,
+		Slow:      slow,
+		Now:       time.Now,
 	}
 
+	app.Upstream.LatchFailures = os.Getenv("TUTORIAL_RECOVERY_DEFECT") == "1"
+
+	if seed := os.Getenv("TUTORIAL_ID_SEED"); seed != "" {
+		var sequence atomic.Uint64
+		app.NewID = func() string {
+			return uuid.NewSHA1(uuid.NameSpaceURL, []byte(fmt.Sprintf("%s/%d", seed, sequence.Add(1)))).String()
+		}
+	}
+	if clock := os.Getenv("TUTORIAL_CLOCK"); clock != "" {
+		fixed, err := time.Parse(time.RFC3339, clock)
+		if err != nil {
+			log.Fatal("invalid TUTORIAL_CLOCK")
+		}
+		app.Now = func() time.Time { return fixed }
+	}
 	srv := &http.Server{
 		Addr:              ":" + port,
 		Handler:           app.Routes(),

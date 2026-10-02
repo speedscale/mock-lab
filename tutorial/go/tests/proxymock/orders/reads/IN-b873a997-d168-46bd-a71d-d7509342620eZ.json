@@ -1,0 +1,91 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-02T00:29:27.733595Z",
+  "l7protocol": "http",
+  "duration": 3,
+  "elapsed": "0.003794s",
+  "tags": {
+    "captureMode": "proxy",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "in",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "undefined",
+    "reverseProxyHost": "localhost",
+    "reverseProxyPort": "63407",
+    "sequence": "54",
+    "source": "goproxy"
+  },
+  "uuid": "uHOpl9FoRr2nHddQk0JiDg==",
+  "direction": "IN",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "GET",
+  "location": "/orders/2cfa6a74-eace-5f52-8354-f048465c4cfe",
+  "status": "200",
+  "dlpModified": true,
+  "dlpRule": "orders-local",
+  "http": {
+    "req": {
+      "url": "/orders/2cfa6a74-eace-5f52-8354-f048465c4cfe",
+      "uri": "/orders/2cfa6a74-eace-5f52-8354-f048465c4cfe",
+      "version": "1.1",
+      "method": "GET",
+      "host": "localhost:63407",
+      "headers": {
+        "Accept-Encoding": [
+          "gzip"
+        ],
+        "Authorization": [
+          "Bearer ${{secret:runtime/TUTORIAL_AUTH_TOKEN}}"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Host": [
+          "localhost:63407"
+        ],
+        "User-Agent": [
+          "Go-http-client/1.1"
+        ]
+      }
+    },
+    "res": {
+      "contentType": "application/json",
+      "statusCode": 200,
+      "statusMessage": "200 OK",
+      "headers": {
+        "Content-Length": [
+          "286"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 02 Oct 2026 00:29:27 GMT"
+        ]
+      },
+      "bodyBase64": "eyJpZCI6IjJjZmE2YTc0LWVhY2UtNWY1Mi04MzU0LWYwNDg0NjVjNGNmZSIsImN1c3RvbWVyIjoiZml4dHVyZS1hbGljZSIsInN0YXR1cyI6InBsYWNlZCIsIml0ZW1zIjpbeyJwcm9qZWN0X2lkIjoia3ViZXJuZXRlcyIsIm5hbWUiOiJLdWJlcm5ldGVzIiwicXVhbnRpdHkiOjIsInVuaXRfcHJpY2VfY2VudHMiOjEyMDB9XSwidG90YWxfY2VudHMiOjI0MDAsImNyZWF0ZWRfYXQiOiIyMDI2LTEwLTAyVDAwOjI5OjI3LjcxOVoiLCJnZW5lcmF0ZWRfYXQiOiIyMDI2LTEwLTAxVDEyOjAwOjAwLjAwMFoifQ=="
+    }
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-02T00:29:27.709739Z",
+    "downstream": {
+      "established": "2026-10-02T00:29:27.708566Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63458,
+      "bytesSent": "549"
+    },
+    "upstream": {
+      "established": "2026-10-02T00:29:27.709118Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63407,
+      "hostname": "localhost",
+      "bytesSent": "795"
+    },
+    "direction": "INGRESS"
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "version": 3,
+  "generator": {
+    "stages": [
+      {
+        "virtualUsers": {
+          "virtualUsers": "1",
+          "requestDelay": {}
+        }
+      }
+    ]
+  },
+  "rules": [
+    {
+      "metricName": "passAssertPct",
+      "type": "TOO_LOW",
+      "value": 100,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "p95Latency",
+      "value": 250,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "transactionsPerSecond",
+      "type": "TOO_LOW",
+      "value": 1,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "failTransactionCount",
+      "value": 0,
+      "action": "ALERT"
+    }
+  ],
+  "assertionGroups": [
+    {
+      "configs": [
+        {
+          "type": "httpStatusCode"
+        },
+        {
+          "type": "httpResponseBody",
+          "config": {
+            "ignore": "generated_at,created_at"
+          }
+        }
+      ]
+    }
+  ],
+  "id": "budgets"
+}

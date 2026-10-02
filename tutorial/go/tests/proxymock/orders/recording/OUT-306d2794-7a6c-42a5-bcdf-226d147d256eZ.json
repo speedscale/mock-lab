@@ -1,0 +1,94 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-02T00:29:27.729480Z",
+  "l7protocol": "http",
+  "duration": 1,
+  "elapsed": "0.000170s",
+  "tags": {
+    "captureMode": "proxy",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "undefined",
+    "sequence": "57",
+    "source": "goproxy"
+  },
+  "uuid": "MG0nlHpsQqW83yJtFH0lbg==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "GET",
+  "location": "/v1/project/flux",
+  "status": "200",
+  "dlpModified": false,
+  "dlpRule": "orders-local",
+  "http": {
+    "req": {
+      "url": "/v1/project/flux",
+      "uri": "/v1/project/flux?ts=1790900967729",
+      "version": "1.1",
+      "method": "GET",
+      "host": "127.0.0.1:63412",
+      "headers": {
+        "Accept": [
+          "application/json"
+        ],
+        "Accept-Encoding": [
+          "gzip"
+        ],
+        "Host": [
+          "127.0.0.1:63412"
+        ],
+        "User-Agent": [
+          "tutorial-orders/1"
+        ],
+        "X-Request-Id": [
+          "7a67cd88-7d81-4d41-a5b9-46c8a9022ee2"
+        ]
+      },
+      "queryParams": {
+        "ts": [
+          "1790900967729"
+        ]
+      }
+    },
+    "res": {
+      "contentType": "application/json",
+      "statusCode": 200,
+      "statusMessage": "200 OK",
+      "headers": {
+        "Content-Length": [
+          "52"
+        ],
+        "Content-Type": [
+          "application/json"
+        ],
+        "Date": [
+          "Fri, 02 Oct 2026 00:29:27 GMT"
+        ]
+      },
+      "bodyBase64": "eyJpZCI6ImZsdXgiLCJuYW1lIjoiRmx1eCIsIm1hdHVyaXR5IjoiSW5jdWJhdGluZyJ9Cg=="
+    }
+  },
+  "netinfo": {
+    "id": "2",
+    "startTime": "2026-10-02T00:29:27.710689Z",
+    "downstream": {
+      "established": "2026-10-02T00:29:27.710437Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63460,
+      "bytesSent": "416"
+    },
+    "upstream": {
+      "established": "2026-10-02T00:29:27.710595Z",
+      "ipAddress": "127.0.0.1",
+      "port": 63412,
+      "hostname": "127.0.0.1",
+      "bytesSent": "331"
+    },
+    "direction": "EGRESS"
+  }
+}

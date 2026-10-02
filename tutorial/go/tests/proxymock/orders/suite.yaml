@@ -1,0 +1,62 @@
+formatVersion: 1
+id: orders
+requires: [suite-v1]
+assets:
+  - {id: traffic, kind: recording, path: tests/proxymock/orders/recording, provenance: owned local capture with supplemental coverage}
+  - {id: original, kind: recording, path: tests/proxymock/orders/original, provenance: first four create/read requests}
+  - {id: reads, kind: recording, path: tests/proxymock/orders/reads, provenance: two distinct accepted order rows}
+  - {id: failure, kind: recording, path: tests/proxymock/orders/chaos, provenance: SPEC catalog unavailable behavior}
+  - {id: recovery, kind: recording, path: tests/proxymock/orders/recovery, provenance: accepted healthy catalog response}
+  - {id: checks, kind: testConfig, path: tests/proxymock/orders/checks.json, provenance: SPEC prices and recorded approved fixtures}
+  - {id: budgets, kind: testConfig, path: tests/proxymock/orders/budgets.json, provenance: proposed local app against mocks budgets}
+  - {id: contract, kind: schema, path: tests/proxymock/orders/openapi.yaml, provenance: base OpenAPI plus optional auth contract}
+  - {id: faults, kind: fault, path: tests/proxymock/orders/faults.json, provenance: deterministic catalog outage}
+  - {id: tuning, kind: fixture, path: tests/proxymock/orders/configuration, provenance: SQL reads keyed on order ID and volatile catalog timestamp ignored}
+app:
+  directory: .
+  start: [./.suite-bin/orders]
+  readiness: /healthz
+  build: orders-fixture-v1
+  env:
+    DATABASE_URL: "${route:db}/tutorial?sslmode=disable"
+    DEMO_API_URL: "${route:catalog}"
+    TUTORIAL_ID_SEED: orders-suite-v1
+    TUTORIAL_CLOCK: "2026-10-01T12:00:00Z"
+    APP_VERSION: v1
+    APP_SLOW: "0"
+  secretEnv:
+    TUTORIAL_AUTH_TOKEN: TUTORIAL_AUTH_TOKEN
+dependencies:
+  recording: traffic
+  configuration: [tuning]
+  timing: none
+  routes:
+    - {id: db, protocol: postgres, recorded: "127.0.0.1:63410", env: DATABASE_URL}
+    - {id: catalog, protocol: http, recorded: "127.0.0.1:63412", env: DEMO_API_URL}
+coverage:
+  schema: contract
+  original: original
+scenarios:
+  - {id: regression, kind: regression, required: true, recording: original, testConfig: checks, evidence: SPEC prices 2400 and 800 with distinct customer and order IDs}
+  - {id: contract, kind: contract, required: true, recording: traffic, schema: contract, evidence: accepted six-operation schema and optional auth 401}
+  - {id: load, kind: load, required: true, recording: reads, testConfig: budgets, evidence: proposed 250ms P95 and at least one response per second against mocks}
+  - {id: chaos, kind: chaos, required: true, recording: failure, testConfig: checks, fault: faults, recovery: recovery, evidence: SPEC catalog unavailable returns 502 then healthy catalog recovers}
+profiles:
+  dev:
+    scenarios: [regression, contract, load, chaos]
+    actors: 4
+    duration: 2s
+    maxRequests: 10000
+    timeout: 30s
+    recoveryDeadline: 10s
+  ci:
+    scenarios: [regression, contract, load, chaos]
+    actors: 8
+    duration: 2s
+    maxRequests: 20000
+    timeout: 30s
+    recoveryDeadline: 10s
+redaction:
+  revision: orders-local-v1
+  verified: true
+  forbiddenPatterns: [RAW_CANARY_, "Bearer [a-zA-Z0-9]"]

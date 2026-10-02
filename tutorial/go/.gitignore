@@ -2,5 +2,3 @@
 /traffic
 *.test
 *.out
-
-/proxymock/

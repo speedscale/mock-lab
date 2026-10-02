@@ -20,7 +20,7 @@ proxymock suite validate tests/proxymock/orders/suite.yaml
 proxymock suite explore tests/proxymock/orders/suite.yaml --profile dev
 ~~~
 
-Exploration deliberately exits 2 even when its cases pass. Review the response fixtures against SPEC.md, the optional-auth contract, SQL parameter keys, fault/recovery behavior and the proposed 250ms P95 / one response per second / zero-error budgets together. After review, a developer accepts that exact revision in a terminal:
+Exploration deliberately exits 2 even when its cases pass. Review the [candidate expectations](EXPECTATIONS.md), response fixtures, optional-auth contract, SQL parameter keys, fault/recovery behavior and proposed budgets together. After review, a developer accepts that exact revision in a terminal:
 
 ~~~sh
 proxymock suite accept tests/proxymock/orders/suite.yaml --reviewer developer

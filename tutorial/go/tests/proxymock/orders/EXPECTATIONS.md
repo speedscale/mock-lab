@@ -13,7 +13,7 @@ Review these expectations, native configs and proposed budgets through the norma
 | Empty order object | 400; customer is required | Contract validation order |
 | Invalid order ID | 404; order not found | Contract ID validation |
 | Catalog dependency returns 503 | App returns 502; catalog unavailable | Contract upstream error handling |
-| Fault window ends | Same app returns healthy catalog within 10 seconds | Candidate recovery deadline and healthy fixture |
+| Confirmed catalog outage | Same app returns healthy catalog and passes recovery assertions within 10 seconds of completing the outage replay, including the remaining fault window | Candidate recovery deadline and healthy fixture |
 
 Alice's recorded ID is 2cfa6a74-eace-5f52-8354-f048465c4cfe; Bob's is b94d7236-ec3c-5fba-b32a-2eb774178728. These are captured examples; the unchanged app generates fresh random IDs on creation. The native test config ignores id only for POST responses and generated_at/created_at for both methods. GET responses retain ID, customer, quantities, names, types and totals. Replaying the recorded reads checks distinct existing rows; it does not prove that a newly created ID is correlated through a complete new journey.
 

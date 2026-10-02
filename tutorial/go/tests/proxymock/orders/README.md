@@ -8,7 +8,7 @@ From `tutorial/go`, with Go, proxymock, curl and jq installed:
 bash tests/proxymock/orders/run.sh
 ```
 
-The fixture-specific CI recipe runs native regression assertions, schema validation, eight-actor load, a bounded catalog outage and healthy recovery on the same app. It preserves native failure exits and checks native measured mock matching and applied fault evidence. It saves separate original/generated/exercised coverage JSON and native verdicts/goals under ignored `proxymock/results/`. It does not define a new suite format or implement a scorer. No live database, catalog or AI provider is needed for reruns.
+The fixture-specific CI recipe runs native regression assertions, schema validation, eight-actor load, a bounded catalog outage and healthy recovery on the same app. It preserves native failure exits, scores measured mock matching for every replay, and checks applied fault evidence. Contract validation uses the scored regression responses. Fault probes wait for the actual outage; recovery polling and response assertions have a 10-second deadline measured from completion of the outage replay. This includes the remaining fault window. Native load thresholds reuse checks.json, keeping assertion groups in one config. Set `KEEP_RESULTS=1` to retain original/generated/exercised coverage JSON and native verdicts/goals under ignored `proxymock/results/`. Otherwise the recipe removes its result directory after printing diagnostics on failure. The built app and private input copy are always removed. It does not define a new suite format or implement a scorer. No live database, catalog or AI provider is needed for reruns.
 
 Review [candidate expectations](EXPECTATIONS.md), configs, schema and budgets through the normal repository review before enabling a CI baseline. The schema is referenced directly from the contract, not copied or weakened. POST assertions ignore the newly generated ID; GET assertions retain the recorded ID and complete business values. This checks recorded rows, not a new transaction's persistence. Authentication is outside the demo contract.
 
@@ -27,7 +27,7 @@ The existing type-regression plant must make the recipe fail:
 APP_VERSION=v2 PORT_BASE=18280 bash tests/proxymock/orders/run.sh
 ```
 
-For a latency-budget defect, use a separate local run with the native mock's `--chaos '(location REGEX "^/v1/projects"): latency=300ms,percent=100'`, then replay the healthy catalog request from recovery/ with budgets.json. This delays a dependency that the selected request actually calls. Keep the normal recipe unchanged. An inactive fault, missing mock data or absent native evidence must fail qualification, not establish a baseline. Resource limits, real-database behavior, broader faults and fresh-worker reliability are untested here.
+For a latency-budget defect, use a separate local run with the native mock's `--chaos '(location REGEX "^/v1/projects"): latency=300ms,percent=100'`, then replay the healthy catalog request from recovery/ with `--test-config tests/proxymock/orders/checks.json --fail-if 'latency.p95>250' --fail-if 'requests.per-second<1' --fail-if 'requests.failed>0'`. This delays a dependency that the selected request actually calls. Keep the normal recipe unchanged. An inactive fault, missing mock data or absent native evidence must fail qualification, not establish a baseline. Resource limits, real-database behavior, broader faults and fresh-worker reliability are untested here.
 
 ## Two prompts
 

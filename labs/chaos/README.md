@@ -4,14 +4,9 @@ The storefront answers `GET /api/stock/{sku}` by asking an inventory service
 how many units are on hand. If inventory is unavailable it falls back to the
 last good answer it saw and marks the response `degraded`.
 
-That fallback has never run. Nothing in the test suite makes inventory fail,
-and inventory does not fail on request. The code is written, reviewed, and
-merged, and whether it works is an open question that nobody has a cheap way
-to close.
+The tests exercise transport and decode errors, but none makes inventory return a non-2xx status with a valid body. That condition matters because the client currently accepts any parseable body, including one returned with a 503 status.
 
-This lab closes it in one command. A scoped chaos rule makes **inventory and
-only inventory** fail, every call, while the rest of the recording keeps
-answering normally. The fallback path runs on demand, every run.
+The failure takes one command to reproduce. A scoped chaos rule makes **inventory and only inventory** fail, every call, while the rest of the recording keeps answering normally. After the status bug is fixed, the fallback path can be rerun on demand.
 
 The sibling [Loki lab](../loki) tells the same kind of story from the other
 side: there, the rare dependency response had to be present in the traffic on
@@ -30,6 +25,14 @@ Run everything from this `chaos` directory of your `mock-lab` clone. The
 storefront binds `127.0.0.1:8080` and the inventory fixture `localhost:8090`,
 matching the neighboring labs; proxymock's health endpoint is on `4141` and
 its proxy on `4140`.
+
+## Coverage is not a behavior check
+
+Run `make coverage` before the chaos case. The current suite reports 77.6% statement coverage for the app package and 100.0% for `fetchStock`. It exercises successful JSON decoding, malformed JSON, and a transport error. It never checks an HTTP 503 that still carries valid JSON, so the client reports success and the fallback stays untested.
+
+The coverage report is accurate about the code the tests executed. The missing part is an assertion about the dependency status and the storefront contract. The exercise below makes that omission visible with a controlled 503.
+
+The full demo run of show is in [`DEMO-SCRIPT.md`](DEMO-SCRIPT.md).
 
 ## 1. Record one ordinary session
 
@@ -156,6 +159,19 @@ the storefront told its callers this data was current when its dependency was
 down.
 
 `AGENT_TASK.md` is the same exercise pointed at a coding agent.
+
+## 4b. Measure the slow dependency path
+
+The service requirement for this lab is that a stock lookup finishes within 750 ms when inventory stalls. Start `make mock-slow`, then run `make slow-evidence` in another terminal. The injected inventory response takes 2 seconds. The current 5-second client timeout lets it complete, which violates this demo service objective of 750 ms. The command reports the storefront's actual elapsed time. Ask the agent to set a suitable client timeout and verify the request returns before the 750 ms limit.
+
+After the timeout fix, test under recorded request load from a healthy mock with a p95 gate:
+
+```shell
+proxymock replay --in proxymock/recording --test-against http://127.0.0.1:8080 \
+  --vus 4 --for 10s --fail-if 'latency.p95>750' --fail-if 'requests.failed!=0'
+```
+
+Use the p95 check as a regression gate on the same runner. Local replay can be limited by the mock and traffic generator, so do not present its RPS as the service's capacity. For capacity numbers, run the generator away from the app and mock.
 
 ## 5. Prove the fix
 

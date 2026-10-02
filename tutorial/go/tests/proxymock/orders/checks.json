@@ -20,6 +20,37 @@
   ],
   "assertionGroups": [
     {
+      "filters": {
+        "filters": [
+          {
+            "include": true,
+            "operator": "EQUAL",
+            "command": "POST"
+          }
+        ]
+      },
+      "configs": [
+        {
+          "type": "httpStatusCode"
+        },
+        {
+          "type": "httpResponseBody",
+          "config": {
+            "ignore": "id,generated_at,created_at"
+          }
+        }
+      ]
+    },
+    {
+      "filters": {
+        "filters": [
+          {
+            "include": true,
+            "operator": "EQUAL",
+            "command": "GET"
+          }
+        ]
+      },
       "configs": [
         {
           "type": "httpStatusCode"

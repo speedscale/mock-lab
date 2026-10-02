@@ -1,3 +1,0 @@
-[
-  "(location REGEX \"^/v1/projects\"): status=503,percent=100,duration=4s,name=catalog-unavailable"
-]

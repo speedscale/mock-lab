@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
@@ -18,13 +17,11 @@ import (
 
 // App wires the handlers to their dependencies.
 type App struct {
-	NewID     func() string
-	AuthToken string
-	Store     Store
-	Upstream  *Upstream
-	Version   string
-	Slow      bool
-	Now       func() time.Time
+	Store    Store
+	Upstream *Upstream
+	Version  string
+	Slow     bool
+	Now      func() time.Time
 }
 
 // Routes returns the HTTP handler for the service.
@@ -39,16 +36,7 @@ func (a *App) Routes() http.Handler {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not found")
 	})
-	if a.AuthToken == "" {
-		return mux
-	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/healthz" && subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte("Bearer "+a.AuthToken)) != 1 {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-			return
-		}
-		mux.ServeHTTP(w, r)
-	})
+	return mux
 }
 
 // FormatTime renders a UTC RFC 3339 timestamp with exactly three fractional
@@ -266,9 +254,6 @@ func (a *App) createOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id := uuid.NewString()
-	if a.NewID != nil {
-		id = a.NewID()
-	}
 	createdAt, err := a.Store.CreateOrder(r.Context(), id, req.Customer, total, lines)
 	if err != nil {
 		a.internalError(w, "create order", err)

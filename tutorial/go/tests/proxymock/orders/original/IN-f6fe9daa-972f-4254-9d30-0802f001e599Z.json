@@ -39,9 +39,6 @@
         "Accept-Encoding": [
           "gzip"
         ],
-        "Authorization": [
-          "Bearer ${{secret:runtime/TUTORIAL_AUTH_TOKEN}}"
-        ],
         "Content-Length": [
           "71"
         ],

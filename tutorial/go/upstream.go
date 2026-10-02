@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,11 +43,9 @@ func PriceCents(maturity string) int {
 // Upstream is a client for the CNCF projects API. It uses the default
 // transport, so http_proxy/https_proxy and SSL_CERT_FILE apply.
 type Upstream struct {
-	LatchFailures bool
-	failed        atomic.Bool
-	base          string
-	client        *http.Client
-	now           func() time.Time
+	base   string
+	client *http.Client
+	now    func() time.Time
 }
 
 func NewUpstream(base string) *Upstream {
@@ -60,9 +57,6 @@ func NewUpstream(base string) *Upstream {
 }
 
 func (u *Upstream) get(ctx context.Context, path string, out any) error {
-	if u.LatchFailures && u.failed.Load() {
-		return errCatalogUnavailable
-	}
 	target := fmt.Sprintf("%s%s?ts=%d", u.base, path, u.now().UnixMilli())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
 	if err != nil {
@@ -83,9 +77,6 @@ func (u *Upstream) get(ctx context.Context, path string, out any) error {
 	case http.StatusNotFound:
 		return errUnknownProject
 	default:
-		if u.LatchFailures {
-			u.failed.Store(true)
-		}
 		return errCatalogUnavailable
 	}
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {

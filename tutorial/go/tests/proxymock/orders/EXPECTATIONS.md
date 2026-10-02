@@ -1,28 +1,24 @@
-# Candidate expectation review
+# Candidate expectations
 
-Review this set together before accepting suite.yaml. Pricing, validation, stored state and upstream error behavior come from the [behavior contract](../../../../contract/SPEC.md). The optional auth requirement and local performance budgets are fixture proposals requiring developer approval. The recording supplies concrete synthetic customers, project data and seeded IDs; it does not independently establish business rules.
+Review these expectations, native configs and proposed budgets through the normal repository review before using them as a CI baseline. Business behavior comes from the [existing contract](../../../../contract/SPEC.md); response shape comes from its [OpenAPI schema](../../../../contract/openapi.yaml). The recording contains synthetic customers and catalog examples. It does not independently establish business correctness.
 
-| Request | Expected response and behavior | Evidence |
+| Case | Expected behavior | Evidence |
 | --- | --- | --- |
-| POST /orders, fixture-alice, Kubernetes quantity 2 | 201; placed order; integer unit price 1200; integer total 2400 | Contract pricing and create-order behavior |
-| GET Alice's order | 200; Alice/Kubernetes/quantity 2/total 2400; matching seeded ID | Contract stored-order behavior and approved fixture |
-| POST /orders, fixture-bob, Flux quantity 1 | 201; placed order; integer unit price 800; integer total 800 | Contract pricing and create-order behavior |
-| GET Bob's order | 200; Bob/Flux/quantity 1/total 800; matching seeded ID | Contract stored-order behavior and approved fixture |
-| GET /catalog | 200; Kubernetes/Graduated/1200, Flux/Incubating/800, Sandbox/Sandbox/500 | Local catalog fixture and contract pricing |
-| GET Alice's order status | 200; Alice's ID and placed status | Contract status endpoint |
-| GET /orders | 200; both distinct orders with their correct customers and totals | Contract list endpoint and stored fixture data |
-| POST /orders with an empty object | 400; customer is required | Contract validation order |
-| GET /orders/not-a-uuid | 404; order not found | Contract ID validation |
-| GET /orders without a bearer token | 401; unauthorized | Proposed optional Go fixture auth contract |
-| GET /catalog while catalog returns 503 | 502; catalog unavailable | Contract upstream error behavior |
-| GET /catalog after the fault window | Healthy 200 catalog response within 10 seconds | Proposed recovery deadline plus healthy catalog fixture |
+| Create Alice's Kubernetes order, quantity 2 | 201; unit price 1200; integer total 2400 | Contract pricing and create behavior |
+| Read Alice's order | Alice/Kubernetes/quantity 2/total 2400 and recorded ID | Contract stored-order behavior plus fixture |
+| Create Bob's Flux order, quantity 1 | 201; unit price 800; integer total 800 | Contract pricing and create behavior |
+| Read Bob's order | Bob/Flux/quantity 1/total 800 and recorded ID | Contract stored-order behavior plus fixture |
+| Catalog | 200; recorded projects with contract prices | Fixture maturity and contract pricing |
+| Order status and listing | 200; correct recorded orders/status/totals | Contract and fixture data |
+| Empty order object | 400; customer is required | Contract validation order |
+| Invalid order ID | 404; order not found | Contract ID validation |
+| Catalog dependency returns 503 | App returns 502; catalog unavailable | Contract upstream error handling |
+| Fault window ends | Same app returns healthy catalog within 10 seconds | Candidate recovery deadline and healthy fixture |
 
-Alice's seeded ID is 2cfa6a74-eace-5f52-8354-f048465c4cfe; Bob's is b94d7236-ec3c-5fba-b32a-2eb774178728. These values preserve replay correlations under the fixture's fixed ID seed. Response comparison ignores only generated_at and created_at, while preserving IDs, customers, item quantities, names, types, ordering and totals. OpenAPI validates response types independently.
+Alice's recorded ID is 2cfa6a74-eace-5f52-8354-f048465c4cfe; Bob's is b94d7236-ec3c-5fba-b32a-2eb774178728. These are captured examples; the unchanged app generates fresh random IDs on creation. The native test config ignores id only for POST responses and generated_at/created_at for both methods. GET responses retain ID, customer, quantities, names, types and totals. Replaying the recorded reads checks distinct existing rows; it does not prove that a newly created ID is correlated through a complete new journey.
 
-Load uses the two reads in reverse order for two seconds, at four actors in dev and eight in ci. Every response retains business assertions. Proposed budgets are P95 at most 250ms, throughput at least one response per second and zero native transaction errors, with dependency timing disabled. These are local app-against-mocks budgets, not production SLOs or real database capacity. A native delivery shortfall or exceeded request ceiling is incomplete.
+Read blueprints key normalized SQL S3/S4/S7 on the order-ID parameter. Reversed reads and eight actors must still return the correct complete rows. Dynamic catalog ts and write/list parameters remain unkeyed. No live database is used for this replay, so transactional state and database capacity remain untested.
 
-Chaos changes only /v1/projects catalog calls to 503 at 100% for four seconds. It must show the selected rule, matched requests and changed downstream status, then the accepted app 502 and a healthy recovery response after removal. A matching rule without an observed effect cannot qualify.
+Candidate local budgets are P95 <= 250ms, throughput >= 1 response/second and zero native transaction failures, with response assertions retained and dependency timing disabled. These are app-against-mocks thresholds requiring review, not production SLOs. The unchanged APP_VERSION=v2 plant must fail body assertions and schema validation. A delayed native mock must fail the latency budget. Inactive faults or missing mocks must not be reported as a successful chaos/correctness test.
 
-SQL read blueprints use the normalized recorded statement location and order-ID parameters. They must return Bob's row for Bob and Alice's row for Alice regardless of arrival order. Qualification asserts complete bodies with eight actors and no missing mocks or passthrough.
-
-Acceptance covers the complete manifest, schema, recordings, SQL tuning, faults and budgets. Changing an input or editing while reviewing requires a new revision confirmation. The checked-in suite is a candidate; no developer acceptance or release qualification is implied by local exploration results.
+Original input covers 2 of the schema's 6 operations; expanded input covers 5. Exercise the additions and validate actual responses before reporting passed coverage. Generated, exercised and passed remain separate report claims backed by native artifacts. Authentication is outside this demo's existing contract.

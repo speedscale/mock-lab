@@ -8,6 +8,14 @@ From `tutorial/go`, with Go, proxymock, curl and jq installed:
 bash tests/proxymock/orders/run.sh
 ```
 
+For CI and agent runs, retain the native evidence explicitly:
+
+```sh
+KEEP_RESULTS=1 bash tests/proxymock/orders/run.sh
+```
+
+Configure your CI artifact step to upload `tutorial/go/proxymock/results/scenarios-*` on both success and failure (path from the repository root). This retains coverage JSON, scores, verdicts and logs; the built app and private input copy are still removed. Plain local runs clean up their output by default.
+
 The fixture-specific CI recipe runs native regression assertions, schema validation, eight-actor load, a bounded catalog outage and healthy recovery on the same app. It preserves native failure exits, scores measured mock matching for every replay, and checks applied fault evidence. Contract validation uses the scored regression responses. Fault probes wait for the actual outage; recovery polling and response assertions have a 10-second deadline measured from completion of the outage replay. This includes the remaining fault window. Native load thresholds reuse checks.json, keeping assertion groups in one config. Set `KEEP_RESULTS=1` to retain original/generated/exercised coverage JSON and native verdicts/goals under ignored `proxymock/results/`. Otherwise the recipe removes its result directory after printing diagnostics on failure. The built app and private input copy are always removed. It does not define a new suite format or implement a scorer. No live database, catalog or AI provider is needed for reruns.
 
 Review [candidate expectations](EXPECTATIONS.md), configs, schema and budgets through the normal repository review before enabling a CI baseline. The schema is referenced directly from the contract, not copied or weakened. POST assertions ignore the newly generated ID; GET assertions retain the recorded ID and complete business values. This checks recorded rows, not a new transaction's persistence. Authentication is outside the demo contract.

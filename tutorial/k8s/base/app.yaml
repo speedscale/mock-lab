@@ -1,0 +1,55 @@
+# The orders service. Each language overlay sets the image. The planted
+# switches are environment variables the tutorial flips in place:
+#   kubectl -n tutorial set env deployment/tutorial-orders APP_VERSION=v2
+#   kubectl -n tutorial set env deployment/tutorial-orders APP_SLOW=1
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tutorial-orders
+  labels:
+    app: tutorial-orders
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tutorial-orders
+  template:
+    metadata:
+      labels:
+        app: tutorial-orders
+    spec:
+      containers:
+        - name: tutorial-orders
+          image: tutorial-orders
+          env:
+            - name: PORT
+              value: "8080"
+            - name: DATABASE_URL
+              value: postgres://tutorial:tutorial@postgres:5432/tutorial?sslmode=disable
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 2
+            failureThreshold: 60
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tutorial-orders
+  labels:
+    app: tutorial-orders
+spec:
+  selector:
+    app: tutorial-orders
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

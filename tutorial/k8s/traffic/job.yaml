@@ -1,0 +1,26 @@
+# Sends the tutorial traffic once from inside the cluster.
+#   kubectl create -f tutorial/k8s/traffic/job.yaml
+#   kubectl -n tutorial logs -f job/<name printed by create>
+# Each create makes a new Job (generateName), so it can be run again.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: tutorial-traffic-
+  namespace: tutorial
+spec:
+  backoffLimit: 0
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: Never
+      # A just-ready pod can take a moment to join the Service. Wait for the
+      # port with a TCP connect only: an HTTP probe would add a request to a
+      # recording of this traffic.
+      initContainers:
+        - name: wait-for-app
+          image: busybox:1.36
+          command: ["sh", "-c", "until nc -z -w 2 tutorial-orders 8080; do sleep 1; done"]
+      containers:
+        - name: traffic
+          image: ghcr.io/speedscale/mock-lab-tutorial-traffic:latest
+          args: ["http://tutorial-orders:8080"]

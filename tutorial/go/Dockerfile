@@ -4,7 +4,10 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/tutorial-orders .
+# Keep the symbol table: Speedscale's eBPF capture (nettap) finds Go's
+# network and TLS functions by name, so a stripped (-s -w) binary is invisible
+# to it in the cluster tutorial.
+RUN CGO_ENABLED=0 go build -trimpath -o /out/tutorial-orders .
 
 FROM alpine:3.22
 RUN apk add --no-cache ca-certificates \

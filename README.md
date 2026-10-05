@@ -19,21 +19,20 @@ Pick a language. Each app runs on port 8080 and calls the same CNCF projects API
 | PHP | [languages/php](languages/php/README.md) |
 | Rust | [languages/rust](languages/rust/README.md) |
 
-Go is a good starting point. Fork this repo on GitHub, clone your fork, and enter the app directory:
+Start with the [Node recording-to-scenarios walkthrough](languages/node/SCENARIOS.md), which needs only Node and proxymock. Fork this repo on GitHub, clone your fork, and enter the app directory:
 
 ```shell
 git clone https://github.com/<your-user>/mock-lab.git
-cd mock-lab/languages/go
-proxymock record -- go run .
+cd mock-lab/languages/node
 ```
 
-Install proxymock and run `proxymock init --api-key <key>` first. Get a free key at [app.speedscale.com/signup](https://app.speedscale.com/signup). Follow the Go README for sending traffic and replaying it. Start your editor or coding agent in the app directory; new recordings and results stay in that app's `proxymock/` workspace.
+Install proxymock and run `proxymock init --api-key <key>` first. Get a free key at [app.speedscale.com/signup](https://app.speedscale.com/signup). Follow the Node walkthrough for proxy setup, a small capture and regression, contract, load and chaos scenarios. Start your editor or coding agent in the app directory; new recordings and results stay in that app's `proxymock/` workspace.
 
 ### GitHub Codespaces
 
 [![Open in GitHub Codespaces](.github/codespaces-badge.svg)](https://codespaces.new/speedscale/mock-lab)
 
-The runtimes and proxymock CLI are preinstalled. Activate proxymock with your API key, then enter `languages/go` or another language directory. To work in your own fork, create a Codespace from that fork.
+The runtimes and proxymock CLI are preinstalled. Activate proxymock with your API key, then enter `languages/node` or another language directory. To work in your own fork, create a Codespace from that fork.
 
 ## Work through the agent tutorial
 

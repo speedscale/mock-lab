@@ -55,6 +55,7 @@ It listens on `localhost:54329` with user, password and database all `tutorial`,
 * [contract/openapi.yaml](contract/openapi.yaml): the API.
 * [contract/schema.sql](contract/schema.sql): the database schema, loaded by `tutorial-db`.
 * [db/](db/): `tutorial-db`, the Postgres runner.
+* [k8s/](k8s/): manifests for running the app and its Postgres in Kubernetes, for the cluster version of the tutorial.
 * [contract/traffic.json](contract/traffic.json): the request sequence each language's traffic driver sends (135 requests).
 * [conformance/](conformance/): checks that a port's recording has the same shape as the Go reference.
 

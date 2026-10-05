@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+images:
+  - name: tutorial-orders
+    newName: ghcr.io/speedscale/mock-lab-tutorial-java
+    newTag: latest
+# The JVM needs more memory than the other ports.
+patches:
+  - target:
+      kind: Deployment
+      name: tutorial-orders
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 384Mi

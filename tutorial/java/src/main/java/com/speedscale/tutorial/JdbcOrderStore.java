@@ -25,7 +25,7 @@ public class JdbcOrderStore implements OrderStore {
     // S5 list recent orders (APP_SLOW=1 only)
     static final String S5 = "SELECT id, customer, status, total_cents, created_at FROM orders WHERE created_at > ?::timestamptz ORDER BY created_at DESC LIMIT 50";
     // S6 list recent orders with item counts (default)
-    static final String S6 = "SELECT o.id, o.customer, o.status, o.total_cents, o.created_at, COUNT(i.id) AS item_count FROM orders o LEFT JOIN order_items i ON i.order_id = o.id WHERE o.created_at > ?::timestamptz GROUP BY o.id ORDER BY o.created_at DESC LIMIT 50";
+    static final String S6 = "SELECT o.id, o.customer, o.status, o.total_cents, o.created_at, (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count FROM orders o WHERE o.created_at > ?::timestamptz ORDER BY o.created_at DESC LIMIT 50";
     // S7 order status
     static final String S7 = "SELECT status FROM orders WHERE id = ?::uuid";
 

@@ -53,7 +53,7 @@ SELECT project_id, name, quantity, unit_price_cents FROM order_items WHERE order
 -- S5 list recent orders (APP_SLOW=1 only)
 SELECT id, customer, status, total_cents, created_at FROM orders WHERE created_at > $1::timestamptz ORDER BY created_at DESC LIMIT 50
 -- S6 list recent orders with item counts (default)
-SELECT o.id, o.customer, o.status, o.total_cents, o.created_at, COUNT(i.id) AS item_count FROM orders o LEFT JOIN order_items i ON i.order_id = o.id WHERE o.created_at > $1::timestamptz GROUP BY o.id ORDER BY o.created_at DESC LIMIT 50
+SELECT o.id, o.customer, o.status, o.total_cents, o.created_at, (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count FROM orders o WHERE o.created_at > $1::timestamptz ORDER BY o.created_at DESC LIMIT 50
 -- S7 order status
 SELECT status FROM orders WHERE id = $1::uuid
 ```
@@ -122,7 +122,7 @@ Same UUID and not-found handling as above, using S7. Response `200 {"id":"...","
 
 Recent orders: the cutoff is the current time minus one hour, computed in the app and passed as the `$1` parameter.
 
-* Default: run S6.
+* Default: run S6. It takes the 50 newest orders first and only then counts their items, so it costs the same however many orders the table holds.
 * `APP_SLOW=1`: run S5, then S4 once per returned order, and use the number of rows as `item_count`.
 
 Response `200`:

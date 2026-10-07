@@ -1,0 +1,113 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-07T17:55:33.487451Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000192s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "75",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1155",
+    "sequence": "49",
+    "source": "goproxy"
+  },
+  "uuid": "AXPtI0CaQMinRu9Gu62L6g==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Bind Statement Parameters",
+  "location": "SELECT product_id, quantity, price :: float8 FROM order_items WHERE order_id = $1 ORDER BY product_id",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "bind": {
+        "preparedStatement": "stmtcache_6ce89676d196438f352e495ab60ff519602b1867214b59fd",
+        "parameterFormatCodes": [
+          1
+        ],
+        "parameters": [
+          {
+            "asString": "\u0000\u0000\u0000\u0001"
+          }
+        ],
+        "resultFormatCodes": [
+          1,
+          1,
+          1
+        ],
+        "parseRequest": {
+          "name": "stmtcache_6ce89676d196438f352e495ab60ff519602b1867214b59fd",
+          "query": "SELECT product_id, quantity, price::float8 FROM order_items WHERE order_id = $1 ORDER BY product_id /*db_driver='pgx',route='%2Forders%2F%7Bid%7D',traceparent='00-d979de778a6818b9a73efb43ca0ff4f7-65f9e66ad73c9606-01'*/",
+          "describedParameterOids": [
+            23
+          ],
+          "describedRow": {
+            "fields": [
+              {
+                "name": "product_id",
+                "tableOid": 16406,
+                "tableAttributeNumber": 2,
+                "dataTypeOid": 23,
+                "dataTypeSize": 4,
+                "typeModifier": -1
+              },
+              {
+                "name": "quantity",
+                "tableOid": 16406,
+                "tableAttributeNumber": 3,
+                "dataTypeOid": 23,
+                "dataTypeSize": 4,
+                "typeModifier": -1
+              },
+              {
+                "name": "price",
+                "dataTypeOid": 701,
+                "dataTypeSize": 8,
+                "typeModifier": -1
+              }
+            ]
+          }
+        }
+      }
+    },
+    "response": {
+      "bind": {
+        "complete": {}
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "QmluZCBTdGF0ZW1lbnQgUGFyYW1ldGVycw==",
+    "postgres:portal": "",
+    "postgres:query": "U0VMRUNUIHByb2R1Y3RfaWQsIHF1YW50aXR5LCBwcmljZSA6OiBmbG9hdDggRlJPTSBvcmRlcl9pdGVtcyBXSEVSRSBvcmRlcl9pZCA9ICQxIE9SREVSIEJZIHByb2R1Y3RfaWQ=",
+    "postgres:query_name": "c3RtdGNhY2hlXzZjZTg5Njc2ZDE5NjQzOGYzNTJlNDk1YWI2MGZmNTE5NjAyYjE4NjcyMTRiNTlmZA=="
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-07T17:55:31.928436Z",
+    "downstream": {
+      "established": "2026-10-07T17:55:31.922973Z",
+      "ipAddress": "127.0.0.1",
+      "port": 53280,
+      "bytesSent": "2740"
+    },
+    "upstream": {
+      "established": "2026-10-07T17:55:31.923500Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "1080"
+    },
+    "direction": "EGRESS"
+  }
+}

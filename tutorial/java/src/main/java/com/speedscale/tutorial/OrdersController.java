@@ -1,7 +1,5 @@
 package com.speedscale.tutorial;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
@@ -10,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -61,12 +60,8 @@ public class OrdersController {
     }
 
     static ResponseEntity<byte[]> jsonResponse(ObjectMapper mapper, int status, Object body) {
-        try {
-            return ResponseEntity.status(HttpStatusCode.valueOf(status))
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(mapper.writeValueAsString(body).getBytes(StandardCharsets.UTF_8));
-        } catch (JsonProcessingException e) {
-            throw new IllegalStateException(e);
-        }
+        return ResponseEntity.status(HttpStatusCode.valueOf(status))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(mapper.writeValueAsString(body).getBytes(StandardCharsets.UTF_8));
     }
 }

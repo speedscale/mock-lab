@@ -1,0 +1,122 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-07T17:55:31.929193Z",
+  "l7protocol": "postgres",
+  "duration": 9,
+  "elapsed": "0.009697s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "75",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1155",
+    "sequence": "5",
+    "source": "goproxy"
+  },
+  "uuid": "i9uud91cRE+OgQOZRUBdpQ==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Query",
+  "location": "CREATE TABLE IF NOT EXISTS products (id serial PRIMARY KEY, name text NOT NULL UNIQUE, price numeric(10, 2) NOT NULL, stock int NOT NULL); CREATE TABLE IF NOT EXISTS orders (id serial PRIMARY KEY, customer text NOT NULL, total numeric(10, 2) NOT NULL, created_at timestamptz NOT NULL DEFAULT now()); CREATE TABLE IF NOT EXISTS order_items (order_id int NOT NULL REFERENCES orders(id) ON DELETE CASCADE, product_id int NOT NULL REFERENCES products(id), quantity int NOT NULL CHECK (quantity > 0), price numeric(10, 2) NOT NULL, PRIMARY KEY (order_id, product_id)); INSERT INTO products (name, price, stock) VALUES ('Espresso beans 1kg', 24.50, 1000), ('Pour-over kettle', 59.00, 1000), ('Ceramic dripper', 18.75, 1000), ('Paper filters (100)', 6.25, 1000), ('Burr grinder', 129.00, 1000) ON CONFLICT (name) DO NOTHING; INSERT INTO orders (id, customer, total) VALUES (1, 'ada@example.com', 49.00) ON CONFLICT (id) DO NOTHING; INSERT INTO order_items (order_id, product_id, quantity, price) VALUES (1, 1, 2, 24.50) ON CONFLICT DO NOTHING; SELECT setval('orders_id_seq', greatest((SELECT max(id) FROM orders), 1));",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "query": {
+        "query": "\nCREATE TABLE IF NOT EXISTS products (\n\tid    serial PRIMARY KEY,\n\tname  text NOT NULL UNIQUE,\n\tprice numeric(10,2) NOT NULL,\n\tstock int NOT NULL\n);\nCREATE TABLE IF NOT EXISTS orders (\n\tid         serial PRIMARY KEY,\n\tcustomer   text NOT NULL,\n\ttotal      numeric(10,2) NOT NULL,\n\tcreated_at timestamptz NOT NULL DEFAULT now()\n);\nCREATE TABLE IF NOT EXISTS order_items (\n\torder_id   int NOT NULL REFERENCES orders(id) ON DELETE CASCADE,\n\tproduct_id int NOT NULL REFERENCES products(id),\n\tquantity   int NOT NULL CHECK (quantity > 0),\n\tprice      numeric(10,2) NOT NULL,\n\tPRIMARY KEY (order_id, product_id)\n);\nINSERT INTO products (name, price, stock) VALUES\n\t('Espresso beans 1kg', 24.50, 1000),\n\t('Pour-over kettle', 59.00, 1000),\n\t('Ceramic dripper', 18.75, 1000),\n\t('Paper filters (100)', 6.25, 1000),\n\t('Burr grinder', 129.00, 1000)\nON CONFLICT (name) DO NOTHING;\nINSERT INTO orders (id, customer, total) VALUES (1, 'ada@example.com', 49.00)\nON CONFLICT (id) DO NOTHING;\nINSERT INTO order_items (order_id, product_id, quantity, price) VALUES (1, 1, 2, 24.50)\nON CONFLICT DO NOTHING;\nSELECT setval('orders_id_seq', greatest((SELECT max(id) FROM orders), 1));"
+      }
+    },
+    "response": {
+      "query": {
+        "messages": [
+          {
+            "complete": {
+              "tag": "CREATE TABLE"
+            }
+          },
+          {
+            "complete": {
+              "tag": "CREATE TABLE"
+            }
+          },
+          {
+            "complete": {
+              "tag": "CREATE TABLE"
+            }
+          },
+          {
+            "complete": {
+              "tag": "INSERT 0 5"
+            }
+          },
+          {
+            "complete": {
+              "tag": "INSERT 0 1"
+            }
+          },
+          {
+            "complete": {
+              "tag": "INSERT 0 1"
+            }
+          },
+          {
+            "rowDescription": {
+              "fields": [
+                {
+                  "name": "setval",
+                  "dataTypeOid": 20,
+                  "dataTypeSize": 8,
+                  "typeModifier": -1
+                }
+              ]
+            }
+          },
+          {
+            "dataRow": {
+              "values": [
+                {
+                  "asString": "1"
+                }
+              ]
+            }
+          },
+          {
+            "complete": {
+              "tag": "SELECT 1"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "UXVlcnk=",
+    "postgres:query": "Q1JFQVRFIFRBQkxFIElGIE5PVCBFWElTVFMgcHJvZHVjdHMgKCBpZCBzZXJpYWwgUFJJTUFSWSBLRVksIG5hbWUgdGV4dCBOT1QgTlVMTCBVTklRVUUsIHByaWNlIG51bWVyaWMgKCAxMCwgMiApIE5PVCBOVUxMLCBzdG9jayBpbnQgTk9UIE5VTEwgKTsgQ1JFQVRFIFRBQkxFIElGIE5PVCBFWElTVFMgb3JkZXJzICggaWQgc2VyaWFsIFBSSU1BUlkgS0VZLCBjdXN0b21lciB0ZXh0IE5PVCBOVUxMLCB0b3RhbCBudW1lcmljICggMTAsIDIgKSBOT1QgTlVMTCwgY3JlYXRlZF9hdCB0aW1lc3RhbXB0eiBOT1QgTlVMTCBERUZBVUxUIG5vdyAoICkgKTsgQ1JFQVRFIFRBQkxFIElGIE5PVCBFWElTVFMgb3JkZXJfaXRlbXMgKCBvcmRlcl9pZCBpbnQgTk9UIE5VTEwgUkVGRVJFTkNFUyBvcmRlcnMgKCBpZCApIE9OIERFTEVURSBDQVNDQURFLCBwcm9kdWN0X2lkIGludCBOT1QgTlVMTCBSRUZFUkVOQ0VTIHByb2R1Y3RzICggaWQgKSwgcXVhbnRpdHkgaW50IE5PVCBOVUxMIENIRUNLICggcXVhbnRpdHkgPiAwICksIHByaWNlIG51bWVyaWMgKCAxMCwgMiApIE5PVCBOVUxMLCBQUklNQVJZIEtFWSAoIG9yZGVyX2lkLCBwcm9kdWN0X2lkICkgKTsgSU5TRVJUIElOVE8gcHJvZHVjdHMgKCBuYW1lLCBwcmljZSwgc3RvY2sgKSBWQUxVRVMgKCAnRXNwcmVzc28gYmVhbnMgMWtnJywgMjQuNTAsIDEwMDAgKSwgKCAnUG91ci1vdmVyIGtldHRsZScsIDU5LjAwLCAxMDAwICksICggJ0NlcmFtaWMgZHJpcHBlcicsIDE4Ljc1LCAxMDAwICksICggJ1BhcGVyIGZpbHRlcnMgKDEwMCknLCA2LjI1LCAxMDAwICksICggJ0J1cnIgZ3JpbmRlcicsIDEyOS4wMCwgMTAwMCApIE9OIENPTkZMSUNUICggbmFtZSApIERPIE5PVEhJTkc7IElOU0VSVCBJTlRPIG9yZGVycyAoIGlkLCBjdXN0b21lciwgdG90YWwgKSBWQUxVRVMgKCAxLCAnYWRhQGV4YW1wbGUuY29tJywgNDkuMDAgKSBPTiBDT05GTElDVCAoIGlkICkgRE8gTk9USElORzsgSU5TRVJUIElOVE8gb3JkZXJfaXRlbXMgKCBvcmRlcl9pZCwgcHJvZHVjdF9pZCwgcXVhbnRpdHksIHByaWNlICkgVkFMVUVTICggMSwgMSwgMiwgMjQuNTAgKSBPTiBDT05GTElDVCBETyBOT1RISU5HOyBTRUxFQ1Qgc2V0dmFsICggJ29yZGVyc19pZF9zZXEnLCBncmVhdGVzdCAoICggU0VMRUNUIG1heCAoIGlkICkgRlJPTSBvcmRlcnMgKSwgMSApICk="
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-07T17:55:31.928436Z",
+    "downstream": {
+      "established": "2026-10-07T17:55:31.922973Z",
+      "ipAddress": "127.0.0.1",
+      "port": 53280,
+      "bytesSent": "1180"
+    },
+    "upstream": {
+      "established": "2026-10-07T17:55:31.923500Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "177"
+    },
+    "direction": "EGRESS"
+  }
+}

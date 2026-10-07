@@ -1,0 +1,64 @@
+{
+  "source": "proxymock sql-report --in proxymock/recording -o json (proxymock v2.5.1155)",
+  "recording": {
+    "inboundRequests": 18
+  },
+  "requestLoad": {
+    "attributedStatements": 31,
+    "exactStatements": 20,
+    "ambiguousStatements": 0,
+    "unattributedStatements": 1
+  },
+  "linkedByTiming": {
+    "total": 11,
+    "breakdown": {
+      "GET /health, untagged": 1,
+      "GET /products/{id} reusing a statement prepared by an earlier request": 7,
+      "requests sent without a traceparent (GET /orders/1, GET /products)": 3
+    }
+  },
+  "endpoints": [
+    {
+      "endpoint": "GET /products/*",
+      "requests": 8,
+      "statements": 8,
+      "avgPerRequest": 1,
+      "maxPerRequest": 1
+    },
+    {
+      "endpoint": "GET /reports/sales",
+      "requests": 4,
+      "statements": 8,
+      "avgPerRequest": 2,
+      "maxPerRequest": 2
+    },
+    {
+      "endpoint": "POST /orders",
+      "requests": 1,
+      "statements": 8,
+      "avgPerRequest": 8,
+      "maxPerRequest": 8
+    },
+    {
+      "endpoint": "GET /orders/*",
+      "requests": 2,
+      "statements": 4,
+      "avgPerRequest": 2,
+      "maxPerRequest": 2
+    },
+    {
+      "endpoint": "GET /products",
+      "requests": 2,
+      "statements": 2,
+      "avgPerRequest": 1,
+      "maxPerRequest": 1
+    },
+    {
+      "endpoint": "GET /health",
+      "requests": 1,
+      "statements": 1,
+      "avgPerRequest": 1,
+      "maxPerRequest": 1
+    }
+  ]
+}

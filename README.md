@@ -40,7 +40,7 @@ The [tutorial app](tutorial/README.md) is a CNCF swag shop with an HTTP dependen
 
 ## Try a specific lab
 
-The [lab catalog](labs/README.md) has exercises for profiles, metrics, traces, logs, network policy, eBPF instrumentation, chaos, and contract testing. Each lab has its own setup and working directory.
+The [lab catalog](labs/README.md) has exercises for profiles, metrics, traces, logs, SQL query attribution, network policy, eBPF instrumentation, chaos, and contract testing. Each lab has its own setup and working directory.
 
 ## Shared tools and recordings
 

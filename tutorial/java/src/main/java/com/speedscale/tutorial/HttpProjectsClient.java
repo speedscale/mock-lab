@@ -1,10 +1,11 @@
 package com.speedscale.tutorial;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriUtils;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.ProxySelector;
@@ -48,7 +49,7 @@ public class HttpProjectsClient implements ProjectsClient {
         try {
             return mapper.readValue(response.body(), new TypeReference<List<Project>>() {
             });
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw unavailable();
         }
     }
@@ -64,7 +65,7 @@ public class HttpProjectsClient implements ProjectsClient {
         }
         try {
             return Optional.of(mapper.readValue(response.body(), Project.class));
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw unavailable();
         }
     }

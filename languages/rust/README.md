@@ -6,7 +6,7 @@ The Rust version of the [mock-lab](../../README.md) proxymock demo. It serves an
 Needs a Rust toolchain (`cargo`; preinstalled in the devcontainer). Downstream calls use
 `reqwest`, which honors `HTTP_PROXY`/`HTTPS_PROXY`.
 
-[Turn one recording into regression, contract, load and chaos scenarios](../../shared/SCENARIOS.md) with this app. The shared guide uses curl; the dashboard is optional.
+Use the installed [agent skills](../../README.md#agent-skills) to create tests from this app's recording and schema. The dashboard is optional.
 
 ## Run
 

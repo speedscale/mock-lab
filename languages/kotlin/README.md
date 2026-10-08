@@ -8,7 +8,7 @@ JVM language, so proxymock uses the **same SOCKS proxy and JKS truststore as Jav
 separate capture path. Needs the Kotlin compiler (preinstalled in the devcontainer; `brew install
 kotlin` or the [compiler zip](https://github.com/JetBrains/kotlin/releases) otherwise).
 
-[Turn one recording into regression, contract, load and chaos scenarios](../../shared/SCENARIOS.md) with this app. The shared guide uses curl; the dashboard is optional.
+Use the installed [agent skills](../../README.md#agent-skills) to create tests from this app's recording and schema. The dashboard is optional.
 
 ## Run
 

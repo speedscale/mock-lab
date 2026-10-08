@@ -6,7 +6,7 @@ via libcurl (`DOWNSTREAM_URL`, default `https://demo-api.trafficreplay.com`; set
 
 Needs a C++17 compiler and **libcurl** (`libcurl4-openssl-dev` on Debian/Ubuntu; preinstalled in the devcontainer).
 
-[Turn one recording into regression, contract, load and chaos scenarios](../../shared/SCENARIOS.md) with this app. The shared guide uses curl; the dashboard is optional.
+Use the installed [agent skills](../../README.md#agent-skills) to create tests from this app's recording and schema. The dashboard is optional.
 
 ## Run
 

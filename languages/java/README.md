@@ -5,7 +5,7 @@ The Java version of the [mock-lab](../../README.md) proxymock demo. It serves an
 (`DOWNSTREAM_URL`, default `https://demo-api.trafficreplay.com`; set `PORT` to change the port).
 Single file, run directly with JDK 11+ source-file mode — no build tool.
 
-[Turn one recording into regression, contract, load and chaos scenarios](../../shared/SCENARIOS.md) with this app. The shared guide uses curl; the dashboard is optional.
+Use the installed [agent skills](../../README.md#agent-skills) to create tests from this app's recording and schema. The dashboard is optional.
 
 ## Run
 

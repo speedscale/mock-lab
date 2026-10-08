@@ -6,7 +6,7 @@ The Node.js version of the [mock-lab](../../README.md) proxymock demo. It serves
 Zero dependencies — built-in `http` + global `fetch`. Needs **Node 24+** (or 22.21+) for the
 built-in proxy support proxymock relies on; the devcontainer ships Node 24.
 
-[Turn one recording into regression, contract, load and chaos scenarios](../../shared/SCENARIOS.md) with this app. The shared guide uses curl; the dashboard is optional.
+Use the installed [agent skills](../../README.md#agent-skills) to create tests from this app's recording and schema. The dashboard is optional.
 
 ## Run
 

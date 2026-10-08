@@ -1,6 +1,6 @@
 # Shared tools
 
-These tools support the language apps and the tutorial. Run the commands below from the repository root.
+These tools support the language apps and the tutorial. The [scenario guide](SCENARIOS.md) works with every language app; the Go reference server and dashboard below are optional. Run the commands below from the repository root.
 
 | Tool | Use |
 | --- | --- |

@@ -1,0 +1,21 @@
+# clusterName is the Kubernetes DNS suffix in this chart, not the reporting ID.
+clusterName: cluster.local
+
+opencost:
+  exporter:
+    defaultClusterId: opencost-lab
+    prometheusDataSource:
+      queryResolutionSeconds: 60
+  customPricing:
+    enabled: true
+    costModel:
+      CPU: "1.00"
+      RAM: "0.10"
+      storage: "0.00"
+      zoneNetworkEgress: "0.00"
+      regionNetworkEgress: "0.00"
+      internetNetworkEgress: "0.00"
+  mcp:
+    enabled: true
+  ui:
+    enabled: false

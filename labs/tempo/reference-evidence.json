@@ -1,0 +1,104 @@
+{
+  "recordedAt": "2026-08-11",
+  "platform": "Apple arm64",
+  "traceQuery": "{ resource.service.name = \"catalog-api\" && name = \"POST /api/catalog\" }",
+  "datasourceUid": "tempo",
+  "selection": "longest of three functional replay traces in the exact recorded interval",
+  "baseline": {
+    "functionalWindow": {
+      "start": "2026-08-11T18:55:00.890634Z",
+      "end": "2026-08-11T18:55:04.784099Z"
+    },
+    "functional": {
+      "requestsTotal": 3,
+      "requestsSucceeded": 3,
+      "requestsFailed": 0,
+      "resultMatchPercent": 100,
+      "averageLatencyMilliseconds": 301,
+      "requestsPerSecond": 3.283103372899205
+    },
+    "loadWindow": {
+      "start": "2026-08-11T18:55:14.447011Z",
+      "end": "2026-08-11T18:55:45.169915Z"
+    },
+    "load": {
+      "virtualUsers": 4,
+      "durationSeconds": 30,
+      "requestsTotal": 392,
+      "requestsSucceeded": 392,
+      "requestsFailed": 0,
+      "averageLatencyMilliseconds": 303,
+      "p95LatencyMilliseconds": 306,
+      "requestsPerSecond": 13.066218713135118,
+      "harnessBound": false
+    },
+    "trace": {
+      "traceId": "72ab046d4903da9b9cbf417c6ee51227",
+      "rootDurationMilliseconds": 301.876375,
+      "totalSpanCount": 17,
+      "inventoryLookupSpanCount": 8,
+      "httpClientSpanCount": 8,
+      "downstreamFanOut": 8,
+      "shape": "eight serial non-overlapping dependency calls"
+    }
+  },
+  "candidate": {
+    "functionalWindow": {
+      "start": "2026-08-11T18:58:39.559276Z",
+      "end": "2026-08-11T18:58:43.467186Z"
+    },
+    "functional": {
+      "requestsTotal": 3,
+      "requestsSucceeded": 3,
+      "requestsFailed": 0,
+      "resultMatchPercent": 100,
+      "averageLatencyMilliseconds": 80,
+      "requestsPerSecond": 11.958966775885518
+    },
+    "loadWindow": {
+      "start": "2026-08-11T18:58:59.718904Z",
+      "end": "2026-08-11T18:59:30.452179Z"
+    },
+    "load": {
+      "virtualUsers": 4,
+      "durationSeconds": 30,
+      "requestsTotal": 1480,
+      "requestsSucceeded": 1480,
+      "requestsFailed": 0,
+      "averageLatencyMilliseconds": 80,
+      "p95LatencyMilliseconds": 83,
+      "requestsPerSecond": 49.33157754026938,
+      "harnessBound": false
+    },
+    "trace": {
+      "traceId": "2b51700da7a9b62bfb8c2cc974649b07",
+      "rootDurationMilliseconds": 85.07325,
+      "totalSpanCount": 17,
+      "inventoryLookupSpanCount": 8,
+      "httpClientSpanCount": 8,
+      "downstreamFanOut": 8,
+      "shape": "two overlapping waves of four dependency calls"
+    }
+  },
+  "responseDiff": {
+    "pairedResponses": 1,
+    "volatileFieldsFiltered": 2,
+    "stableFieldDifferences": 0,
+    "result": "No stable-field differences — the responses match once volatile fields are ignored."
+  },
+  "attribution": {
+    "serviceName": "catalog-api",
+    "applicationInstrumentationScope": "github.com/speedscale/mock-lab/tempo-demo/internal/catalog",
+    "applicationInstrumentationVersion": "",
+    "httpInstrumentationScope": "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+    "httpInstrumentationVersion": "0.62.0",
+    "codeFilePath": "internal/catalog/catalog.go",
+    "codeFunctionName": "catalog.(*Service).fetchInventory"
+  },
+  "change": {
+    "criticalPathReductionPercent": 71.8,
+    "loadThroughputMultiplier": 3.78,
+    "stableBehavior": true,
+    "serialPatternRemoved": true
+  }
+}

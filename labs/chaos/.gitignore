@@ -1,0 +1,5 @@
+bin/
+scratch/
+proxymock.log
+proxymock/capture.log
+proxymock/results/

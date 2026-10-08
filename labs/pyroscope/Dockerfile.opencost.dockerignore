@@ -1,0 +1,10 @@
+.git
+.run
+bin
+config
+proxymock
+thoughts
+*.md
+docker-compose.yaml
+mcp.example.json
+scripts

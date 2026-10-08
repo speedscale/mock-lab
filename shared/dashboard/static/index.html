@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mock lab</title>
+<style>
+  :root {
+    --chassis: #e4ebf1;
+    --face: #f7f9fb;
+    --screen: #f3f6f8;
+    --ink: #1a2733;
+    --mid: #3c4d5e;
+    --metal: #5c6f82;
+    --line: #d3dce4;
+    --app: #1b6b50;
+    --app-wash: #e4f3ec;
+    --record: #c56a10;
+    --record-wash: #fdebd6;
+    --fault: #9d2c22;
+    --lamp: var(--app);
+    --wash: var(--app-wash);
+    --body: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+    --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+
+  body[data-target="record"] {
+    --lamp: var(--record);
+    --wash: var(--record-wash);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { height: 100%; margin: 0; }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--chassis);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  button, select { font: inherit; color: inherit; }
+
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 2px;
+  }
+
+  .topbar, .foot {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--face);
+    padding: 0 20px;
+  }
+
+  .topbar {
+    height: 52px;
+    border-bottom: 1px solid var(--line);
+    justify-content: space-between;
+  }
+
+  .brand { display: flex; align-items: center; gap: 10px; }
+
+  .brand-name {
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .brand-badge, .top-note {
+    color: var(--metal);
+    font-size: 13px;
+  }
+
+  .brand-badge {
+    border: 1px solid var(--line);
+    border-radius: 99px;
+    padding: 1px 8px;
+  }
+
+  main {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    padding: 16px 20px 20px;
+  }
+
+  .frame {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .story {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    background: var(--face);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin-bottom: 16px;
+  }
+
+  .story article { padding: 16px 18px 18px; }
+
+  .story article + article { border-left: 1px solid var(--line); }
+
+  .ordinal {
+    margin: 0 0 4px;
+    color: var(--metal);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .story h2 {
+    margin: 0 0 8px;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .story p {
+    margin: 0;
+    color: var(--mid);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.92em;
+    background: var(--chassis);
+    padding: 0 4px;
+    border-radius: 3px;
+  }
+
+  .workspace {
+    display: grid;
+    grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+    background: var(--face);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    min-height: 520px;
+    overflow: hidden;
+  }
+
+  .controls {
+    padding: 14px 16px 18px;
+    border-right: 1px solid var(--line);
+  }
+
+  .pane-name {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--metal);
+  }
+
+  .section-label {
+    margin: 18px 0 8px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--metal);
+  }
+
+  .controls .section-label:first-of-type { margin-top: 14px; }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .actions button:last-child:nth-child(odd) { grid-column: 1 / -1; }
+
+  .actions button, .project select, .run {
+    background: var(--face);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+  }
+
+  .actions button:hover, .run:hover, .rocker button:hover { border-color: var(--metal); }
+
+  .project {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    align-items: center;
+  }
+
+  .project label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--metal);
+  }
+
+  .project select {
+    min-width: 11rem;
+    cursor: pointer;
+    background: var(--face);
+  }
+
+  .held { margin: 12px 0 0; padding: 0; }
+
+  .held div {
+    display: grid;
+    grid-template-columns: 7.5rem minmax(0, 1fr);
+    gap: 8px;
+    padding: 6px 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .held dt { margin: 0; color: var(--metal); font-size: 13px; }
+
+  .held dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  .held dd.pending { color: var(--metal); font-family: var(--body); font-size: 13px; }
+
+  .hint { margin: 8px 0 0; color: var(--metal); font-size: 13px; }
+
+  .run {
+    margin-top: 14px;
+    background: var(--ink);
+    color: var(--face);
+    border-color: var(--ink);
+    padding: 9px 14px;
+  }
+
+  .run:hover { border-color: var(--ink); }
+
+  button:disabled, select:disabled { cursor: not-allowed; opacity: 0.45; }
+
+  .log {
+    list-style: none;
+    margin: 12px 0 0;
+    padding: 0;
+  }
+
+  .log li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .log li[data-kind="bad"] { color: var(--fault); }
+
+  .screen {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    background: var(--screen);
+  }
+
+  .screen-bar {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--face);
+    font-family: var(--mono);
+    font-size: 13px;
+  }
+
+  #meta { overflow-wrap: anywhere; color: var(--ink); }
+
+  #status { margin-left: auto; font-weight: 600; }
+
+  #status[data-kind="ok"] { color: var(--app); }
+  #status[data-kind="bad"] { color: var(--fault); }
+
+  #timing { color: var(--metal); }
+
+  pre {
+    margin: 0;
+    padding: 16px 16px 24px;
+    flex: 1;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .foot {
+    min-height: 64px;
+    border-top: 3px solid var(--lamp);
+    justify-content: space-between;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .endpoint { display: flex; align-items: center; gap: 12px; }
+
+  .foot-label {
+    color: var(--metal);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .rocker { display: flex; gap: 8px; }
+
+  .rocker button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--face);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+
+  .rocker button[aria-checked="true"] {
+    background: var(--wash);
+    border-color: var(--lamp);
+  }
+
+  .lamp {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--line);
+  }
+
+  .rocker button[aria-checked="true"] .lamp {
+    background: var(--lamp);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--lamp) 28%, transparent);
+  }
+
+  .rock-port {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rock-name { font-size: 14px; font-weight: 600; }
+
+  .dest { margin: 0; color: var(--mid); font-size: 14px; }
+
+  @media (max-width: 800px) {
+    .story { grid-template-columns: 1fr; }
+    .story article + article { border-left: 0; border-top: 1px solid var(--line); }
+    .workspace { grid-template-columns: 1fr; }
+    .controls { border-right: 0; border-bottom: 1px solid var(--line); }
+    .screen { min-height: 280px; }
+    pre { max-height: 50vh; flex: none; }
+    .foot, .endpoint { flex-wrap: wrap; }
+    .top-note { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body data-target="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-name">mock lab</span>
+      <span class="brand-badge">local</span>
+    </div>
+    <span class="top-note">CNCF projects demo</span>
+  </header>
+
+  <main>
+    <div class="frame">
+      <section class="story" aria-label="What this demo does">
+        <article>
+          <p class="ordinal">1 · Record</p>
+          <h2>Save the traffic</h2>
+          <p>Start <code>proxymock record</code> with one of the language apps. Set the endpoint switch to port 4143, then click the calls. proxymock keeps each one, and the request the app sends to the CNCF projects API.</p>
+        </article>
+        <article>
+          <p class="ordinal">2 · Analyze</p>
+          <h2>Read what was saved</h2>
+          <p>Open <code>proxymock web</code> on port 7788. The access token and the order id are new on every run, so a later replay of those two calls will not match the recording until something chains them.</p>
+        </article>
+        <article>
+          <p class="ordinal">3 · Replay</p>
+          <h2>Run it again, offline</h2>
+          <p>Mock the downstream and set the endpoint switch to port 8080. Run the same calls. Smart replace copies the new token and order id into the requests that need them.</p>
+        </article>
+      </section>
+
+      <div class="workspace">
+        <div class="controls">
+          <h2 class="pane-name">Calls</h2>
+          <h3 class="section-label">Look up</h3>
+          <div class="actions">
+            <button type="button" id="service">Service info</button>
+            <button type="button" id="projects">All projects</button>
+            <button type="button" id="categories">Categories</button>
+            <button type="button" id="stats">Stats by maturity</button>
+          </div>
+          <div class="project">
+            <label for="project">Project</label>
+            <select id="project">
+              <option value="kubernetes">Kubernetes</option>
+              <option value="prometheus">Prometheus</option>
+              <option value="envoy">Envoy</option>
+              <option value="containerd">containerd</option>
+              <option value="coredns">CoreDNS</option>
+              <option value="jaeger">Jaeger</option>
+              <option value="fluentd">Fluentd</option>
+              <option value="helm">Helm</option>
+              <option value="harbor">Harbor</option>
+              <option value="etcd">etcd</option>
+              <option value="argo">Argo</option>
+              <option value="linkerd">Linkerd</option>
+              <option value="istio">Istio</option>
+              <option value="cilium">Cilium</option>
+              <option value="falco">Falco</option>
+              <option value="flux">Flux</option>
+              <option value="opentelemetry">OpenTelemetry</option>
+              <option value="knative">Knative</option>
+              <option value="crossplane">Crossplane</option>
+              <option value="kyverno">Kyverno</option>
+              <option value="backstage">Backstage</option>
+              <option value="k3s">K3s</option>
+              <option value="kubeedge">KubeEdge</option>
+              <option value="chaos-mesh">Chaos Mesh</option>
+            </select>
+            <button type="button" id="one">Get this project</button>
+          </div>
+
+          <h3 class="section-label">Sign in and order</h3>
+          <p class="hint">The token and the order id are new on every call. Create and read send the latest token.</p>
+          <div class="actions">
+            <button type="button" id="mint">Mint a token</button>
+            <button type="button" id="create">Create an order</button>
+            <button type="button" id="read" disabled>Read the order</button>
+          </div>
+          <dl class="held">
+            <div>
+              <dt>Access token</dt>
+              <dd id="token" class="pending">None yet</dd>
+            </div>
+            <div>
+              <dt>Order id</dt>
+              <dd id="order" class="pending">None yet</dd>
+            </div>
+          </dl>
+
+          <button type="button" class="run" id="run">Run every call</button>
+          <p class="hint">Eight calls, in the same order as the test script. On port 4143 it pauses a second between them.</p>
+          <ol id="log" class="log" hidden></ol>
+        </div>
+
+        <section class="screen" aria-live="polite">
+          <div class="screen-bar">
+            <h2 class="pane-name">Response</h2>
+            <span id="meta"></span>
+            <span id="status"></span>
+            <span id="timing"></span>
+          </div>
+          <pre id="body">Pick a call. The response shows up here.</pre>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer class="foot">
+    <div class="endpoint">
+      <span class="foot-label">Endpoint</span>
+      <div class="rocker" role="radiogroup" aria-label="Where calls are sent">
+        <button type="button" role="radio" data-target="app" aria-checked="true">
+          <span class="lamp" aria-hidden="true"></span>
+          <span class="rock-port">8080</span>
+          <span class="rock-name">App</span>
+        </button>
+        <button type="button" role="radio" data-target="record" aria-checked="false">
+          <span class="lamp" aria-hidden="true"></span>
+          <span class="rock-port">4143</span>
+          <span class="rock-name">Record</span>
+        </button>
+      </div>
+    </div>
+    <p id="dest" class="dest">Next call goes to the app on port 8080.</p>
+  </footer>
+
+<script>
+(function () {
+  var PORTS = { app: 8080, record: 4143 };
+  var target = "app";
+  var token = "";
+  var orderId = "";
+  var busy = false;
+
+  var dest = document.getElementById("dest");
+  var meta = document.getElementById("meta");
+  var statusEl = document.getElementById("status");
+  var timing = document.getElementById("timing");
+  var bodyEl = document.getElementById("body");
+  var tokenEl = document.getElementById("token");
+  var orderEl = document.getElementById("order");
+  var readBtn = document.getElementById("read");
+  var logEl = document.getElementById("log");
+  var controls = document.querySelectorAll(".controls button, .rocker button, #project");
+
+  function project() {
+    return document.getElementById("project").value;
+  }
+
+  function remember(key, value) {
+    try { localStorage.setItem(key, value); } catch (e) {}
+  }
+
+  function recall(key) {
+    try { return localStorage.getItem(key); } catch (e) { return null; }
+  }
+
+  function applyTarget(next) {
+    target = next === "record" ? "record" : "app";
+    remember("mocklab-target", target);
+    document.body.dataset.target = target;
+    var buttons = document.querySelectorAll(".rocker button");
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute("aria-checked", buttons[i].dataset.target === target ? "true" : "false");
+    }
+    dest.textContent = target === "record"
+      ? "Next call goes through proxymock on port 4143."
+      : "Next call goes to the app on port 8080.";
+  }
+
+  function setBusy(on) {
+    for (var i = 0; i < controls.length; i++) {
+      if (controls[i].id === "read") {
+        controls[i].disabled = on || !orderId;
+      } else {
+        controls[i].disabled = on;
+      }
+    }
+  }
+
+  function pretty(text) {
+    if (!text) return "Empty body.";
+    try { return JSON.stringify(JSON.parse(text), null, 2); }
+    catch (e) { return text; }
+  }
+
+  function explain(data) {
+    var port = data.port || PORTS[target];
+    if (data.error === "unreachable") {
+      if (port === 4143) {
+        return "Nothing is listening on port 4143. Start proxymock record, or switch to App.";
+      }
+      return "Nothing is listening on port 8080. Start one of the language apps, or switch to Record.";
+    }
+    if (data.error === "timeout") {
+      return "Port " + port + " did not answer within 8 seconds.";
+    }
+    if (data.detail) return data.detail;
+    return "The call failed.";
+  }
+
+  function showResult(data) {
+    meta.textContent = (data.method || "") + " " + (data.path || "");
+    timing.textContent = "";
+    if (data.error) {
+      statusEl.textContent = "Failed";
+      statusEl.dataset.kind = "bad";
+      if (data.port) timing.textContent = "port " + data.port;
+      bodyEl.textContent = explain(data);
+      return;
+    }
+    statusEl.textContent = String(data.status);
+    statusEl.dataset.kind = data.status >= 200 && data.status < 300 ? "ok" : "bad";
+    timing.textContent = data.elapsed_ms + " ms · port " + data.port;
+    bodyEl.textContent = pretty(data.body);
+    capture(data);
+  }
+
+  function capture(data) {
+    if (data.status < 200 || data.status >= 300) return;
+    var parsed;
+    try { parsed = JSON.parse(data.body); } catch (e) { return; }
+    if (!parsed) return;
+    if (data.path === "/oauth/token" && parsed.access_token) {
+      token = parsed.access_token;
+      tokenEl.textContent = token;
+      tokenEl.classList.remove("pending");
+    }
+    if (data.method === "POST" && data.path === "/api/orders" && parsed.order_id) {
+      orderId = parsed.order_id;
+      orderEl.textContent = orderId;
+      orderEl.classList.remove("pending");
+      if (!busy) readBtn.disabled = false;
+    }
+  }
+
+  function call(method, path, opts) {
+    opts = opts || {};
+    var port = PORTS[target];
+    return fetch("/relay", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        port: port,
+        method: method,
+        path: path,
+        body: opts.body || "",
+        token: opts.useToken ? token : ""
+      })
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        data.method = data.method || method;
+        data.path = data.path || path;
+        data.port = data.port || port;
+        if (!res.ok && !data.error) data.error = "bad_request";
+        showResult(data);
+        return data;
+      });
+    }).catch(function () {
+      var data = {
+        method: method,
+        path: path,
+        port: port,
+        error: "request_failed",
+        detail: "The dashboard lost the connection. Reload the page."
+      };
+      showResult(data);
+      return data;
+    });
+  }
+
+  function failed(data) {
+    return !!(data.error || data.status < 200 || data.status >= 300);
+  }
+
+  function outcome(data) {
+    if (data.error === "unreachable") return "no connection";
+    if (data.error === "timeout") return "timed out";
+    if (data.error) return "failed";
+    return String(data.status);
+  }
+
+  function appendLog(data) {
+    var li = document.createElement("li");
+    var name = document.createElement("span");
+    var code = document.createElement("span");
+    name.textContent = (data.method || "") + " " + (data.path || "");
+    code.textContent = outcome(data);
+    if (failed(data)) li.dataset.kind = "bad";
+    li.appendChild(name);
+    li.appendChild(code);
+    logEl.appendChild(li);
+    logEl.hidden = false;
+  }
+
+  function wait(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  function runAll() {
+    if (busy) return;
+    busy = true;
+    setBusy(true);
+    logEl.textContent = "";
+    var pause = target === "record" ? 1000 : 120;
+    var id = project();
+    var steps = [
+      function () { return call("GET", "/"); },
+      function () { return call("GET", "/api/projects"); },
+      function () { return call("GET", "/api/projects/" + id); },
+      function () { return call("GET", "/api/categories"); },
+      function () { return call("GET", "/api/stats"); },
+      function () { return call("POST", "/oauth/token"); },
+      function () { return call("POST", "/api/orders", { body: JSON.stringify({ project: id }), useToken: true }); },
+      function () { return call("GET", "/api/orders/" + orderId, { useToken: true }); }
+    ];
+
+    var chain = Promise.resolve();
+    steps.forEach(function (step, i) {
+      chain = chain.then(function (prev) {
+        if (prev && failed(prev)) return prev;
+        return step().then(function (data) {
+          appendLog(data);
+          if (failed(data) || i === steps.length - 1) return data;
+          return wait(pause).then(function () { return data; });
+        });
+      });
+    });
+    chain.then(function () {
+      busy = false;
+      setBusy(false);
+    });
+  }
+
+  document.querySelector(".rocker").addEventListener("click", function (e) {
+    var btn = e.target.closest("button");
+    if (!btn || busy) return;
+    applyTarget(btn.dataset.target);
+  });
+
+  document.querySelector(".rocker").addEventListener("keydown", function (e) {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    e.preventDefault();
+    applyTarget(target === "app" ? "record" : "app");
+    document.querySelector('.rocker button[data-target="' + target + '"]').focus();
+  });
+
+  function once(fn) {
+    return function () {
+      if (busy) return;
+      busy = true;
+      setBusy(true);
+      logEl.hidden = true;
+      Promise.resolve().then(fn).then(function () {
+        busy = false;
+        setBusy(false);
+      }, function () {
+        busy = false;
+        setBusy(false);
+      });
+    };
+  }
+
+  document.getElementById("service").addEventListener("click", once(function () { return call("GET", "/"); }));
+  document.getElementById("projects").addEventListener("click", once(function () { return call("GET", "/api/projects"); }));
+  document.getElementById("categories").addEventListener("click", once(function () { return call("GET", "/api/categories"); }));
+  document.getElementById("stats").addEventListener("click", once(function () { return call("GET", "/api/stats"); }));
+  document.getElementById("one").addEventListener("click", once(function () {
+    return call("GET", "/api/projects/" + project());
+  }));
+  document.getElementById("mint").addEventListener("click", once(function () { return call("POST", "/oauth/token"); }));
+  document.getElementById("create").addEventListener("click", once(function () {
+    return call("POST", "/api/orders", { body: JSON.stringify({ project: project() }), useToken: true });
+  }));
+  document.getElementById("read").addEventListener("click", once(function () {
+    if (!orderId) return null;
+    return call("GET", "/api/orders/" + orderId, { useToken: true });
+  }));
+  document.getElementById("run").addEventListener("click", runAll);
+
+  applyTarget(recall("mocklab-target") || "app");
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+bin/
+proxymock/recording/
+proxymock/results/
+proxymock/failure/
+proxymock/*.log

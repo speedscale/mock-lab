@@ -1,0 +1,20 @@
+// Tail the checkout API's structured log file and push every line to Loki
+// under the service="checkout" stream label.
+local.file_match "checkout" {
+  path_targets = [{
+    __path__ = "/var/log/lab/checkout.log",
+    service  = "checkout",
+  }]
+  sync_period = "5s"
+}
+
+loki.source.file "checkout" {
+  targets    = local.file_match.checkout.targets
+  forward_to = [loki.write.lab.receiver]
+}
+
+loki.write "lab" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

@@ -1,0 +1,8 @@
+# Captured 2026-08-20T10:47:43Z against the checked-in (broken) storefront.
+# Inventory is returning 503 on every call. Nothing below says so.
+{"sku":"SSC-4110","available":42,"in_stock":true,"degraded":false,"source":"inventory"}
+{"sku":"SSC-4111","available":7,"in_stock":true,"degraded":false,"source":"inventory"}
+{"sku":"SSC-5200","available":118,"in_stock":true,"degraded":false,"source":"inventory"}
+{"sku":"SSC-5201","available":0,"in_stock":false,"degraded":false,"source":"inventory"}
+{"sku":"SSC-6100","available":63,"in_stock":true,"degraded":false,"source":"inventory"}
+{"sku":"SSC-7300","available":9,"in_stock":true,"degraded":false,"source":"inventory"}

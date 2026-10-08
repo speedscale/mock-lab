@@ -1,0 +1,181 @@
+name: Tutorial app
+
+# The agent tutorial app (tutorial/) ships in four languages that must behave
+# the same. Each job audits the port's dependencies, runs its unit tests,
+# starts it against Postgres (from tutorial-db, as readers run it) and the
+# bundled reference downstream (shared/server), drives the shared traffic
+# sequence through it, and builds its image. With an API key it also records the port under proxymock and checks
+# the recording's shape against the Go reference.
+on:
+  push:
+    paths:
+      - 'tutorial/**'
+      - 'shared/server/**'
+      - '.github/workflows/tutorial.yml'
+  pull_request:
+    paths:
+      - 'tutorial/**'
+      - 'shared/server/**'
+      - '.github/workflows/tutorial.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  port:
+    name: tutorial ${{ matrix.lang }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lang: [go, java, python, node]
+    env:
+      DATABASE_URL: postgres://tutorial:tutorial@localhost:54329/tutorial?sslmode=disable
+      PORT: "8080"
+    defaults:
+      run:
+        working-directory: tutorial/${{ matrix.lang }}
+    steps:
+    - uses: actions/checkout@v4
+
+    # Go is always needed for tutorial-db and the reference downstream in shared/server.
+    - uses: actions/setup-go@v5
+      with:
+        go-version: "1.26"
+        cache-dependency-path: |
+          shared/server/go.sum
+          tutorial/db/go.sum
+          tutorial/go/go.sum
+
+    - name: Start tutorial-db
+      working-directory: tutorial
+      run: |
+        set -euo pipefail
+        nohup go -C db run . > /tmp/tutorial-db.log 2>&1 &
+        for i in $(seq 1 120); do grep -q "ready on" /tmp/tutorial-db.log && break; sleep 1; done
+        cat /tmp/tutorial-db.log
+        grep -q "ready on localhost:54329" /tmp/tutorial-db.log
+    - if: matrix.lang == 'java'
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: temurin
+        cache: maven
+    - if: matrix.lang == 'python'
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    - if: matrix.lang == 'node'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+        cache: npm
+        cache-dependency-path: tutorial/node/package-lock.json
+
+    - name: Dependency audit
+      run: |
+        set -euo pipefail
+        case "${{ matrix.lang }}" in
+          go)     go run golang.org/x/vuln/cmd/govulncheck@latest ./... ;;
+          java)   ./mvnw -B -q dependency:resolve
+                  curl -sSfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b "$RUNNER_TEMP/bin"
+                  "$RUNNER_TEMP/bin/trivy" fs --scanners vuln --pkg-types library --ignore-unfixed --offline-scan --exit-code 1 . ;;
+          python) python -m pip install -q pip-audit && pip-audit -r requirements.txt -r requirements-dev.txt ;;
+          node)   npm ci && npm audit --audit-level=moderate ;;
+        esac
+
+    - name: Unit tests
+      run: |
+        set -euo pipefail
+        case "${{ matrix.lang }}" in
+          go)     go vet ./... && go test ./... && go build -o bin/tutorial-orders . ;;
+          java)   ./mvnw -B -q package ;;
+          python) python -m pip install -q -r requirements.txt -r requirements-dev.txt && python -m pytest -q ;;
+          node)   npm test ;;
+        esac
+
+    - name: Start the reference downstream and the app
+      run: |
+        set -euo pipefail
+        # The job-wide PORT=8080 is the app's; shared/server reads PORT too.
+        (cd ../../shared/server && PORT=8090 nohup go run . > /tmp/server.log 2>&1 &)
+        for i in $(seq 1 60); do curl -sf localhost:8090/healthz > /dev/null && break; sleep 1; done
+        export DEMO_API_URL=http://localhost:8090
+        case "${{ matrix.lang }}" in
+          go)     nohup ./bin/tutorial-orders > app.log 2>&1 & ;;
+          java)   nohup java -jar target/tutorial-orders.jar > app.log 2>&1 & ;;
+          python) nohup python app.py > app.log 2>&1 & ;;
+          node)   nohup node server.js > app.log 2>&1 & ;;
+        esac
+        for i in $(seq 1 60); do
+          if curl -fsS http://localhost:8080/healthz; then echo; exit 0; fi
+          sleep 1
+        done
+        cat app.log
+        exit 1
+
+    - name: Drive the traffic sequence
+      run: |
+        set -euo pipefail
+        case "${{ matrix.lang }}" in
+          go)     go run ./cmd/traffic http://localhost:8080 ;;
+          java)   ./mvnw -B -q exec:java -Dexec.args="http://localhost:8080" ;;
+          python) python traffic.py http://localhost:8080 ;;
+          node)   node traffic.mjs http://localhost:8080 ;;
+        esac
+
+    - name: App log
+      if: always()
+      run: cat app.log || true
+
+    # Record the port under proxymock against the real CNCF API (the shape
+    # names its host) and compare the recording with the Go reference in
+    # tutorial/conformance/shape.txt. proxymock init needs an API key, so this
+    # is skipped where the secret is not available.
+    - name: Conformance
+      env:
+        SPEEDSCALE_API_KEY: ${{ secrets.SPEEDSCALE_API_KEY }}
+      run: |
+        set -euo pipefail
+        if [ -z "${SPEEDSCALE_API_KEY}" ]; then
+          echo "::notice title=conformance::skipped, SPEEDSCALE_API_KEY is not available"
+          exit 0
+        fi
+        sh -c "$(curl -Lfs https://downloads.speedscale.com/proxymock/install-proxymock)"
+        export PATH="$HOME/.speedscale:$PATH"
+        proxymock init --api-key "${SPEEDSCALE_API_KEY}" --yes --quiet --no-rcfile-update
+        pkill -f tutorial-orders || true
+        pkill -f "app.py" || true
+        pkill -f "server.js" || true
+        sleep 2
+        case "${{ matrix.lang }}" in
+          go)     run="./bin/tutorial-orders" ;;
+          java)   run="java -jar target/tutorial-orders.jar" ;;
+          python) run="python app.py" ;;
+          node)   run="node server.js" ;;
+        esac
+        DATABASE_URL="postgres://tutorial:tutorial@localhost:15432/tutorial?sslmode=disable" \
+          nohup proxymock record --app-port 8080 --map 15432=postgres://localhost:54329 --out "$RUNNER_TEMP/rec" -- $run > record.log 2>&1 &
+        pm=$!
+        # Probe the app directly and only open a socket to proxymock's inbound
+        # port: a request through it would be recorded and break the shape.
+        for i in $(seq 1 60); do
+          if curl -fsS http://localhost:8080/healthz > /dev/null 2>&1 && (exec 3<>/dev/tcp/localhost/4143) 2>/dev/null; then break; fi
+          sleep 1
+        done
+        case "${{ matrix.lang }}" in
+          go)     go run ./cmd/traffic http://localhost:4143 ;;
+          java)   ./mvnw -B -q exec:java -Dexec.args="http://localhost:4143" ;;
+          python) python traffic.py http://localhost:4143 ;;
+          node)   node traffic.mjs http://localhost:4143 ;;
+        esac
+        kill -INT "$pm"
+        wait "$pm" || true
+        python3 ../conformance/shape.py "$RUNNER_TEMP/rec" --check ../conformance/shape.txt
+
+    - name: Record log
+      if: always()
+      run: cat record.log 2>/dev/null || true
+
+    - name: Build the image
+      run: docker build -t tutorial-orders-${{ matrix.lang }}:ci .

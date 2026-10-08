@@ -1,0 +1,42 @@
+{
+  "id": "schema-coverage",
+  "version": 3,
+  "generator": {
+    "stages": [
+      {
+        "virtualUsers": {
+          "virtualUsers": "1",
+          "requestDelay": {}
+        }
+      }
+    ]
+  },
+  "rules": [
+    {
+      "metricName": "passAssertPct",
+      "type": "TOO_LOW",
+      "value": 100,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "recordingSchemaOperationPct",
+      "type": "TOO_LOW",
+      "value": 100,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "recordingSchemaStatusPct",
+      "type": "TOO_LOW",
+      "value": 100,
+      "action": "ALERT"
+    }
+  ],
+  "assertionGroups": [
+    {
+      "configs": [
+        {"type": "httpStatusCode"},
+        {"type": "httpResponseSchema"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+# Postgres for the sqlcommenter lab. It listens on 127.0.0.1:54330, next to the
+# agent tutorial's tutorial-db on 54329, so the two can run side by side.
+services:
+  postgres:
+    image: postgres:16.10
+    environment:
+      POSTGRES_USER: demo
+      POSTGRES_PASSWORD: demo
+      POSTGRES_DB: shop
+    ports:
+      - "127.0.0.1:${PG_HOST_PORT:-54330}:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "demo", "-d", "shop"]
+      interval: 2s
+      timeout: 5s
+      retries: 30

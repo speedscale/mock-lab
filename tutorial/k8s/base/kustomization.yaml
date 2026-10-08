@@ -1,0 +1,15 @@
+# The tutorial orders service and its Postgres in the `tutorial` namespace.
+# Apply a language overlay, not this base: it sets the app's image.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: tutorial
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - app.yaml
+# schema.sql is a copy of ../../contract/schema.sql (kustomize cannot read
+# outside this directory); CI checks the two match.
+configMapGenerator:
+  - name: postgres-schema
+    files:
+      - schema.sql

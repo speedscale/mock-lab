@@ -1,0 +1,59 @@
+{
+ "endpoints": [
+  {
+   "url": "-ALL-",
+   "method": "-ALL-",
+   "metrics": {
+    "latency.avg": 1,
+    "latency.max": 3,
+    "latency.min": 1,
+    "latency.p50": 1,
+    "latency.p75": 1,
+    "latency.p90": 1,
+    "latency.p95": 1,
+    "latency.p99": 2,
+    "requests.failed": 0,
+    "requests.per-minute": 267070.3018836947,
+    "requests.per-second": 4451.171698061578,
+    "requests.response-pct": 100,
+    "requests.succeeded": 800,
+    "requests.total": 800
+   }
+  },
+  {
+   "url": "/api/quote",
+   "method": "GET",
+   "metrics": {
+    "latency.avg": 1,
+    "latency.max": 3,
+    "latency.min": 1,
+    "latency.p50": 1,
+    "latency.p75": 1,
+    "latency.p90": 1,
+    "latency.p95": 1,
+    "latency.p99": 2,
+    "requests.failed": 0,
+    "requests.per-minute": 267070.3018836947,
+    "requests.per-second": 4451.171698061578,
+    "requests.response-pct": 100,
+    "requests.succeeded": 800,
+    "requests.total": 800
+   }
+  }
+ ],
+ "resources": {
+  "generatorMaxCpuPct": 18.7,
+  "mockMaxCpuPct": 41.4,
+  "harnessMaxCpuPct": 60,
+  "appMaxCpuPct": 29,
+  "appAvgCpuPct": 7.6,
+  "hostIdleMinPct": 83.3,
+  "rpsPerAppCore": 58568,
+  "sampleCount": 4,
+  "mockAttributed": true,
+  "harnessBound": false,
+  "notes": [
+   "latency percentiles are integer milliseconds; at p99 2 ms differences below ~5 ms are quantization, not signal"
+  ]
+ }
+}

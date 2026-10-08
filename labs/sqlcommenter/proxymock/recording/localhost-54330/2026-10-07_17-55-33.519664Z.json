@@ -1,0 +1,97 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-07T17:55:33.519664Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000291s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "75",
+    "dbName": "shop",
+    "dbTransaction": "active",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1155",
+    "sequence": "93",
+    "source": "goproxy"
+  },
+  "uuid": "1usFiS2UQmapHSGjyNNQ6g==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Bind Statement Parameters",
+  "location": "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4)",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "bind": {
+        "preparedStatement": "stmtcache_ec7a2fce6eb22fd3407855962db6e6afe97f6f33b0400955",
+        "parameterFormatCodes": [
+          1,
+          1,
+          1,
+          1
+        ],
+        "parameters": [
+          {
+            "asString": "\u0000\u0000\u0000\u0002"
+          },
+          {
+            "asString": "\u0000\u0000\u0000\u0004"
+          },
+          {
+            "asString": "\u0000\u0000\u0000\u0003"
+          },
+          {
+            "asBytes": "AAIAAAAAAAIABgnE"
+          }
+        ],
+        "parseRequest": {
+          "name": "stmtcache_ec7a2fce6eb22fd3407855962db6e6afe97f6f33b0400955",
+          "query": "INSERT INTO order_items (order_id, product_id, quantity, price) VALUES ($1, $2, $3, $4) /*db_driver='pgx',route='%2Forders',traceparent='00-edc8aee7e1dd8ebef78e5789f5d44eeb-51965f5b444b06ea-01'*/",
+          "describedParameterOids": [
+            23,
+            23,
+            23,
+            1700
+          ]
+        }
+      }
+    },
+    "response": {
+      "bind": {
+        "complete": {}
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "QmluZCBTdGF0ZW1lbnQgUGFyYW1ldGVycw==",
+    "postgres:portal": "",
+    "postgres:query": "SU5TRVJUIElOVE8gb3JkZXJfaXRlbXMgKCBvcmRlcl9pZCwgcHJvZHVjdF9pZCwgcXVhbnRpdHksIHByaWNlICkgVkFMVUVTICggJDEsICQyLCAkMywgJDQgKQ==",
+    "postgres:query_name": "c3RtdGNhY2hlX2VjN2EyZmNlNmViMjJmZDM0MDc4NTU5NjJkYjZlNmFmZTk3ZjZmMzNiMDQwMDk1NQ=="
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-07T17:55:31.928436Z",
+    "downstream": {
+      "established": "2026-10-07T17:55:31.922973Z",
+      "ipAddress": "127.0.0.1",
+      "port": 53280,
+      "bytesSent": "4430"
+    },
+    "upstream": {
+      "established": "2026-10-07T17:55:31.923500Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "1427"
+    },
+    "direction": "EGRESS"
+  }
+}

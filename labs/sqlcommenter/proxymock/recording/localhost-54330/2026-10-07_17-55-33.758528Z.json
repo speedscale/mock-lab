@@ -1,0 +1,100 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-07T17:55:33.758528Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000976s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "83",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1155",
+    "sequence": "163",
+    "source": "goproxy"
+  },
+  "uuid": "k2kvaoh5Qeanb49btdA1nQ==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Bind Statement Parameters",
+  "location": "SELECT p.name, coalesce(sum(i.quantity), 0) :: int, coalesce(sum(i.quantity * i.price), 0) :: float8 FROM products p LEFT JOIN order_items i ON i.product_id = p.id GROUP BY p.name ORDER BY 3 DESC",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "bind": {
+        "preparedStatement": "stmtcache_1d0de2029a7f01ecb1d7f00b252b65814bfe6333942ec8b7",
+        "resultFormatCodes": [
+          0,
+          1,
+          1
+        ],
+        "parseRequest": {
+          "name": "stmtcache_1d0de2029a7f01ecb1d7f00b252b65814bfe6333942ec8b7",
+          "query": "SELECT p.name, coalesce(sum(i.quantity), 0)::int, coalesce(sum(i.quantity * i.price), 0)::float8\n\t\tFROM products p LEFT JOIN order_items i ON i.product_id = p.id GROUP BY p.name ORDER BY 3 DESC /*db_driver='pgx',route='%2Freports%2Fsales',traceparent='00-0c7e0b297b0748fb6772bb48472520ab-baec79cda2a314e9-01'*/",
+          "describedRow": {
+            "fields": [
+              {
+                "name": "name",
+                "tableOid": 16386,
+                "tableAttributeNumber": 2,
+                "dataTypeOid": 25,
+                "dataTypeSize": 4294967295,
+                "typeModifier": -1
+              },
+              {
+                "name": "coalesce",
+                "dataTypeOid": 23,
+                "dataTypeSize": 4,
+                "typeModifier": -1
+              },
+              {
+                "name": "coalesce",
+                "dataTypeOid": 701,
+                "dataTypeSize": 8,
+                "typeModifier": -1
+              }
+            ]
+          }
+        }
+      }
+    },
+    "response": {
+      "bind": {
+        "complete": {}
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "QmluZCBTdGF0ZW1lbnQgUGFyYW1ldGVycw==",
+    "postgres:portal": "",
+    "postgres:query": "U0VMRUNUIHAubmFtZSwgY29hbGVzY2UgKCBzdW0gKCBpLnF1YW50aXR5ICksIDAgKSA6OiBpbnQsIGNvYWxlc2NlICggc3VtICggaS5xdWFudGl0eSAqIGkucHJpY2UgKSwgMCApIDo6IGZsb2F0OCBGUk9NIHByb2R1Y3RzIHAgTEVGVCBKT0lOIG9yZGVyX2l0ZW1zIGkgT04gaS5wcm9kdWN0X2lkID0gcC5pZCBHUk9VUCBCWSBwLm5hbWUgT1JERVIgQlkgMyBERVND",
+    "postgres:query_name": "c3RtdGNhY2hlXzFkMGRlMjAyOWE3ZjAxZWNiMWQ3ZjAwYjI1MmI2NTgxNGJmZTYzMzM5NDJlYzhiNw=="
+  },
+  "netinfo": {
+    "id": "10",
+    "startTime": "2026-10-07T17:55:33.554995Z",
+    "downstream": {
+      "established": "2026-10-07T17:55:33.551554Z",
+      "ipAddress": "127.0.0.1",
+      "port": 53303,
+      "bytesSent": "682"
+    },
+    "upstream": {
+      "established": "2026-10-07T17:55:33.551891Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "427"
+    },
+    "direction": "EGRESS"
+  }
+}

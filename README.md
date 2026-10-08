@@ -1,205 +1,65 @@
 # mock-lab
 
-Demo apps for the [proxymock](https://docs.speedscale.com/proxymock/) quickstart — the same
-small app in seven languages. Each one calls a CNCF projects API as its downstream; proxymock
-records that call, then mocks it so the app runs and tests with **no network**.
+Runnable apps and exercises for learning [proxymock](https://docs.speedscale.com/proxymock/). Fork this repository to change an app, record its traffic, and test your changes by replaying that traffic.
 
-## Try it in GitHub Codespaces
+## Start with a small app
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/speedscale/mock-lab)
+Pick a language. Each app runs on port 8080 and calls the same CNCF projects API. Its README walks through running, recording, mocking, and replaying it. Each app includes a complete proxymock workspace for trying the recorded examples offline.
 
-One click — all seven runtimes and the `proxymock` CLI are preinstalled. Run
-`proxymock init --api-key <key>` once to activate it (free key at
-[app.speedscale.com/signup](https://app.speedscale.com/signup)).
-
-## Pick your language
-
-| Language | Run |
+| Language | Example |
 | --- | --- |
-| [Go](go/README.md) | `cd go && go run .` |
-| [Node.js](node/README.md) | `cd node && node index.js` |
-| [Python](python/README.md) | `cd python && python3 app.py` |
-| [Java](java/README.md) | `cd java && java App.java` |
-| [Ruby](ruby/README.md) | `cd ruby && ruby app.rb` |
-| [.NET](dotnet/README.md) | `cd dotnet && dotnet run` |
-| [C++](cpp/README.md) | `cd cpp && c++ -std=c++17 main.cpp -o app -lcurl && ./app` |
+| Go | [languages/go](languages/go/README.md) |
+| Node.js | [languages/node](languages/node/README.md) |
+| Python | [languages/python](languages/python/README.md) |
+| Java | [languages/java](languages/java/README.md) |
+| Kotlin | [languages/kotlin](languages/kotlin/README.md) |
+| Ruby | [languages/ruby](languages/ruby/README.md) |
+| .NET | [languages/dotnet](languages/dotnet/README.md) |
+| C++ | [languages/cpp](languages/cpp/README.md) |
+| PHP | [languages/php](languages/php/README.md) |
+| Rust | [languages/rust](languages/rust/README.md) |
 
-Every app listens on `:8080` (override `PORT`) and calls the downstream at `DOWNSTREAM_URL`
-(default `https://demo-api.trafficreplay.com`).
-
-## Endpoints (identical across every language)
-
-| Endpoint | Calls downstream | Returns |
-| --- | --- | --- |
-| `GET /` | – | service info |
-| `GET /api/projects` | `/v1/projects` | all CNCF projects |
-| `GET /api/projects/{id}` | `/v1/project/{id}` | one project |
-| `GET /api/categories` | `/v1/categories` | categories with counts |
-| `GET /api/stats` | `/v1/projects` | counts by maturity |
-| `POST /oauth/token` | – | a fresh `access_token` |
-| `POST /api/orders` ¹ | `/v1/project/{id}` | creates an order with a fresh `order_id` |
-| `GET /api/orders/{order_id}` ¹ | – | the order |
-
-¹ requires `Authorization: Bearer <access_token>`.
-
-## proxymock quickstart
-
-First time on a machine, [install proxymock](https://docs.speedscale.com/proxymock/) and activate it
-once — `proxymock init --api-key <key>` (free key at
-[app.speedscale.com/signup](https://app.speedscale.com/signup)). In a Codespace the CLI is already
-installed, so you only need the `init`.
+Start with the [Node recording-to-scenarios walkthrough](languages/node/SCENARIOS.md), which needs only Node and proxymock. Fork this repo on GitHub, clone your fork, and enter the app directory:
 
 ```shell
-cd go                                          # pick any language dir (node/, python/, ...)
-proxymock record -- go run .                   # 1. record the app calling the downstream
-./lab/tests/run_tests.sh --recording           # 2. new terminal (repo root): drive every endpoint
-proxymock web                                   # 3. browse the recorded traffic in your browser (:7788)
-proxymock mock -- go run .                      # 4. mock the downstream — no network needed
-proxymock replay --test-against http://localhost:8080   # 5. replay it back at the app
+git clone https://github.com/<your-user>/mock-lab.git
+cd mock-lab/languages/node
 ```
 
-One script drives the whole demo — the 5 read endpoints plus the OAuth + order flow — pausing ~1s
-between calls so you can watch each one land in `proxymock web` (set `DELAY=0` to skip the pause).
-Step 5 can also be run **from the proxymock web UI** instead of the `proxymock replay` command.
+Install proxymock and run `proxymock init --api-key <key>` first. Get a free key at [app.speedscale.com/signup](https://app.speedscale.com/signup). Follow the Node walkthrough for proxy setup, a small capture and regression, contract, load and chaos scenarios. Start your editor or coding agent in the app directory; new recordings and results stay in that app's `proxymock/` workspace.
 
-Go, Python, Ruby, Java, .NET, and C++ all work with `proxymock record` out of the box — proxymock
-injects the proxy and TLS settings each runtime understands (for Java, via `JAVA_TOOL_OPTIONS`).
-**Node is the exception:** its `fetch` ignores proxy env vars until Node 24 (backported to 22.21),
-so set `NODE_USE_ENV_PROXY=1` and `NODE_EXTRA_CA_CERTS` first — see [node/README.md](node/README.md).
+### GitHub Codespaces
 
-## Auth handshake + the two moving IDs
+[![Open in GitHub Codespaces](.github/codespaces-badge.svg)](https://codespaces.new/speedscale/mock-lab)
 
-Each app also exposes a small OAuth-style flow, built to show how proxymock handles values that
-change between record and replay. `POST /oauth/token` returns a fresh `access_token`;
-`POST /api/orders` (Bearer-protected, validates the project against the downstream) returns a
-fresh `order_id`; `GET /api/orders/{order_id}` (Bearer-protected) reads it back. Those two IDs
-are **regenerated on every call**, so on replay the recorded token/order_id are stale and the
-protected calls would 401/404 — until *smart replace* chains them.
+The runtimes and proxymock CLI are preinstalled. Activate proxymock with your API key, then enter `languages/node` or another language directory. To work in your own fork, create a Codespace from that fork.
 
-A committed recording **and** smart-replace blueprint ship in [`lab/proxymock/`](lab/proxymock/),
-so you can mock + replay the whole demo (basic + auth endpoints) **offline against any language**,
-with no recording step:
+## Work through the agent tutorial
+
+The [tutorial app](tutorial/README.md) is a CNCF swag shop with an HTTP dependency and Postgres. Go, Java, Python, and Node implementations let an agent record traffic, tune mocks and tests, and run regression and performance tests. Start with the tutorial README for prerequisites and database setup.
+
+## Try a specific lab
+
+The [lab catalog](labs/README.md) has exercises for profiles, metrics, traces, logs, SQL query attribution, network policy, eBPF instrumentation, chaos, and contract testing. Each lab has its own setup and working directory.
+
+## Shared tools and recordings
+
+The [shared tools](shared/README.md) provide a reference downstream API, a dashboard, and a traffic driver for the language apps. Their downstream contract is [shared/openapi.yaml](shared/openapi.yaml).
+
+The root [proxymock workspace](proxymock/README.md) holds the reusable baseline recording, app contract, smart-replace blueprint, and schema-coverage test configuration. Run its examples from the repository root. The language workspaces hold captures from their own runtimes.
+
+## Agent skills
+
+Install the [Speedscale agent skills](https://github.com/speedscale/skills) into your agent:
 
 ```shell
-cd go                                                          # any language dir
-proxymock mock --in ../lab/proxymock/recording -- go run .     # downstream served from the recording
-# in another terminal:
-proxymock replay --in ../lab/proxymock/recording --test-against http://localhost:8080
+npx skills add speedscale/skills
 ```
 
-Replay passes 0% failed — the blueprint (`res_body → json_path → smart_replace_recorded` on
-`access_token` and `order_id`) re-chains both IDs. To record your own and watch it happen, use the
-quickstart above (`./lab/tests/run_tests.sh --recording` drives the auth flow too).
-
-## Mock match-rate tuning (MCP)
-
-The Go app has an opt-in telemetry beacon (`EMIT_TELEMETRY=1`) whose outbound calls each
-rotate on every run, so a replay produces mock misses by construction and exercises the
-tuner's pattern discovery: rotating UUIDs, a full set of **time-anchored ids** (ULID, epoch,
-Snowflake, Mongo ObjectId, UUIDv7, xid, KSUID), a **GraphQL** operation (variable masked,
-`query`/`operationName` protected), a **cursor pagination** flow whose value flows
-response→request (a correlation to bind, surfaced by `POST /api/mocks/provenance`), a
-**stateful poll** (same request, cycling response → needs a sequenced mock) with a companion
-**noise-only** endpoint (differs solely in a rotating timestamp), a **create→use** id
-(`POST /v1/orders` → `GET /v1/orders/{id}` — bound, never wildcarded), and an **auth/session**
-flow (token + session cookie replayed in headers → surfaced as credentials to correlate). The
-cursor, poll, create→use, and auth flows need the lab reference server as downstream
-(`DOWNSTREAM_URL=http://localhost:8090` against `../lab/server`). See
-[`go/README.md`](go/README.md#run) for the per-call breakdown. The
-[mock match-rate tuning guide](https://docs.speedscale.com/proxymock/guides/mock-match-rate/)
-uses it to demonstrate the `improve-mock-match-rate` skill and the proxymock MCP tuning tools
-(`analyze_mock_matches`, `accept_mock_recommendation`, `similar_candidates`): record with the
-beacon on, mock + replay, then let an AI agent tune the blueprint until the match rate is 100%.
-
-## Traffic replay tuning
-
-Traffic replay is useful because it keeps the story honest: the app succeeds or fails against
-requests it already saw. In this lab, the story starts with the Go demo app calling the CNCF API
-and running the auth/order flow. proxymock records that traffic as RRPairs. Then the mock set gets
-stale — several downstream recordings are missing — and replay exposes the gap as `MISS` results.
-Tuning means restoring or adjusting the mock set until the same replay passes cleanly.
-
-Use [`skills/proxymock-replay-tuning/`](skills/proxymock-replay-tuning/SKILL.md) when a local
-HTTP/HTTPS mock has replay misses and you need a repeatable match-rate report:
+The skills' proof scripts use this repository's root recording:
 
 ```shell
-./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh --in <recording-dir>
+MOCK_LAB_DIR="$PWD" /path/to/skills/skills/quality-loop/scripts/prove-quality-loop.sh
 ```
 
-`--in` points at a recording; the script replays its outbound pairs against the mock and skips the
-inbound ones. The committed recording works out of the box:
-
-```shell
-./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh --in lab/proxymock/recording
-```
-
-To tune your own traffic from a fresh checkout, take a local recording. This example uses the Go
-app, but the same pattern works from any language directory in this repo:
-
-```shell
-git clone https://github.com/speedscale/mock-lab.git
-cd mock-lab/go
-proxymock record --out ../replay-work/recording -- go run .
-```
-
-In another terminal from the repo root, drive the demo traffic, then tune the recording:
-
-```shell
-./lab/tests/run_tests.sh --recording
-./skills/proxymock-replay-tuning/scripts/tune-proxymock-replay.sh --in replay-work/recording
-```
-
-Or hand it to an AI agent from the repo root:
-
-```text
-Use the proxymock-replay-tuning skill to tune this replay.
-Recording: replay-work/recording
-Run the tuning script, summarize HIT/MISS/PASSTHROUGH, and recommend what transforms or recordings need to change.
-```
-
-The agent should run the tuning script, read `summary.json`, inspect misses in `mock-output/`, and
-recommend concrete changes to recordings, signatures, filters, or transforms. Rerun the same skill
-after each tuning change until the match rate is acceptable.
-
-To verify the tuning workflow itself, run:
-
-```shell
-./skills/proxymock-replay-tuning/scripts/prove-proxymock-replay-tuning.sh
-```
-
-The proof tells the whole replay story: record real app traffic, create a stale mock baseline,
-measure the misses, replay against the tuned mock set, and verify the hit rate improves.
-
-## More proxymock skills
-
-The same recordings power three more agent skills in [`skills/`](skills/). Each ships a script and
-a `prove-*.sh`, runs against the committed `lab/proxymock/recording`, and needs no Speedscale Cloud
-account.
-
-| Skill | What it does | Wraps |
-| --- | --- | --- |
-| [`proxymock-load-test`](skills/proxymock-load-test/SKILL.md) | Replay recorded traffic at a target with parallel virtual users; report latency percentiles, throughput, and match rate, with `--fail-if` SLO gates | `proxymock replay --vus --for --fail-if` |
-| [`proxymock-compare-results`](skills/proxymock-compare-results/SKILL.md) | Deep before/after comparison of two replay/recording sets — what regressed, improved, or persisted across performance/reliability/security; writes JSON, HTML, and an LLM digest | `proxymock report --baseline` + `proxymock drift` |
-| [`proxymock-summarize-recording`](skills/proxymock-summarize-recording/SKILL.md) | Summarize a recording: hosts, inbound/outbound endpoints, methods, status mix, volume, plus the report digest | `proxymock report --format prompt` |
-
-```shell
-# quick load test against the mocked app (run `cd go && proxymock mock --in ../lab/proxymock/recording -- go run .` first)
-./skills/proxymock-load-test/scripts/proxymock-load-test.sh \
-  --in lab/proxymock/recording/localhost --test-against http://localhost:8080 --vus 8 --for 20s
-
-# deep comparison of two replay outputs
-./skills/proxymock-compare-results/scripts/proxymock-compare-results.sh \
-  --in ./after --baseline ./before --drift --fail-on-regression
-
-# summarize what a recording contains
-./skills/proxymock-summarize-recording/scripts/proxymock-summarize-recording.sh \
-  --in lab/proxymock/recording --out recording-brief.md
-```
-
-## The downstream API
-
-The apps query a hosted CNCF projects API (default `demo-api.trafficreplay.com`). You don't
-run or manage it — its contract is in [`lab/openapi.yaml`](lab/openapi.yaml).
-
-> Everything the lab needs for itself (the mock backend, the traffic driver, and the API spec)
-> lives in [`lab/`](lab/). You can ignore it for the quickstart.
+See [how runtime feedback improves AI coding](AI-CONTEXT.md) for using recordings as context and replay as a check on code changes.

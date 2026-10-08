@@ -1,0 +1,38 @@
+pyroscope.write "local" {
+  endpoint {
+    url = "http://pyroscope:4040"
+  }
+}
+
+pyroscope.scrape "catalog_api" {
+  targets = [
+    {
+      "__address__" = "host.docker.internal:6060",
+      "service_name" = "catalog-api",
+    },
+  ]
+
+  forward_to = [pyroscope.write.local.receiver]
+
+  profiling_config {
+    profile.process_cpu {
+      enabled = true
+    }
+
+    profile.memory {
+      enabled = true
+    }
+
+    profile.goroutine {
+      enabled = true
+    }
+
+    profile.mutex {
+      enabled = false
+    }
+
+    profile.block {
+      enabled = false
+    }
+  }
+}

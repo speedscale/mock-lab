@@ -1,0 +1,99 @@
+{
+  "generated_at": "2026-08-13T19:30:00Z",
+  "host": "Apple arm64, macOS",
+  "versions": {
+    "loki": "3.5.7",
+    "alloy": "v1.12.0",
+    "grafana": "13.1.0",
+    "grafana_mcp": "0.14.0",
+    "go_directive": "1.23.0",
+    "proxymock": "v2.5.842"
+  },
+  "workload": {
+    "recording": "8 inbound GET /api/quote requests across 8 SKUs, 11 outbound GET /v1/price/ lookups (4 of them for the repricing SKU SSC-7300)",
+    "rare_path_share": "1 of 8 recorded quotes, 12.5% of every replay",
+    "functional": { "times": 1, "requests_total": 8 },
+    "load": { "virtual_users": 4, "iterations_per_user": 25, "requests_total": 800 }
+  },
+  "baseline": {
+    "pricing_attempts_on_repricing": 4,
+    "functional": {
+      "requests_total": 8,
+      "requests_failed": 0,
+      "result_match_pct": 100,
+      "latency_avg_ms": 55,
+      "latency_max_ms": 429
+    },
+    "load": {
+      "requests_total": 800,
+      "requests_failed": 0,
+      "latency_avg_ms": 55,
+      "latency_p50_ms": 1,
+      "latency_p90_ms": 429,
+      "latency_p95_ms": 431,
+      "latency_p99_ms": 432,
+      "requests_per_second": 72.01072401488678,
+      "window": {
+        "query_start": "2026-08-13T19:26:29Z",
+        "query_end": "2026-08-13T19:26:53Z",
+        "window_seconds": 24
+      }
+    },
+    "loki": {
+      "lines_by_level": { "INFO": 800, "WARN": 300, "ERROR": 100 },
+      "warn_error_events": {
+        "pricing_retry": 300,
+        "pricing_retry_exhausted": 100
+      },
+      "exhausted_by_sku": { "SSC-7300": { "dep_state": "REPRICING", "count": 100 } },
+      "quote_served_by_price_source": { "live": 700, "last_settled": 100 },
+      "quote_served_p95_duration_ms": { "live": 2, "last_settled": 432 }
+    }
+  },
+  "candidate": {
+    "pricing_attempts_on_repricing": 1,
+    "functional": {
+      "requests_total": 8,
+      "requests_failed": 0,
+      "result_match_pct": 100,
+      "latency_avg_ms": 1,
+      "latency_max_ms": 3
+    },
+    "load": {
+      "requests_total": 800,
+      "requests_failed": 0,
+      "latency_avg_ms": 1,
+      "latency_p50_ms": 1,
+      "latency_p90_ms": 1,
+      "latency_p95_ms": 1,
+      "latency_p99_ms": 2,
+      "requests_per_second": 4451.171698061578,
+      "window": {
+        "query_start": "2026-08-13T19:28:17Z",
+        "query_end": "2026-08-13T19:28:32Z",
+        "window_seconds": 15
+      }
+    },
+    "loki": {
+      "lines_by_level": { "INFO": 800, "WARN": 100, "ERROR": 0 },
+      "warn_error_events": {
+        "pricing_repricing_settled_price_used": 100
+      },
+      "quote_served_by_price_source": { "live": 700, "last_settled": 100 },
+      "quote_served_p95_duration_ms": { "live": 1, "last_settled": 1 }
+    }
+  },
+  "response_diff": {
+    "paired_responses_compared": 8,
+    "volatile_fields_filtered": 6,
+    "stable_field_differences": 0
+  },
+  "improvement": {
+    "pricing_calls_per_repricing_quote": "4 to 1",
+    "warn_and_error_lines_per_800_requests": "400 to 100",
+    "error_level_lines": "100 to 0",
+    "repricing_quote_p95_duration": "432 ms to 1 ms",
+    "load_p95_latency": "431 ms to 1 ms",
+    "decision_preserved": "700 live and 100 last_settled quotes in both runs; 0 stable-field response differences"
+  }
+}

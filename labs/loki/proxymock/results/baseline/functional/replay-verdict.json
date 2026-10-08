@@ -1,0 +1,120 @@
+{
+  "schemaVersion": 1,
+  "mode": "replay",
+  "verdict": "pass",
+  "replayDir": "proxymock/results/baseline/functional",
+  "pairs": [
+    {
+      "endpoint": "/api/quote?sku=SSC-4111\u0026qty=1",
+      "method": "GET",
+      "recordedStatus": 200,
+      "observedStatus": 200,
+      "match": "pass",
+      "bodyMatch": "pass",
+      "refUuid": "44f2e9b5-7af3-48fa-92e9-b554f5b69101",
+      "sourceFile": "proxymock/recording/localhost/2026-08-13_19-25-46.827092Z.md",
+      "replayFile": "proxymock/results/baseline/functional/localhost/2026-08-13_19-26-10.340874Z.md",
+      "newMismatch": false,
+      "changedVsBaseline": false
+    },
+    {
+      "endpoint": "/api/quote?sku=SSC-4110\u0026qty=3",
+      "method": "GET",
+      "recordedStatus": 200,
+      "observedStatus": 200,
+      "match": "pass",
+      "bodyMatch": "pass",
+      "refUuid": "4c4f83b6-f37c-4afa-8f08-21ea42e5b5b4",
+      "sourceFile": "proxymock/recording/localhost/2026-08-13_19-25-46.799704Z.md",
+      "replayFile": "proxymock/results/baseline/functional/localhost/2026-08-13_19-26-10.335806Z.md",
+      "newMismatch": false,
+      "changedVsBaseline": false
+    },
+    {
+      "endpoint": "/api/quote?sku=SSC-6100\u0026qty=1",
+      "method": "GET",
+      "recordedStatus": 200,
+      "observedStatus": 200,
+      "match": "pass",
+      "bodyMatch": "pass",
+      "refUuid": "555a5a1d-cc4b-418d-a9bf-85fec626e8a2",
+      "sourceFile": "proxymock/recording/localhost/2026-08-13_19-25-47.40419Z.md",
+      "replayFile": "proxymock/results/baseline/functional/localhost/2026-08-13_19-26-10.780148Z.md",
+      "newMismatch": false,
+      "changedVsBaseline": false
+    },
+    {
+      "endpoint": "/api/quote?sku=SSC-5200\u0026qty=12",
+      "method": "GET",
+      "recordedStatus": 200,
+      "observedStatus": 200,
+      "match": "pass",
+      "bodyMatch": "pass",
+      "refUuid": "a980238e-e43d-4d8e-a7be-7210407656b3",
+      "sourceFile": "proxymock/recording/localhost/2026-08-13_19-25-46.851426Z.md",
+      "replayFile": "proxymock/results/baseline/functional/localhost/2026-08-13_19-26-10.343769Z.md",
+      "newMismatch": false,
+      "changedVsBaseline": false
+    },
+    {
+      "endpoint": "/api/quote?sku=SSC-7300\u0026qty=2",
+      "method": "GET",
+      "recordedStatus": 200,
+      "observedStatus": 200,
+      "match": "pass",
+      "bodyMatch": "pass",
+      "refUuid": "b85557b9-d3af-4671-a50c-9e5dea8670be",
+      "sourceFile": "proxymock/recording/localhost/2026-08-13_19-25-46.875321Z.md",
+      "replayFile": "proxymock/results/baseline/functional/localhost/2026-08-13_19-26-10.346425Z.md",
+      "newMismatch": false,
+      "changedVsBaseline": false
+    },
+    {
+      "endpoint": "/api/quote?sku=SSC-8200\u0026qty=25",
+      "method": "GET",
+      "recordedStatus": 200,
+      "observedStatus": 200,
+      "match": "pass",
+      "bodyMatch": "pass",
+      "refUuid": "bd9799dc-323d-467c-926a-0997cea0f4da",
+      "sourceFile": "proxymock/recording/localhost/2026-08-13_19-25-47.453029Z.md",
+      "replayFile": "proxymock/results/baseline/functional/localhost/2026-08-13_19-26-10.784932Z.md",
+      "newMismatch": false,
+      "changedVsBaseline": false
+    },
+    {
+      "endpoint": "/api/quote?sku=SSC-5201\u0026qty=4",
+      "method": "GET",
+      "recordedStatus": 200,
+      "observedStatus": 200,
+      "match": "pass",
+      "bodyMatch": "pass",
+      "refUuid": "e6aaf754-f132-4be1-933a-d0aa923d8a68",
+      "sourceFile": "proxymock/recording/localhost/2026-08-13_19-25-47.372291Z.md",
+      "replayFile": "proxymock/results/baseline/functional/localhost/2026-08-13_19-26-10.777451Z.md",
+      "newMismatch": false,
+      "changedVsBaseline": false
+    },
+    {
+      "endpoint": "/api/quote?sku=SSC-6101\u0026qty=7",
+      "method": "GET",
+      "recordedStatus": 200,
+      "observedStatus": 200,
+      "match": "pass",
+      "bodyMatch": "pass",
+      "refUuid": "ffa2c2d7-dc33-4fd0-869b-73322d363b54",
+      "sourceFile": "proxymock/recording/localhost/2026-08-13_19-25-47.429788Z.md",
+      "replayFile": "proxymock/results/baseline/functional/localhost/2026-08-13_19-26-10.782439Z.md",
+      "newMismatch": false,
+      "changedVsBaseline": false
+    }
+  ],
+  "summary": {
+    "pairs": 8,
+    "mismatches": 0
+  },
+  "gate": {
+    "enabled": false,
+    "exitCode": 0
+  }
+}

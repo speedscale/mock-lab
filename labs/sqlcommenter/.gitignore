@@ -1,0 +1,7 @@
+bin/
+scratch/
+proxymock.log
+proxymock/capture.log
+proxymock/results/
+proxymock/recording/.replay/
+proxymock/recording/*/.replay/

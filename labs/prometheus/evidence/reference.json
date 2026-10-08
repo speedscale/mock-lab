@@ -1,0 +1,87 @@
+{
+  "generated_at": "2026-08-13T15:05:00Z",
+  "host": "Apple arm64, macOS",
+  "versions": {
+    "prometheus": "3.12.0",
+    "grafana": "13.1.0",
+    "grafana_mcp": "0.14.0",
+    "prometheus_client_golang": "1.20.5",
+    "go_directive": "1.23.0",
+    "proxymock": "2.5.842"
+  },
+  "workload": {
+    "recording": "1 inbound GET /api/quote?sku=SSC-4110&qty=3, 1 outbound GET /v1/price/SSC-4110",
+    "mock_timing": "40x",
+    "functional": { "times": 3 },
+    "load": { "virtual_users": 8, "iterations_per_user": 150, "requests_total": 1200 }
+  },
+  "baseline": {
+    "pricing_max_conns": 2,
+    "functional": {
+      "requests_total": 3,
+      "requests_failed": 0,
+      "result_match_pct": 100,
+      "latency_avg_ms": 44
+    },
+    "load": {
+      "requests_total": 1200,
+      "requests_failed": 0,
+      "latency_avg_ms": 107,
+      "latency_p50_ms": 90,
+      "latency_p95_ms": 173,
+      "latency_p99_ms": 174,
+      "requests_per_second": 46.43631236239506,
+      "window": {
+        "query_start": "2026-08-13T14:59:55Z",
+        "query_end": "2026-08-13T15:00:24Z",
+        "window_seconds": 29
+      }
+    },
+    "prometheus": {
+      "request_duration_p95_seconds": 0.18997573062922515,
+      "conn_wait_p95_seconds": 0.13997573062922514,
+      "cpu_average_cores": 0.04650782086993787,
+      "request_count_extrapolated": 1239.1259910006427
+    }
+  },
+  "candidate": {
+    "pricing_max_conns": 16,
+    "functional": {
+      "requests_total": 3,
+      "requests_failed": 0,
+      "result_match_pct": 100,
+      "latency_avg_ms": 46
+    },
+    "load": {
+      "requests_total": 1200,
+      "requests_failed": 0,
+      "latency_avg_ms": 44,
+      "latency_p50_ms": 44,
+      "latency_p95_ms": 46,
+      "latency_p99_ms": 47,
+      "requests_per_second": 176.83912984986347,
+      "window": {
+        "query_start": "2026-08-13T15:01:23Z",
+        "query_end": "2026-08-13T15:01:33Z",
+        "window_seconds": 10
+      }
+    },
+    "prometheus": {
+      "request_duration_p95_seconds": 0.04876806541582151,
+      "conn_wait_p95_seconds": 0.000991333916486595,
+      "cpu_average_cores": 0.10452077777777777,
+      "request_count_extrapolated": 1315.666666666667
+    }
+  },
+  "response_diff": {
+    "paired_responses_compared": 1,
+    "volatile_fields_filtered": 1,
+    "stable_field_differences": 0
+  },
+  "improvement": {
+    "load_p95_latency": "173 ms to 46 ms (3.8x)",
+    "conn_wait_p95": "140 ms to 0.99 ms (141x)",
+    "throughput": "46.4 req/s to 176.8 req/s (3.8x)",
+    "cpu": "0.05 to 0.10 average cores; never the limiting resource"
+  }
+}

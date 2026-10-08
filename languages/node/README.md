@@ -37,10 +37,6 @@ Node 24 (backported to 22.21) adds `NODE_USE_ENV_PROXY`, which routes `fetch` th
 older Node, route `fetch` through a proxy dispatcher per the
 [language reference](https://docs.speedscale.com/proxymock/getting-started/language-reference/).
 
-## Credential styles
-
-[Try JWT, HTTP Basic and opaque-bearer replay](CREDENTIALS.md) with a small committed recording. This optional Node-only exercise uses built-in crypto and native proxymock transforms.
-
 ## Auth flow (two moving IDs)
 
 This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. The dashboard in step 2 drives this flow too — set the endpoint switch to Record, then click through the calls. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see [`./proxymock/`](./proxymock/) for the ready-to-run recording + blueprint.

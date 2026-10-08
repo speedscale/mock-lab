@@ -2,7 +2,7 @@ openapi: 3.0.3
 info:
   title: mock-lab app API
   version: "1.0.0"
-  description: Node inbound API, including its credential demo endpoints.
+  description: Inbound API served by each language implementation in mock-lab.
 servers:
   - url: http://localhost:8080
 paths:
@@ -133,72 +133,7 @@ paths:
               schema: {$ref: "#/components/schemas/Order"}
         "401": {$ref: "#/components/responses/Unauthorized"}
         "404": {$ref: "#/components/responses/NotFound"}
-  /auth/login:
-    post:
-      summary: Issue a demo HS256 JWT for a subject
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [username]
-              properties:
-                username: {type: string, minLength: 1}
-      responses:
-        "200":
-          description: Demo JWT
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [access_token, token_type, expires_in, subject]
-                properties:
-                  access_token: {type: string, minLength: 1}
-                  token_type: {type: string, enum: [Bearer]}
-                  expires_in: {type: integer, enum: [86400]}
-                  subject: {type: string, minLength: 1}
-        "400":
-          description: Missing or invalid username
-          content:
-            application/json:
-              schema: {$ref: "#/components/schemas/Error"}
-  /api/profile:
-    get:
-      summary: Read the signed JWT subject
-      security: [{DemoJWT: []}]
-      responses:
-        "200":
-          description: Subject profile
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [subject, plan]
-                properties:
-                  subject: {type: string, minLength: 1}
-                  plan: {type: string, enum: [pro]}
-        "401": {$ref: "#/components/responses/Unauthorized"}
-  /api/account:
-    get:
-      summary: Read a demo Basic account
-      security: [{DemoBasic: []}]
-      responses:
-        "200":
-          description: Account information
-          content:
-            application/json:
-              schema:
-                type: object
-                required: [account, orders]
-                properties:
-                  account: {type: string, enum: [acme, globex]}
-                  orders: {type: integer, minimum: 0}
-        "401": {$ref: "#/components/responses/Unauthorized"}
 components:
-  securitySchemes:
-    DemoJWT: {type: http, scheme: bearer, bearerFormat: JWT}
-    DemoBasic: {type: http, scheme: basic}
   schemas:
     Project:
       type: object

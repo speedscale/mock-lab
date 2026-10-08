@@ -10,7 +10,6 @@
 !/languages/go/proxymock/testconfigs/
 /languages/node/proxymock/*
 !/languages/node/proxymock/recording/
-!/languages/node/proxymock/credential-recording/
 !/languages/node/proxymock/applications/
 !/languages/node/proxymock/blueprints/
 !/languages/node/proxymock/testconfigs/
@@ -60,8 +59,6 @@
 # scratch proxymock writes inside the committed per-language recordings
 /languages/*/proxymock/recording/.replay/
 /languages/*/proxymock/recording/*/.replay/
-/languages/node/proxymock/credential-recording/.replay/
-/languages/node/proxymock/credential-recording/*/.replay/
 # scratch proxymock writes into the committed root workspace
 /proxymock/results/
 /proxymock/recording/.replay/
@@ -113,3 +110,11 @@ node_modules/
 /tutorial/.tutorial-db/
 /tutorial/tutorial-db
 /tutorial/tutorial-db.exe
+
+# credential lab: retain the fixture and ignore new captures and replay output
+/labs/credentials/proxymock/recorded-*/
+/labs/credentials/proxymock/results/
+/labs/credentials/proxymock/.replay/
+/labs/credentials/proxymock/recording/.replay/
+/labs/credentials/proxymock/recording/*/.replay/
+/labs/credentials/proxymock.log

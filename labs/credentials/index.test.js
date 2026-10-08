@@ -64,7 +64,7 @@ test("Basic accounts accept only the demo credential set", async () => {
   assert.equal((await fetch(`${base}/api/account`)).status, 401);
 });
 
-test("existing opaque bearer flow remains distinct", async () => {
+test("opaque bearer flow remains distinct", async () => {
   const response = await fetch(`${base}/oauth/token`, { method: "POST" });
   assert.equal(response.status, 200);
   const { access_token } = await response.json();

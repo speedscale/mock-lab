@@ -27,7 +27,7 @@ proxymock validate --spec proxymock/applications/my-app.openapi.yaml \
 
 Expect nine matched responses and passing assertion goals, including the intended 404 and 401. The credential-replay blueprint re-signs the two profile JWTs with the public demo key, refreshing their expiry. The same blueprint refreshes the opaque token from its login response using native smart replacement. Basic credentials are the fixed synthetic set. The test config ignores the generated access_token response field while checking status, stable body fields and schema; HTTP tests separately verify issued JWTs. The unknown-user request is a regression test for accepting an empty password.
 
-Results stay in ignored proxymock/results. Use a fresh output directory for another run. This recording has no dependency calls, so mock match rate is not a metric for this exercise. Use [the Node recording-to-scenarios guide](../../languages/node/SCENARIOS.md) for dependency mocks, load and chaos.
+Results stay in ignored proxymock/results. Use a fresh output directory for another run. This recording has no dependency calls, so mock match rate is not a metric for this exercise. Use the built-in [Node app](../../languages/node/README.md) and installed [agent skills](../../README.md#agent-skills) to create tests with dependency mocks.
 
 ## Make a fresh credential capture
 

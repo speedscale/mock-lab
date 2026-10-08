@@ -19,14 +19,14 @@ Pick a language. Each app runs on port 8080 and calls the same CNCF projects API
 | PHP | [languages/php](languages/php/README.md) |
 | Rust | [languages/rust](languages/rust/README.md) |
 
-Start with the [Node recording-to-scenarios walkthrough](languages/node/SCENARIOS.md), which needs only Node and proxymock. Fork this repo on GitHub, clone your fork, and enter the app directory:
+Start with the [Node app](languages/node/README.md), which needs only Node and proxymock. Fork this repo on GitHub, clone your fork, and enter the app directory:
 
 ```shell
 git clone https://github.com/<your-user>/mock-lab.git
 cd mock-lab/languages/node
 ```
 
-Install proxymock and run `proxymock init --api-key <key>` first. Get a free key at [app.speedscale.com/signup](https://app.speedscale.com/signup). Follow the Node walkthrough for proxy setup, a small capture and regression, contract, load and chaos scenarios. Start your editor or coding agent in the app directory; new recordings and results stay in that app's `proxymock/` workspace.
+Install proxymock and run `proxymock init --api-key <key>` first. Get a free key at [app.speedscale.com/signup](https://app.speedscale.com/signup). Follow the app README for runtime and proxy setup. Record a small session or use the committed recording, then ask the installed skills to create the tests. Start your editor or coding agent in the app directory; new recordings and results stay in that app's `proxymock/` workspace.
 
 ### GitHub Codespaces
 
@@ -55,6 +55,8 @@ Install the [Speedscale agent skills](https://github.com/speedscale/skills) into
 ```shell
 npx skills add speedscale/skills
 ```
+
+From the app directory, ask your agent: "Use this recording to create and run regression, contract, load and chaos tests. Show proposed expectations and budgets for review before saving them." Then ask it to use the results and OpenAPI schema to improve coverage and nonfunctional checks. The skills choose the scenarios and native commands from the app and traffic; this repository supplies their inputs.
 
 The skills' proof scripts use this repository's root recording:
 

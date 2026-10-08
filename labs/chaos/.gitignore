@@ -3,3 +3,7 @@ scratch/
 proxymock.log
 proxymock/capture.log
 proxymock/results/
+proxymock/recorded-*/
+proxymock/.replay/
+proxymock/recording/.replay/
+proxymock/recording/*/.replay/

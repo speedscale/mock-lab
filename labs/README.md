@@ -13,6 +13,6 @@ Companion scenarios. Each directory has its own README and is independent of the
 | [credentials](credentials/README.md) | Re-sign JWTs, refresh opaque bearer tokens and replay HTTP Basic credentials in an independent Node app |
 | [contract-testing](contract-testing/README.md) | Compare a deliberately invalid vendor capture with the clean baseline using an OpenAPI contract |
 | [sqlcommenter](sqlcommenter/README.md) | which inbound request ran each SQL query, exactly, from the trace id the app writes into a SQL comment |
-| [chaos](chaos/README.md) | a scoped chaos rule that forces the storefront's unused inventory-fallback path to run |
+| [chaos](chaos/README.md) | Verify a Node storefront against API and latency requirements using recorded inventory traffic |
 
 The reference API and traffic tools live in [shared/](../shared/README.md). The reusable baseline lives in the root [proxymock workspace](../proxymock/README.md).

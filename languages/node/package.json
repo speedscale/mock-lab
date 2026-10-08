@@ -5,6 +5,7 @@
   "type": "module",
   "description": "proxymock CNCF quickstart demo app (Node.js)",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "test": "node --test index.test.js"
   }
 }

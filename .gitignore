@@ -10,6 +10,7 @@
 !/languages/go/proxymock/testconfigs/
 /languages/node/proxymock/*
 !/languages/node/proxymock/recording/
+!/languages/node/proxymock/credential-recording/
 !/languages/node/proxymock/applications/
 !/languages/node/proxymock/blueprints/
 !/languages/node/proxymock/testconfigs/
@@ -59,6 +60,8 @@
 # scratch proxymock writes inside the committed per-language recordings
 /languages/*/proxymock/recording/.replay/
 /languages/*/proxymock/recording/*/.replay/
+/languages/node/proxymock/credential-recording/.replay/
+/languages/node/proxymock/credential-recording/*/.replay/
 # scratch proxymock writes into the committed root workspace
 /proxymock/results/
 /proxymock/recording/.replay/

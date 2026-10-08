@@ -81,6 +81,10 @@ jobs:
       - if: matrix.lang == 'rust'
         run: cargo build --release --manifest-path languages/rust/Cargo.toml
 
+      - name: Node credential tests
+        if: matrix.lang == 'node'
+        run: node --test languages/node/index.test.js
+
       - name: validate ${{ matrix.lang }} app against the reference downstream
         run: |
           set -euo pipefail

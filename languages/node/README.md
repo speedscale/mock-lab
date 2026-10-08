@@ -6,6 +6,8 @@ The Node.js version of the [mock-lab](../../README.md) proxymock demo. It serves
 Zero dependencies — built-in `http` + global `fetch`. Needs **Node 24+** (or 22.21+) for the
 built-in proxy support proxymock relies on; the devcontainer ships Node 24.
 
+[Turn one recording into regression, contract, load and chaos scenarios](SCENARIOS.md) using only Node and proxymock. The guide includes a four-request capture and the two prompts.
+
 ## Run
 
 ```shell

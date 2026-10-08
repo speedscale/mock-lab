@@ -1,0 +1,65 @@
+# Postgres 16 with the tutorial schema. Data lives in an emptyDir, so a pod
+# restart starts from empty tables, which is all the tutorial needs.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          env:
+            - name: POSTGRES_USER
+              value: tutorial
+            - name: POSTGRES_PASSWORD
+              value: tutorial
+            - name: POSTGRES_DB
+              value: tutorial
+          ports:
+            - containerPort: 5432
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "tutorial", "-d", "tutorial"]
+            periodSeconds: 2
+          volumeMounts:
+            - name: schema
+              mountPath: /docker-entrypoint-initdb.d
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+      volumes:
+        - name: schema
+          configMap:
+            name: postgres-schema
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

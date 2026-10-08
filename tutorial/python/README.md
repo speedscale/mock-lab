@@ -4,16 +4,16 @@ A small CNCF swag shop API (FastAPI, httpx, psycopg 3) for the proxymock getting
 
 ## Prerequisites
 
-Python 3.11+, Docker (for Postgres), and [proxymock](https://docs.speedscale.com/proxymock/).
+Python 3.11+, `tutorial-db` for Postgres (see [Start the database](../README.md#start-the-database)), and [proxymock](https://docs.speedscale.com/proxymock/).
 
 ## Run it
+
+Start Postgres first, in its own terminal (see [Start the database](../README.md#start-the-database)). Then:
 
 ```sh
 python3 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 source .venv/bin/activate
-
-(cd .. && docker compose up -d)   # Postgres on localhost:5432
 
 python app.py                     # listens on :8080
 pytest                            # unit tests, no database needed
@@ -25,7 +25,7 @@ The environment variables (`PORT`, `DATABASE_URL`, `DEMO_API_URL`, `APP_VERSION`
 ## Record with proxymock
 
 ```sh
-DATABASE_URL=postgres://tutorial:tutorial@localhost:15432/tutorial?sslmode=disable proxymock record --map 15432=postgres://localhost:5432 -- python app.py
+DATABASE_URL=postgres://tutorial:tutorial@localhost:15432/tutorial?sslmode=disable proxymock record --map 15432=postgres://localhost:54329 -- python app.py
 ```
 
 In another terminal, send traffic through the proxymock inbound port:

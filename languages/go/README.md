@@ -4,6 +4,8 @@ The Go version of the [mock-lab](../../README.md) proxymock demo. It serves an H
 `:8080` and fulfills each request by calling the CNCF projects API downstream
 (`DOWNSTREAM_URL`, default `https://demo-api.trafficreplay.com`; set `PORT` to change the port).
 
+[Turn one recording into regression, contract, load and chaos scenarios](SCENARIOS.md) using Go and proxymock. Start with the committed HTTP recording; new captures can follow through the record-traffic skill.
+
 ## Run
 
 ```shell

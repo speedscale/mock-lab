@@ -1,0 +1,122 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-07T17:55:33.833252Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000671s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "85",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1155",
+    "sequence": "193",
+    "source": "goproxy"
+  },
+  "uuid": "kks1WO+xR1CJAlNJgQ3DQg==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Bind Statement Parameters",
+  "location": "SELECT id, name, price :: float8, stock FROM products WHERE id = $1",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "bind": {
+        "preparedStatement": "product_by_id",
+        "parameterFormatCodes": [
+          1
+        ],
+        "parameters": [
+          {
+            "asString": "\u0000\u0000\u0000\u0003"
+          }
+        ],
+        "resultFormatCodes": [
+          1,
+          0,
+          1,
+          1
+        ],
+        "parseRequest": {
+          "name": "product_by_id",
+          "query": "SELECT id, name, price::float8, stock FROM products WHERE id = $1 /*db_driver='pgx',route='%2Fproducts%2F%7Bid%7D',traceparent='00-b05664498a3b82a5b808a4d178cab016-01bdaf1479a4fc46-01'*/",
+          "describedParameterOids": [
+            23
+          ],
+          "describedRow": {
+            "fields": [
+              {
+                "name": "id",
+                "tableOid": 16386,
+                "tableAttributeNumber": 1,
+                "dataTypeOid": 23,
+                "dataTypeSize": 4,
+                "typeModifier": -1
+              },
+              {
+                "name": "name",
+                "tableOid": 16386,
+                "tableAttributeNumber": 2,
+                "dataTypeOid": 25,
+                "dataTypeSize": 4294967295,
+                "typeModifier": -1
+              },
+              {
+                "name": "price",
+                "dataTypeOid": 701,
+                "dataTypeSize": 8,
+                "typeModifier": -1
+              },
+              {
+                "name": "stock",
+                "tableOid": 16386,
+                "tableAttributeNumber": 4,
+                "dataTypeOid": 23,
+                "dataTypeSize": 4,
+                "typeModifier": -1
+              }
+            ]
+          }
+        }
+      }
+    },
+    "response": {
+      "bind": {
+        "complete": {}
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "QmluZCBTdGF0ZW1lbnQgUGFyYW1ldGVycw==",
+    "postgres:portal": "",
+    "postgres:query": "U0VMRUNUIGlkLCBuYW1lLCBwcmljZSA6OiBmbG9hdDgsIHN0b2NrIEZST00gcHJvZHVjdHMgV0hFUkUgaWQgPSAkMQ==",
+    "postgres:query_name": "cHJvZHVjdF9ieV9pZA=="
+  },
+  "netinfo": {
+    "id": "12",
+    "startTime": "2026-10-07T17:55:33.555008Z",
+    "downstream": {
+      "established": "2026-10-07T17:55:33.551948Z",
+      "ipAddress": "127.0.0.1",
+      "port": 53308,
+      "bytesSent": "1092"
+    },
+    "upstream": {
+      "established": "2026-10-07T17:55:33.552121Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "789"
+    },
+    "direction": "EGRESS"
+  }
+}

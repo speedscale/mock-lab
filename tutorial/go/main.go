@@ -25,7 +25,7 @@ func main() {
 	log.SetFlags(0)
 
 	port := env("PORT", "8080")
-	dbURL := env("DATABASE_URL", "postgres://tutorial:tutorial@localhost:5432/tutorial?sslmode=disable")
+	dbURL := env("DATABASE_URL", "postgres://tutorial:tutorial@localhost:54329/tutorial?sslmode=disable")
 	apiURL := env("DEMO_API_URL", "https://demo-api.trafficreplay.com")
 	version := env("APP_VERSION", "v1")
 	slow := os.Getenv("APP_SLOW") == "1"

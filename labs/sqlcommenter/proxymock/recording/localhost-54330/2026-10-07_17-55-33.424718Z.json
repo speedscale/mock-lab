@@ -1,0 +1,101 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-07T17:55:33.424718Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000004s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "75",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1155",
+    "sequence": "16",
+    "source": "goproxy"
+  },
+  "uuid": "lt85TpcGQkWArNDsnu8IfQ==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Execute Prepared Statement",
+  "location": "SELECT count(*) FROM products",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "execute": {
+        "bindRequest": {
+          "preparedStatement": "stmtcache_16093db087f8261e03be7df3b1cdb7c8a7e4edae96c67213",
+          "resultFormatCodes": [
+            1
+          ],
+          "parseRequest": {
+            "name": "stmtcache_16093db087f8261e03be7df3b1cdb7c8a7e4edae96c67213",
+            "query": "SELECT count(*) FROM products",
+            "describedRow": {
+              "fields": [
+                {
+                  "name": "count",
+                  "dataTypeOid": 20,
+                  "dataTypeSize": 8,
+                  "typeModifier": -1
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "response": {
+      "execute": {
+        "messages": [
+          {
+            "dataRow": {
+              "values": [
+                {
+                  "asString": "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0005"
+                }
+              ]
+            }
+          },
+          {
+            "complete": {
+              "tag": "SELECT 1"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "RXhlY3V0ZSBQcmVwYXJlZCBTdGF0ZW1lbnQ=",
+    "postgres:portal": "",
+    "postgres:query": "U0VMRUNUIGNvdW50ICggKiApIEZST00gcHJvZHVjdHM=",
+    "postgres:query_name": "c3RtdGNhY2hlXzE2MDkzZGIwODdmODI2MWUwM2JlN2RmM2IxY2RiN2M4YTdlNGVkYWU5NmM2NzIxMw=="
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-07T17:55:31.928436Z",
+    "downstream": {
+      "established": "2026-10-07T17:55:31.922973Z",
+      "ipAddress": "127.0.0.1",
+      "port": 53280,
+      "bytesSent": "1447"
+    },
+    "upstream": {
+      "established": "2026-10-07T17:55:31.923500Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "281"
+    },
+    "direction": "EGRESS"
+  }
+}

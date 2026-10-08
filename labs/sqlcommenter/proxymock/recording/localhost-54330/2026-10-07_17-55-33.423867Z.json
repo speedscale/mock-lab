@@ -1,0 +1,87 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-07T17:55:33.423867Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000040s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "75",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1155",
+    "sequence": "13",
+    "source": "goproxy"
+  },
+  "uuid": "m5YaswENS4aXl27inw7cmg==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Describe Prepared Statement",
+  "location": "SELECT count(*) FROM products",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "describe": {
+        "objectType": "OBJECT_TYPE_PREPARED_STATEMENT",
+        "name": "stmtcache_16093db087f8261e03be7df3b1cdb7c8a7e4edae96c67213",
+        "parseRequest": {
+          "name": "stmtcache_16093db087f8261e03be7df3b1cdb7c8a7e4edae96c67213",
+          "query": "SELECT count(*) FROM products"
+        }
+      }
+    },
+    "response": {
+      "describe": {
+        "messages": [
+          {
+            "parameterDescription": {}
+          },
+          {
+            "rowDescription": {
+              "fields": [
+                {
+                  "name": "count",
+                  "dataTypeOid": 20,
+                  "dataTypeSize": 8,
+                  "typeModifier": -1
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "RGVzY3JpYmUgUHJlcGFyZWQgU3RhdGVtZW50",
+    "postgres:query": "U0VMRUNUIGNvdW50ICggKiApIEZST00gcHJvZHVjdHM=",
+    "postgres:query_name": "c3RtdGNhY2hlXzE2MDkzZGIwODdmODI2MWUwM2JlN2RmM2IxY2RiN2M4YTdlNGVkYWU5NmM2NzIxMw=="
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-07T17:55:31.928436Z",
+    "downstream": {
+      "established": "2026-10-07T17:55:31.922973Z",
+      "ipAddress": "127.0.0.1",
+      "port": 53280,
+      "bytesSent": "1447"
+    },
+    "upstream": {
+      "established": "2026-10-07T17:55:31.923500Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "237"
+    },
+    "direction": "EGRESS"
+  }
+}

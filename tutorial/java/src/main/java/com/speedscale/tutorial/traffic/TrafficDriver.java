@@ -1,7 +1,8 @@
 package com.speedscale.tutorial.traffic;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.net.URI;
@@ -57,8 +58,8 @@ public class TrafficDriver {
             String id = null;
             if (created != null) {
                 try {
-                    id = mapper.readTree(created).path("id").asText(null);
-                } catch (IOException e) {
+                    id = mapper.readTree(created).path("id").asString(null);
+                } catch (JacksonException e) {
                     id = null;
                 }
             }
@@ -76,7 +77,7 @@ public class TrafficDriver {
             call("GET", "/orders", null, 200);
         }
         for (JsonNode bad : plan.get("bad_requests")) {
-            call(bad.get("method").asText(), bad.get("path").asText(), bad.get("body"), bad.get("expect").asInt());
+            call(bad.get("method").asString(), bad.get("path").asString(), bad.get("body"), bad.get("expect").asInt());
         }
     }
 

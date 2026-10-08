@@ -1,0 +1,90 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-07T17:55:33.555130Z",
+  "l7protocol": "postgres",
+  "duration": 201,
+  "elapsed": "0.201992s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "85",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1155",
+    "sequence": "139",
+    "source": "goproxy"
+  },
+  "uuid": "I+fg+5rLTmGQVVmyR1qzVQ==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Query",
+  "location": "SELECT pg_sleep(0.2)",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "query": {
+        "query": "SELECT pg_sleep(0.2) /*db_driver='pgx',route='%2Freports%2Fsales',traceparent='00-f0980d255e3909cded9f6a98f9f6c864-102cd36c1ddff3ba-01'*/"
+      }
+    },
+    "response": {
+      "query": {
+        "messages": [
+          {
+            "rowDescription": {
+              "fields": [
+                {
+                  "name": "pg_sleep",
+                  "dataTypeOid": 2278,
+                  "dataTypeSize": 4,
+                  "typeModifier": -1
+                }
+              ]
+            }
+          },
+          {
+            "dataRow": {
+              "values": [
+                {}
+              ]
+            }
+          },
+          {
+            "complete": {
+              "tag": "SELECT 1"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "UXVlcnk=",
+    "postgres:query": "U0VMRUNUIHBnX3NsZWVwICggMC4yICk="
+  },
+  "netinfo": {
+    "id": "12",
+    "startTime": "2026-10-07T17:55:33.555008Z",
+    "downstream": {
+      "established": "2026-10-07T17:55:33.551948Z",
+      "ipAddress": "127.0.0.1",
+      "port": 53308,
+      "bytesSent": "143"
+    },
+    "upstream": {
+      "established": "2026-10-07T17:55:33.552121Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "65"
+    },
+    "direction": "EGRESS"
+  }
+}

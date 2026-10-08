@@ -13,7 +13,7 @@ A small CNCF swag shop. Customers order stickers and shirts of CNCF projects. Th
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PORT` | `8080` | HTTP listen port |
-| `DATABASE_URL` | `postgres://tutorial:tutorial@localhost:5432/tutorial?sslmode=disable` | Postgres URL, always in this `postgres://` form in every language (Java converts it to JDBC itself) |
+| `DATABASE_URL` | `postgres://tutorial:tutorial@localhost:54329/tutorial?sslmode=disable` | Postgres URL, always in this `postgres://` form in every language (Java converts it to JDBC itself) |
 | `DEMO_API_URL` | `https://demo-api.trafficreplay.com` | Base URL of the CNCF projects API, no trailing slash |
 | `APP_VERSION` | `v1` | `v2` turns on the planted regression |
 | `APP_SLOW` | `0` | `1` turns on the planted N+1 query |
@@ -29,7 +29,7 @@ proxymock starts the app with `http_proxy`/`https_proxy` (lowercase) pointing at
 * Python: `httpx` with `trust_env=True` (the default) reads the proxy variables. Pass `verify=` an `ssl.SSLContext` that loads the system defaults plus `SSL_CERT_FILE` when that variable is set.
 * Node: global `fetch` ignores proxy variables. When `https_proxy`/`HTTPS_PROXY` is set, install an `undici` `EnvHttpProxyAgent` as the global dispatcher and make outbound calls with `undici`'s own `fetch`. When `SSL_CERT_FILE` is set, pass `[...tls.rootCertificates, <that CA>]` as `ca` in `connect`, `requestTls` and `proxyTls`: for an HTTPS request through the proxy, undici verifies the target with `requestTls`, not `connect`.
 
-Postgres is recorded through `proxymock record --map <port>=postgres://localhost:5432` with `DATABASE_URL` pointed at the mapped port, so the database driver needs nothing special.
+Postgres runs from `tutorial-db` (see `db/`) on port 54329. It is recorded through `proxymock record --map <port>=postgres://localhost:54329` with `DATABASE_URL` pointed at the mapped port, so the database driver needs nothing special.
 
 ## Database access rules
 
@@ -53,7 +53,7 @@ SELECT project_id, name, quantity, unit_price_cents FROM order_items WHERE order
 -- S5 list recent orders (APP_SLOW=1 only)
 SELECT id, customer, status, total_cents, created_at FROM orders WHERE created_at > $1::timestamptz ORDER BY created_at DESC LIMIT 50
 -- S6 list recent orders with item counts (default)
-SELECT o.id, o.customer, o.status, o.total_cents, o.created_at, COUNT(i.id) AS item_count FROM orders o LEFT JOIN order_items i ON i.order_id = o.id WHERE o.created_at > $1::timestamptz GROUP BY o.id ORDER BY o.created_at DESC LIMIT 50
+SELECT o.id, o.customer, o.status, o.total_cents, o.created_at, (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count FROM orders o WHERE o.created_at > $1::timestamptz ORDER BY o.created_at DESC LIMIT 50
 -- S7 order status
 SELECT status FROM orders WHERE id = $1::uuid
 ```
@@ -122,7 +122,7 @@ Same UUID and not-found handling as above, using S7. Response `200 {"id":"...","
 
 Recent orders: the cutoff is the current time minus one hour, computed in the app and passed as the `$1` parameter.
 
-* Default: run S6.
+* Default: run S6. It takes the 50 newest orders first and only then counts their items, so it costs the same however many orders the table holds.
 * `APP_SLOW=1`: run S5, then S4 once per returned order, and use the number of rows as `item_count`.
 
 Response `200`:

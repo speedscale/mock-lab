@@ -8,7 +8,7 @@ export const SQL = {
   S3: 'SELECT id, customer, status, total_cents, created_at FROM orders WHERE id = $1::uuid',
   S4: 'SELECT project_id, name, quantity, unit_price_cents FROM order_items WHERE order_id = $1::uuid ORDER BY id',
   S5: 'SELECT id, customer, status, total_cents, created_at FROM orders WHERE created_at > $1::timestamptz ORDER BY created_at DESC LIMIT 50',
-  S6: 'SELECT o.id, o.customer, o.status, o.total_cents, o.created_at, COUNT(i.id) AS item_count FROM orders o LEFT JOIN order_items i ON i.order_id = o.id WHERE o.created_at > $1::timestamptz GROUP BY o.id ORDER BY o.created_at DESC LIMIT 50',
+  S6: 'SELECT o.id, o.customer, o.status, o.total_cents, o.created_at, (SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count FROM orders o WHERE o.created_at > $1::timestamptz ORDER BY o.created_at DESC LIMIT 50',
   S7: 'SELECT status FROM orders WHERE id = $1::uuid',
 }
 

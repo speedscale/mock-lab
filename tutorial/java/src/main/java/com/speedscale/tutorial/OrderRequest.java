@@ -1,11 +1,11 @@
 package com.speedscale.tutorial;
 
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectReader;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.DeserializationFeature;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectReader;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,7 +24,7 @@ public record OrderRequest(String customer, List<Line> items) {
         JsonNode root;
         try {
             root = body == null || body.length == 0 ? null : READER.readTree(body);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             root = null;
         }
         if (root == null || !root.isObject()) {
@@ -32,7 +32,7 @@ public record OrderRequest(String customer, List<Line> items) {
         }
 
         JsonNode customer = root.get("customer");
-        if (customer == null || !customer.isTextual() || customer.textValue().isEmpty()) {
+        if (customer == null || !customer.isString() || customer.stringValue().isEmpty()) {
             throw bad("customer is required");
         }
 
@@ -44,16 +44,16 @@ public record OrderRequest(String customer, List<Line> items) {
         List<Line> lines = new ArrayList<>();
         for (JsonNode item : items) {
             JsonNode projectId = item.get("project_id");
-            if (projectId == null || !projectId.isTextual() || projectId.textValue().isEmpty()) {
+            if (projectId == null || !projectId.isString() || projectId.stringValue().isEmpty()) {
                 throw bad("project_id is required");
             }
             JsonNode quantity = item.get("quantity");
             if (!validQuantity(quantity)) {
                 throw bad("quantity must be between 1 and 99");
             }
-            lines.add(new Line(projectId.textValue(), (int) quantity.doubleValue()));
+            lines.add(new Line(projectId.stringValue(), (int) quantity.doubleValue()));
         }
-        return new OrderRequest(customer.textValue(), lines);
+        return new OrderRequest(customer.stringValue(), lines);
     }
 
     /** A JSON number with no fractional part (2.0 counts as 2) in 1..99. */

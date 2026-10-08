@@ -30,9 +30,9 @@ S5 = (
     "WHERE created_at > %s::timestamptz ORDER BY created_at DESC LIMIT 50"
 )
 S6 = (
-    "SELECT o.id, o.customer, o.status, o.total_cents, o.created_at, COUNT(i.id) AS item_count "
-    "FROM orders o LEFT JOIN order_items i ON i.order_id = o.id "
-    "WHERE o.created_at > %s::timestamptz GROUP BY o.id ORDER BY o.created_at DESC LIMIT 50"
+    "SELECT o.id, o.customer, o.status, o.total_cents, o.created_at, "
+    "(SELECT COUNT(*) FROM order_items i WHERE i.order_id = o.id) AS item_count "
+    "FROM orders o WHERE o.created_at > %s::timestamptz ORDER BY o.created_at DESC LIMIT 50"
 )
 S7 = "SELECT status FROM orders WHERE id = %s::uuid"
 
@@ -274,7 +274,7 @@ def create_app(db=None, upstream=None, version: str | None = None, slow: bool | 
     async def lifespan(app: FastAPI):
         if app.state.db is None:
             app.state.db = Database(
-                os.environ.get("DATABASE_URL", "postgres://tutorial:tutorial@localhost:5432/tutorial?sslmode=disable")
+                os.environ.get("DATABASE_URL", "postgres://tutorial:tutorial@localhost:54329/tutorial?sslmode=disable")
             )
         if app.state.upstream is None:
             app.state.upstream = Upstream(os.environ.get("DEMO_API_URL", "https://demo-api.trafficreplay.com"))

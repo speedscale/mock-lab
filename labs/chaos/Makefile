@@ -1,7 +1,8 @@
-.PHONY: build capture coverage mock mock-chaos mock-chaos-record mock-flaky mock-slow web verify-mock verify baseline chaos-evidence slow-evidence clean
+.PHONY: capture coverage mock mock-chaos mock-chaos-record mock-flaky mock-slow web verify-mock verify baseline chaos-evidence slow-evidence clean
 
 PROXYMOCK ?= proxymock
 RECORDING_DIR ?= proxymock/recording
+CAPTURE_DIR ?= proxymock/recorded-local
 APP_URL ?= http://127.0.0.1:8080
 MOCK_HEALTH_PORT ?= 4141
 MOCK_HEALTH_URL ?= http://127.0.0.1:$(MOCK_HEALTH_PORT)
@@ -15,48 +16,38 @@ CHAOS_RULE ?= $(CHAOS_SCOPE): status=503,percent=100
 CHAOS_RULE_FLAKY ?= $(CHAOS_SCOPE): status=503,percent=50,seed=lab
 CHAOS_RULE_SLOW ?= $(CHAOS_SCOPE): latency=2s
 
-build:
-	mkdir -p bin
-	go build -o bin/app ./cmd/app
-	go build -o bin/inventory ./cmd/inventory
-
 # Record one ordinary session with inventory healthy. Nothing rare happens.
-capture: build
-	RECORDING_DIR="$(RECORDING_DIR)" PROXYMOCK="$(PROXYMOCK)" ./scripts/capture.sh
+capture:
+	RECORDING_DIR="$(CAPTURE_DIR)" PROXYMOCK="$(PROXYMOCK)" ./scripts/capture.sh
 
-# Show line coverage for the HTTP client before running the behavioral failure case.
 coverage:
-	mkdir -p scratch
-	go test -coverprofile=scratch/coverage.out ./cmd/app
-	go tool cover -func=scratch/coverage.out | grep -E 'fetchStock|total:'
+	npm run coverage
 
 # Serve the recorded inventory and run the storefront against it, untouched.
-mock: build
-	$(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --no-out \
-		--health-port $(MOCK_HEALTH_PORT) -- ./bin/app
+mock:
+	NODE_USE_ENV_PROXY=1 NO_PROXY= no_proxy= $(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --mock-timing none --out proxymock/results/healthy \
+		--health-port $(MOCK_HEALTH_PORT) -- node app.js
 
 # The same run with inventory failing every call, and nothing else touched.
-mock-chaos: build
-	$(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --no-out \
-		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE)' -- ./bin/app
+mock-chaos:
+	NODE_USE_ENV_PROXY=1 NO_PROXY= no_proxy= $(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --mock-timing none --out proxymock/results/chaos \
+		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE)' -- node app.js
 
 # Half the calls fail, deterministically. This is the one to run after a fix:
 # it exercises the healthy path, the degraded path, and the transition.
-mock-flaky: build
-	$(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --no-out \
-		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE_FLAKY)' -- ./bin/app
+mock-flaky:
+	NODE_USE_ENV_PROXY=1 NO_PROXY= no_proxy= $(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --mock-timing none --out proxymock/results/flaky \
+		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE_FLAKY)' -- node app.js
 
 # Delay only inventory responses to test the storefront's latency budget.
-mock-slow: build
-	$(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --no-out \
-		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE_SLOW)' -- ./bin/app
+mock-slow:
+	NODE_USE_ENV_PROXY=1 NO_PROXY= no_proxy= $(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough --mock-timing none --out proxymock/results/slow \
+		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE_SLOW)' -- node app.js
 
-# Same as mock-chaos but WRITES the observed pairs, because proxymock web
-# reads them off disk. --no-out elsewhere keeps repeat runs from piling up
-# result directories; here the output is the point.
-mock-chaos-record: build
-	$(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough \
-		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE_FLAKY)' -- ./bin/app
+# Retain a mixed healthy/faulted run for the web Requests grid.
+mock-chaos-record:
+	NODE_USE_ENV_PROXY=1 NO_PROXY= no_proxy= $(PROXYMOCK) mock --in "$(RECORDING_DIR)" --no-passthrough \
+		--health-port $(MOCK_HEALTH_PORT) --chaos '$(CHAOS_RULE_FLAKY)' -- node app.js
 
 # Browse the run: the Chaos column, the "chaos applied" filter, and the
 # per-pair banner naming the rule that fired.
@@ -80,9 +71,9 @@ baseline: verify-mock
 # What inventory is really answering, straight off the mock server, so the
 # storefront's claim can be checked against it.
 chaos-evidence: verify-mock
-	@curl --silent --show-error --proxy http://127.0.0.1:4140 --dump-header - \
+	@curl --silent --show-error --noproxy "" --proxy http://127.0.0.1:4140 --dump-header - \
 		"http://localhost:8090/v1/inventory/SSC-4110" \
-		| grep -E '^HTTP|^X-Speedscale-Chaos|^\{'
+		| grep -Ei '^HTTP|^X-Speedscale-Chaos|^\{'
 
 # Measure one app response while its inventory dependency is slow.
 slow-evidence: verify-mock
@@ -92,4 +83,4 @@ slow-evidence: verify-mock
 verify: verify-mock baseline
 
 clean:
-	rm -rf bin scratch
+	rm -rf scratch

@@ -8,7 +8,7 @@ set -euo pipefail
 
 root_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 proxymock=${PROXYMOCK:-proxymock}
-recording_dir=${RECORDING_DIR:-$root_dir/proxymock/recording}
+recording_dir=${RECORDING_DIR:-$root_dir/proxymock/recorded-local}
 log_file=${CAPTURE_LOG:-$root_dir/proxymock/capture.log}
 inventory_pid=
 recorder_pid=
@@ -28,12 +28,17 @@ cleanup() {
     wait "$inventory_pid" 2>/dev/null || true
   fi
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-rm -rf "$recording_dir"
+if [[ -e "$recording_dir" ]]; then
+  echo "capture output already exists: $recording_dir; choose a fresh RECORDING_DIR" >&2
+  exit 1
+fi
 mkdir -p "$recording_dir" "$(dirname "$log_file")"
 
-"$root_dir/bin/inventory" >>"$log_file" 2>&1 &
+node "$root_dir/inventory.js" >>"$log_file" 2>&1 &
 inventory_pid=$!
 
 for _ in $(seq 1 15); do
@@ -43,7 +48,7 @@ for _ in $(seq 1 15); do
 done
 curl --fail --silent http://127.0.0.1:8090/healthz >/dev/null
 
-"$proxymock" record --out "$recording_dir" -- "$root_dir/bin/app" >>"$log_file" 2>&1 &
+NODE_USE_ENV_PROXY=1 NO_PROXY= no_proxy= "$proxymock" record --app-port 8080 --out "$recording_dir" -- node "$root_dir/app.js" >>"$log_file" 2>&1 &
 recorder_pid=$!
 
 for _ in $(seq 1 30); do
@@ -63,7 +68,9 @@ for sku in "${skus[@]}"; do
 done
 sleep 2
 
-kill -INT "$recorder_pid"; wait "$recorder_pid" || true; recorder_pid=
+kill -INT "$recorder_pid" 2>/dev/null || true
+wait "$recorder_pid" || true
+recorder_pid=
 kill "$inventory_pid"; wait "$inventory_pid" 2>/dev/null || true; inventory_pid=
 
 inbound=$(grep -rlE '^GET .*/api/stock/' "$recording_dir" --include='*.md' | wc -l | tr -d ' ')

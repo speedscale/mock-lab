@@ -1,218 +1,103 @@
-# Chaos + proxymock: reaching the fallback path on purpose
+# Chaos, coverage and response behavior
 
-The storefront answers `GET /api/stock/{sku}` by asking an inventory service
-how many units are on hand. If inventory is unavailable it falls back to the
-last good answer it saw and marks the response `degraded`.
+This independent Node lab shows why high code coverage does not prove that an app handles a failed dependency or meets a latency requirement. The storefront reads inventory through proxymock and has a cache fallback. Its starter client accepts a valid JSON body even when inventory returns 503. The starter tests pass because they never assert that case.
 
-The tests exercise transport and decode errors, but none makes inventory return a non-2xx status with a valid body. That condition matters because the client currently accepts any parseable body, including one returned with a 503 status.
+You need Node 24+ (or 22.21+), initialized proxymock v2.5.1133 or newer, make and curl. No npm packages, Go, Docker, database or cluster are needed. From the repository root, run `cd labs/chaos`. Run all commands below from this directory. The app uses port 8080, inventory 8090 and proxymock 4140/4141/4143; run one mock at a time.
 
-The failure takes one command to reproduce. A scoped chaos rule makes **inventory and only inventory** fail, every call, while the rest of the recording keeps answering normally. After the status bug is fixed, the fallback path can be rerun on demand.
+## Show what coverage misses
 
-The sibling [Loki lab](../loki) tells the same kind of story from the other
-side: there, the rare dependency response had to be present in the traffic on
-the day it was captured. Here you do not need that luck.
-
-The lab is checked in with the bug. Read the evidence, find the unhandled
-failure, make the smallest fix, and prove the storefront degrades honestly.
-
-## Prerequisites
-
-- Go 1.23 or newer, `curl`
-- proxymock 2.5.876 or newer, installed, initialized, and on `PATH`
-- No Docker, no cluster, no Speedscale account. Every command below is local.
-
-Run everything from this `chaos` directory of your `mock-lab` clone. The
-storefront binds `127.0.0.1:8080` and the inventory fixture `localhost:8090`,
-matching the neighboring labs; proxymock's health endpoint is on `4141` and
-its proxy on `4140`.
-
-## Coverage is not a behavior check
-
-Run `make coverage` before the chaos case. The current suite reports 77.6% statement coverage for the app package and 100.0% for `fetchStock`. It exercises successful JSON decoding, malformed JSON, and a transport error. It never checks an HTTP 503 that still carries valid JSON, so the client reports success and the fallback stays untested.
-
-The coverage report is accurate about the code the tests executed. The missing part is an assertion about the dependency status and the storefront contract. The exercise below makes that omission visible with a controlled 503.
-
-The full demo run of show is in [`DEMO-SCRIPT.md`](DEMO-SCRIPT.md).
-
-## 1. Record one ordinary session
-
-```shell
-make capture
+```sh
+make coverage
 ```
 
-The inventory fixture starts, `proxymock record` runs the storefront as a
-child, six SKUs are looked up through proxymock's inbound reverse proxy on
-`4143`, and everything stops. You get 6 inbound stock lookups and 6 outbound
-inventory calls.
+Node's built-in test runner reports line, branch and function coverage for `app.js`. On Node 24.19.0 the starter has 94.74% line coverage, and the lines in `fetchStock` all run. Read `app.test.js`: successful JSON, invalid JSON, connection errors and cache fallback are exercised. A 503 with valid JSON and a slow dependency are absent. The CI job checks this intentionally incomplete starter suite, not full resilience.
 
-Nothing rare is in this recording, deliberately. Every SKU resolves, inventory
-answers `200` every time, and there is no failure anywhere in it.
+## Replay a healthy baseline
 
-## 2. Watch the storefront work
+The committed recording has six inbound stock reads and six healthy outbound inventory calls. It works offline. Inventory does not need to run:
 
-```shell
-make mock          # leave running
-make baseline      # in a second terminal
+```sh
+make mock
 ```
 
-Six healthy answers, `degraded:false`, `source:"inventory"`. This is the state
-every test suite has ever seen.
+In another terminal:
 
-## 3. Take inventory down, and nothing else
-
-Stop `make mock`, then:
-
-```shell
-make mock-chaos    # leave running
-make baseline      # in a second terminal
+```sh
+make baseline
 ```
 
-The rule is one flag:
+Expect six healthy results with `degraded:false` and `source:"inventory"`. Results stay under ignored `proxymock/results/healthy`. The Makefile enables Node's built-in proxy support and clears loopback proxy exclusions so local inventory calls reach the mocks. Only local HTTP is used, so no extra TLS setup is needed.
 
+## Make inventory fail
+
+Stop the healthy mock with Ctrl-C and start:
+
+```sh
+make mock-chaos
 ```
---chaos '(url CONTAINS "/v1/inventory"): status=503,percent=100'
-```
 
-The scope is a filter query — the same syntax the Requests grid and
-`--query-string` use, and every group must be parenthesized. It selects the
-outbound inventory calls and nothing else.
+In the second terminal:
 
-Now compare what the storefront says with what inventory actually did:
-
-```shell
+```sh
+make baseline
 make chaos-evidence
 ```
 
-Inventory is answering `503 Service Unavailable` on every call, and says so:
+The dependency returns 503 with `X-Speedscale-Chaos: effect=status code;status=503;rule=chaos-1`. The app still reports healthy inventory data. The recorded body survives the status injection, so JSON decoding succeeds. The app's status and body match its healthy baseline while its claim about the dependency is wrong. This is a behavior requirement that response shape alone cannot establish.
 
-```
-HTTP/1.1 503 Service Unavailable
-X-Speedscale-Chaos: effect=status code;status=503;rule=chaos-1
-```
+Ask the agent:
 
-The `x-speedscale-chaos` header is how you tell an injected failure from a
-real one. It names the effect and the rule that fired, it is absent on
-untouched responses, and it is persisted onto the recorded pair, so it is
-visible later in proxymock-web as well as on the wire.
+> Check the inventory response status before accepting its body. Add an HTTP regression test for 503 with valid JSON. Require an honest 503 when the cache is empty and a 200 with degraded=true and source=cache when stock was previously cached. Preserve healthy responses and the recording. Run the tests and show the dependency's chaos marker beside the app's actual response.
 
-And the storefront's answer to all six SKUs, with its only dependency
-completely down:
+The committed app deliberately leaves this fix for the exercise. Stop the faulted mock before switching modes. After the fix, total outage should produce honest errors with an empty cache. To exercise both healthy and cached results:
 
-```
-{"sku":"SSC-4110","available":42,"in_stock":true,"degraded":false,"source":"inventory"}
+```sh
+make mock-flaky
 ```
 
-`degraded:false`. `source:"inventory"`. No warning in the log. The fallback
-cache — which exists, and is correct — never ran.
+Run `make baseline` several times from another terminal. Check responses against the actual faulted dependency calls in the retained output. `percent=50,seed=lab` is repeatable per request signature and occurrence; differing request counts can change the sequence. A seeded run is not a guarantee that every state appears in one six-request pass.
 
-## 3b. See it in proxymock web
+## Test a latency requirement
 
-The header on the wire is one view. The other is the run itself.
+Stop the current mock and start:
 
-Stop `make mock-chaos` and start a run that writes what it serves — the
-earlier targets pass `--no-out` so repeat runs do not pile up result
-directories, and here the output is the point:
-
-```shell
-make mock-chaos-record    # leave running
-make baseline             # a few times, in a second terminal
+```sh
+make mock-slow
 ```
 
-Then, in a third terminal:
+Then:
 
-```shell
-make web
+```sh
+make slow-evidence
 ```
 
-Open `http://127.0.0.1:7788` and go to Requests. The **Chaos** column marks
-every perturbed response, the toolbar filter narrows to just those, and
-opening one shows which rule fired and what it changed.
+Inventory is delayed by two seconds; the starter allows five seconds. This exercise's candidate requirement is an app response within 750 ms, with cached data or an honest 503. Review that requirement before accepting it as a baseline. Ask the agent to bound the inventory timeout below the app budget, add a slow-dependency test, and prove both empty-cache and cached behavior. The delay has no start window, so app startup time cannot consume the fault.
 
-This variant uses `percent=50`, so the grid holds both kinds of row and the
-filter has something to do. That is the view worth having: injected failures
-are labelled, so an injected 503 is never mistaken for a real one.
+Stop and restart `make mock-slow` after editing the app. An empty-cache timeout should now return 503 before 750 ms. Verify the dependency's latency chaos marker in the retained mock run; a missing mock or unrelated failure does not prove the timeout requirement.
 
-**The STATUS column shows what the client actually received** — `503` on
-chaosed rows — with a tooltip reading `Chaos sent 503; the mock recorded 200`.
-Both numbers are true and the grid keeps both: the recorded pair deliberately
-holds its pre-chaos status, because that pair is mock input for a later run
-and rewriting it would change what a re-replay does. A response chaos withheld
-entirely shows `—` rather than a status.
+## Keep a bounded replay gate
 
-So the file on disk and the `/api/rrpairs` field say `200` while the cell says
-`503`. That is the intended split, not a disagreement.
+Stop the faulted mock and restart `make mock`. In the second terminal:
 
-## 4. Find it
-
-The evidence is in [`evidence/broken-storefront.jsonl`](evidence/broken-storefront.jsonl)
-if you want to read it without running anything.
-
-Two facts to reconcile:
-
-- inventory returned `503` on every call, with the chaos marker to prove it
-- the storefront reported fresh data from inventory, undegraded, for every SKU
-
-Nothing in the response contract changed, which is why no status assertion and
-no response diff would have caught this. The numbers are even *right* — they
-are the recorded body, which a 503 does not erase. The lie is the metadata:
-the storefront told its callers this data was current when its dependency was
-down.
-
-`AGENT_TASK.md` is the same exercise pointed at a coding agent.
-
-## 4b. Measure the slow dependency path
-
-The service requirement for this lab is that a stock lookup finishes within 750 ms when inventory stalls. Start `make mock-slow`, then run `make slow-evidence` in another terminal. The injected inventory response takes 2 seconds. The current 5-second client timeout lets it complete, which violates this demo service objective of 750 ms. The command reports the storefront's actual elapsed time. Ask the agent to set a suitable client timeout and verify the request returns before the 750 ms limit.
-
-After the timeout fix, test under recorded request load from a healthy mock with a p95 gate:
-
-```shell
+```sh
 proxymock replay --in proxymock/recording --test-against http://127.0.0.1:8080 \
-  --vus 4 --for 10s --fail-if 'latency.p95>750' --fail-if 'requests.failed!=0'
+  --rewrite-host --test-config regression --vus 4 --for 10s --fail-if 'latency.p95>750' \
+  --fail-if 'requests.failed>0' --out proxymock/results/healthy-load
+proxymock replay score proxymock/results/healthy-load --mock-run proxymock/results/healthy -o json
 ```
 
-Use the p95 check as a regression gate on the same runner. Local replay can be limited by the mock and traffic generator, so do not present its RPS as the service's capacity. For capacity numbers, run the generator away from the app and mock.
+Require passing recorded responses, zero failed requests, p95 within the candidate budget and measured dependency mock matching. The app, mock and generator share the machine: this measures the app against recorded dependencies on this runner, not production capacity. Use fresh replay output names for subsequent runs. Mock output, replay output and original traffic remain available for review; `make clean` only removes scratch files.
 
-## 5. Prove the fix
+Stop mocks with Ctrl-C when done. For a visual view of healthy and faulted dependency calls, `make mock-chaos-record` retains a mixed run and `make web` opens the native Requests grid, whose Chaos column identifies injected failures. This optional mode is for viewing evidence, not proving all fallback states.
 
-After fixing, run the flaky variant rather than the total outage:
+## Capture your own baseline
 
-```shell
-make mock-flaky    # leave running
-make baseline      # a few times, in a second terminal
+The local inventory fixture is needed only for a new capture:
+
+```sh
+make capture
 ```
 
-```
---chaos '(url CONTAINS "/v1/inventory"): status=503,percent=50,seed=lab'
-```
+This starts inventory, records six requests and stops its own processes. Output goes to `proxymock/recorded-local`; the committed recording is preserved. Repeating capture refuses to overwrite an existing directory. Use `make capture CAPTURE_DIR=proxymock/recorded-second` for another capture and `make mock RECORDING_DIR=proxymock/recorded-second` to use it.
 
-Half the calls fail, so one run exercises the healthy path, the degraded path,
-and the transition between them. A fixed storefront answers with all three
-states and never claims `degraded:false` on a call that failed:
-
-```
-{"error":"inventory unavailable"}                                    first call, nothing cached yet
-{"sku":"SSC-4110","available":42,...,"degraded":false,"source":"inventory"}
-{"sku":"SSC-4110","available":42,...,"degraded":true,"source":"cache"}
-```
-
-## On reproducibility
-
-`seed=lab` makes the run repeatable, with a limit worth stating plainly.
-
-The roll is a pure function of the rule, the request signature, and the
-occurrence count — the Nth lookup of a given SKU always gets the same verdict.
-It is **not** a promise that two runs are bit-identical: a run that issues a
-different number of requests for a signature diverges after that point. That
-is stronger than ordering-based reproducibility, which is worthless when the
-responder serves requests concurrently, and weaker than full determinism.
-
-In practice it means a failure you find this way is one you can hand to a
-teammate with the command that produced it.
-
-## What this does not do
-
-It does not hide the consequences. If the storefront cannot absorb an injected
-failure, the failure is reported normally — that is the entire question you
-came to answer. Chaos-affected traffic is excluded from drift and match-rate
-analysis, because an injected 503 is not mock drift, but never from pass/fail.
+The focused [agent task](AGENT_TASK.md) and [video script](DEMO-SCRIPT.md) use the same app and native commands. Dependency replacement, chaos and replay gates are existing proxymock features.

@@ -1,0 +1,9 @@
+{
+  "name": "proxymock-chaos-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test app.test.js",
+    "coverage": "node --test --experimental-test-coverage --test-coverage-include=app.js app.test.js"
+  }
+}

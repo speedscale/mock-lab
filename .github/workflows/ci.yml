@@ -97,3 +97,15 @@ jobs:
           #    asserts 24 projects and that the auth flow returns a token + order.
           DELAY=0 PORT=8080 ./shared/tests/run_tests.sh
           echo "${{ matrix.lang }} app OK"
+
+  credentials:
+    name: Credential lab
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Verify JWT, Basic and opaque bearer behavior
+        working-directory: labs/credentials
+        run: npm test

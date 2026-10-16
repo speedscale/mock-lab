@@ -1,0 +1,71 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-12T19:14:21.375852Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000383s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "74",
+    "dbName": "shop",
+    "dbTransaction": "active",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1179-7-g080d884da",
+    "sequence": "107",
+    "source": "goproxy"
+  },
+  "uuid": "tEIPq/lZQui/mqYOEJODBQ==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Query",
+  "location": "COMMIT",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "query": {
+        "query": "COMMIT"
+      }
+    },
+    "response": {
+      "query": {
+        "messages": [
+          {
+            "complete": {
+              "tag": "COMMIT"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "UXVlcnk=",
+    "postgres:query": "Q09NTUlU"
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-12T19:14:19.636198Z",
+    "downstream": {
+      "established": "2026-10-12T19:14:19.631300Z",
+      "ipAddress": "127.0.0.1",
+      "port": 56176,
+      "bytesSent": "4002"
+    },
+    "upstream": {
+      "established": "2026-10-12T19:14:19.631660Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "1497"
+    },
+    "direction": "EGRESS"
+  }
+}

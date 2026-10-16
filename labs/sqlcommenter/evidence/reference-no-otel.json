@@ -1,0 +1,68 @@
+{
+  "source": "proxymock sql-report --in proxymock/recording-no-otel -o json (proxymock v2.5.1179), recorded with make capture-no-otel (SQL_COMMENTS=off, TRACEPARENT=off)",
+  "recording": {
+    "inboundRequests": 18,
+    "traceparentHeaders": 0,
+    "sqlComments": 0
+  },
+  "requestLoad": {
+    "attributedStatements": 31,
+    "exactStatements": 0,
+    "ambiguousStatements": 8,
+    "unattributedStatements": 1
+  },
+  "overlappingReports": {
+    "note": "Each GET /reports/sales runs 2 statements (pg_sleep, then the aggregate). The 4 reports overlap, so timing gives every one of their statements to whichever report was in flight; in this recording the queries per request read 7, 1, 0 and 0. The trace-tagged recording reads 2, 2, 2 and 2.",
+    "queriesPerRequest": [
+      7,
+      1,
+      0,
+      0
+    ]
+  },
+  "variesByCapture": "Which report collects the statements depends on scheduling. Over five captures, ambiguousStatements was 7 or 8 and the busiest report was given 7 or 8 statements; exactStatements was always 0 and attributedStatements always 31.",
+  "endpoints": [
+    {
+      "endpoint": "GET /products/*",
+      "requests": 8,
+      "statements": 8,
+      "avgPerRequest": 1,
+      "maxPerRequest": 1
+    },
+    {
+      "endpoint": "GET /reports/sales",
+      "requests": 4,
+      "statements": 8,
+      "avgPerRequest": 2,
+      "maxPerRequest": 7
+    },
+    {
+      "endpoint": "POST /orders",
+      "requests": 1,
+      "statements": 8,
+      "avgPerRequest": 8,
+      "maxPerRequest": 8
+    },
+    {
+      "endpoint": "GET /orders/*",
+      "requests": 2,
+      "statements": 4,
+      "avgPerRequest": 2,
+      "maxPerRequest": 2
+    },
+    {
+      "endpoint": "GET /products",
+      "requests": 2,
+      "statements": 2,
+      "avgPerRequest": 1,
+      "maxPerRequest": 1
+    },
+    {
+      "endpoint": "GET /health",
+      "requests": 1,
+      "statements": 1,
+      "avgPerRequest": 1,
+      "maxPerRequest": 1
+    }
+  ]
+}

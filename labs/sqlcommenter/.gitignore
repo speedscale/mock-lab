@@ -2,6 +2,9 @@ bin/
 scratch/
 proxymock.log
 proxymock/capture.log
+proxymock/capture-no-otel.log
 proxymock/results/
 proxymock/recording/.replay/
 proxymock/recording/*/.replay/
+proxymock/recording-no-otel/.replay/
+proxymock/recording-no-otel/*/.replay/

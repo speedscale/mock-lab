@@ -1,0 +1,67 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-12T19:14:21.374928Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000478s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "74",
+    "dbName": "shop",
+    "dbTransaction": "active",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1179-7-g080d884da",
+    "sequence": "98",
+    "source": "goproxy"
+  },
+  "uuid": "N+n8u5j5RmWBlVlGMpI5Nw==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Prepare Statement",
+  "location": "UPDATE orders SET total = (SELECT sum(quantity * price) FROM order_items WHERE order_id = $1) WHERE id = $1",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "parse": {
+        "name": "stmtcache_43c6293e57ff58aeed1a4ce4cf19447515c32100b32eca41",
+        "query": "UPDATE orders SET total = (SELECT sum(quantity * price) FROM order_items WHERE order_id = $1) WHERE id = $1"
+      }
+    },
+    "response": {
+      "parse": {
+        "complete": {}
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "UHJlcGFyZSBTdGF0ZW1lbnQ=",
+    "postgres:query": "VVBEQVRFIG9yZGVycyBTRVQgdG90YWwgPSAoIFNFTEVDVCBzdW0gKCBxdWFudGl0eSAqIHByaWNlICkgRlJPTSBvcmRlcl9pdGVtcyBXSEVSRSBvcmRlcl9pZCA9ICQxICkgV0hFUkUgaWQgPSAkMQ==",
+    "postgres:query_name": "c3RtdGNhY2hlXzQzYzYyOTNlNTdmZjU4YWVlZDFhNGNlNGNmMTk0NDc1MTVjMzIxMDBiMzJlY2E0MQ=="
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-12T19:14:19.636198Z",
+    "downstream": {
+      "established": "2026-10-12T19:14:19.631300Z",
+      "ipAddress": "127.0.0.1",
+      "port": 56176,
+      "bytesSent": "3894"
+    },
+    "upstream": {
+      "established": "2026-10-12T19:14:19.631660Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "1454"
+    },
+    "direction": "EGRESS"
+  }
+}

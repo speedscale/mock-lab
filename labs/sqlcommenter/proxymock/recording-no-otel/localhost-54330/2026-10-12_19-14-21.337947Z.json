@@ -1,0 +1,67 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-12T19:14:21.337947Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000841s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "74",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1179-7-g080d884da",
+    "sequence": "22",
+    "source": "goproxy"
+  },
+  "uuid": "ltveyDcnTDmwPK5aaTt2MA==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Prepare Statement",
+  "location": "SELECT id, name, price :: float8, stock FROM products ORDER BY id",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "parse": {
+        "name": "stmtcache_f589375c3cadba45698d64b8194b2961cfb013ffaa4445b9",
+        "query": "SELECT id, name, price::float8, stock FROM products ORDER BY id"
+      }
+    },
+    "response": {
+      "parse": {
+        "complete": {}
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "UHJlcGFyZSBTdGF0ZW1lbnQ=",
+    "postgres:query": "U0VMRUNUIGlkLCBuYW1lLCBwcmljZSA6OiBmbG9hdDgsIHN0b2NrIEZST00gcHJvZHVjdHMgT1JERVIgQlkgaWQ=",
+    "postgres:query_name": "c3RtdGNhY2hlX2Y1ODkzNzVjM2NhZGJhNDU2OThkNjRiODE5NGIyOTYxY2ZiMDEzZmZhYTQ0NDViOQ=="
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-12T19:14:19.636198Z",
+    "downstream": {
+      "established": "2026-10-12T19:14:19.631300Z",
+      "ipAddress": "127.0.0.1",
+      "port": 56176,
+      "bytesSent": "1647"
+    },
+    "upstream": {
+      "established": "2026-10-12T19:14:19.631660Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "398"
+    },
+    "direction": "EGRESS"
+  }
+}

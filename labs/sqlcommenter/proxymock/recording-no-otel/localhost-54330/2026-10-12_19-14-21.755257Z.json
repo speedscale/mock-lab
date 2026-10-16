@@ -1,0 +1,209 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-12T19:14:21.755257Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000011s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "83",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1179-7-g080d884da",
+    "sequence": "263",
+    "source": "goproxy"
+  },
+  "uuid": "ehbKoix0QnykclhhooFoCA==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Execute Prepared Statement",
+  "location": "SELECT id, name, price :: float8, stock FROM products ORDER BY id",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "execute": {
+        "bindRequest": {
+          "preparedStatement": "stmtcache_f589375c3cadba45698d64b8194b2961cfb013ffaa4445b9",
+          "resultFormatCodes": [
+            1,
+            0,
+            1,
+            1
+          ],
+          "parseRequest": {
+            "name": "stmtcache_f589375c3cadba45698d64b8194b2961cfb013ffaa4445b9",
+            "query": "SELECT id, name, price::float8, stock FROM products ORDER BY id",
+            "describedRow": {
+              "fields": [
+                {
+                  "name": "id",
+                  "tableOid": 16386,
+                  "tableAttributeNumber": 1,
+                  "dataTypeOid": 23,
+                  "dataTypeSize": 4,
+                  "typeModifier": -1
+                },
+                {
+                  "name": "name",
+                  "tableOid": 16386,
+                  "tableAttributeNumber": 2,
+                  "dataTypeOid": 25,
+                  "dataTypeSize": 4294967295,
+                  "typeModifier": -1
+                },
+                {
+                  "name": "price",
+                  "dataTypeOid": 701,
+                  "dataTypeSize": 8,
+                  "typeModifier": -1
+                },
+                {
+                  "name": "stock",
+                  "tableOid": 16386,
+                  "tableAttributeNumber": 4,
+                  "dataTypeOid": 23,
+                  "dataTypeSize": 4,
+                  "typeModifier": -1
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "response": {
+      "execute": {
+        "messages": [
+          {
+            "dataRow": {
+              "values": [
+                {
+                  "asString": "\u0000\u0000\u0000\u0001"
+                },
+                {
+                  "asString": "Espresso beans 1kg"
+                },
+                {
+                  "asBytes": "QDiAAAAAAAA="
+                },
+                {
+                  "asBytes": "AAAD6A=="
+                }
+              ]
+            }
+          },
+          {
+            "dataRow": {
+              "values": [
+                {
+                  "asString": "\u0000\u0000\u0000\u0002"
+                },
+                {
+                  "asString": "Pour-over kettle"
+                },
+                {
+                  "asBytes": "QE2AAAAAAAA="
+                },
+                {
+                  "asBytes": "AAAD5w=="
+                }
+              ]
+            }
+          },
+          {
+            "dataRow": {
+              "values": [
+                {
+                  "asString": "\u0000\u0000\u0000\u0003"
+                },
+                {
+                  "asString": "Ceramic dripper"
+                },
+                {
+                  "asBytes": "QDLAAAAAAAA="
+                },
+                {
+                  "asBytes": "AAAD6A=="
+                }
+              ]
+            }
+          },
+          {
+            "dataRow": {
+              "values": [
+                {
+                  "asString": "\u0000\u0000\u0000\u0004"
+                },
+                {
+                  "asString": "Paper filters (100)"
+                },
+                {
+                  "asString": "@\u0019\u0000\u0000\u0000\u0000\u0000\u0000"
+                },
+                {
+                  "asBytes": "AAAD5Q=="
+                }
+              ]
+            }
+          },
+          {
+            "dataRow": {
+              "values": [
+                {
+                  "asString": "\u0000\u0000\u0000\u0005"
+                },
+                {
+                  "asString": "Burr grinder"
+                },
+                {
+                  "asString": "@` \u0000\u0000\u0000\u0000\u0000"
+                },
+                {
+                  "asBytes": "AAAD6A=="
+                }
+              ]
+            }
+          },
+          {
+            "complete": {
+              "tag": "SELECT 5"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "RXhlY3V0ZSBQcmVwYXJlZCBTdGF0ZW1lbnQ=",
+    "postgres:portal": "",
+    "postgres:query": "U0VMRUNUIGlkLCBuYW1lLCBwcmljZSA6OiBmbG9hdDgsIHN0b2NrIEZST00gcHJvZHVjdHMgT1JERVIgQlkgaWQ=",
+    "postgres:query_name": "c3RtdGNhY2hlX2Y1ODkzNzVjM2NhZGJhNDU2OThkNjRiODE5NGIyOTYxY2ZiMDEzZmZhYTQ0NDViOQ=="
+  },
+  "netinfo": {
+    "id": "12",
+    "startTime": "2026-10-12T19:14:21.395797Z",
+    "downstream": {
+      "established": "2026-10-12T19:14:21.393070Z",
+      "ipAddress": "127.0.0.1",
+      "port": 56209,
+      "bytesSent": "1977"
+    },
+    "upstream": {
+      "established": "2026-10-12T19:14:21.393208Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "1988"
+    },
+    "direction": "EGRESS"
+  }
+}

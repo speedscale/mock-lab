@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -56,5 +57,50 @@ func TestTagLeavesStatementsOutsideARequestUntagged(t *testing.T) {
 	want := "SELECT 1 /*db_driver='pgx',route='%2Fproducts',traceparent='00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01'*/"
 	if got := tag(ctx, "SELECT 1"); got != want {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestParseCommentMode(t *testing.T) {
+	for in, want := range map[string]commentMode{"": commentTrace, "trace": commentTrace, " Route ": commentRoute, "off": commentOff} {
+		if got, err := parseCommentMode(in); err != nil || got != want {
+			t.Fatalf("parseCommentMode(%q) = %q, %v; want %q", in, got, err, want)
+		}
+	}
+	if _, err := parseCommentMode("on"); err == nil {
+		t.Fatal("want an error for an unknown mode")
+	}
+}
+
+func TestCommentModes(t *testing.T) {
+	defer func(m commentMode) { sqlComments = m }(sqlComments)
+	cases := map[commentMode]struct {
+		sql         string
+		traceHeader bool
+	}{
+		commentTrace: {"SELECT 1 /*db_driver='pgx',route='%2Fproducts',traceparent='00-", true},
+		commentRoute: {"SELECT 1 /*db_driver='pgx',route='%2Fproducts'*/", false},
+		commentOff:   {"SELECT 1", false},
+	}
+	for mode, want := range cases {
+		sqlComments = mode
+		var got string
+		mux := http.NewServeMux()
+		(&server{}).handle(mux, "GET /products", func(w http.ResponseWriter, r *http.Request) {
+			got = tag(r.Context(), "SELECT 1")
+		})
+		r := httptest.NewRequest("GET", "/products", nil)
+		r.Header.Set("traceparent", "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01")
+		w := httptest.NewRecorder()
+		mux.ServeHTTP(w, r)
+		if mode == commentTrace {
+			if !strings.HasPrefix(got, want.sql) || !strings.Contains(got, "4bf92f3577b34da6a3ce929d0e0e4736") {
+				t.Fatalf("%s: got %q", mode, got)
+			}
+		} else if got != want.sql {
+			t.Fatalf("%s: got %q, want %q", mode, got, want.sql)
+		}
+		if has := w.Header().Get("traceparent") != ""; has != want.traceHeader {
+			t.Fatalf("%s: traceparent response header present = %v, want %v", mode, has, want.traceHeader)
+		}
 	}
 }

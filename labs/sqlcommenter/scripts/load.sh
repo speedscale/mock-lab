@@ -4,17 +4,32 @@
 #
 #   ./load.sh                                   through proxymock
 #   BASE_URL=http://localhost:8080 ./load.sh    straight at the app
+#   TRACEPARENT=off ./load.sh                   no request carries a traceparent
 #
 # Most requests carry a W3C traceparent, as if an upstream service or gateway
 # had started the trace. A few carry none, so the app starts the trace itself.
 # The /reports/sales requests are sent at the same time and each takes 200 ms,
 # so they overlap and timing alone cannot tell their statements apart.
+#
+# TRACEPARENT=off sends the same requests without a traceparent, as if nothing
+# upstream traced them. Run the app with SQL_COMMENTS=off as well for a service
+# with no tracing at all.
 set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://localhost:4143}"
+TRACEPARENT="${TRACEPARENT:-on}"
 failures=0
 
-new_trace() { openssl rand -hex 16; }
+case "$TRACEPARENT" in
+  on | off) ;;
+  *)
+    echo "TRACEPARENT=$TRACEPARENT: want on or off" >&2
+    exit 2
+    ;;
+esac
+
+# new_trace prints a new trace id, or nothing when TRACEPARENT=off.
+new_trace() { if [[ "$TRACEPARENT" == on ]]; then openssl rand -hex 16; fi; }
 new_span() { openssl rand -hex 8; }
 
 # call METHOD PATH EXPECTED_STATUS TRACE_ID [JSON_BODY]
@@ -31,7 +46,7 @@ call() {
   local got
   got=$(curl "${args[@]}" || true)
   if [[ "$got" == "$want" ]]; then
-    printf 'ok   %-4s %-16s %s trace %s\n' "$method" "$path" "$got" "${trace:-(started by the app)}"
+    printf 'ok   %-4s %-16s %s trace %s\n' "$method" "$path" "$got" "${trace:-(none sent)}"
   else
     printf 'FAIL %-4s %-16s got %s, want %s\n' "$method" "$path" "$got" "$want"
     return 1
@@ -40,6 +55,10 @@ call() {
 
 # check runs call and counts a failure without stopping the script.
 check() { call "$@" || failures=$((failures + 1)); }
+
+if [[ "$TRACEPARENT" == off ]]; then
+  echo "== TRACEPARENT=off: no request below carries a traceparent"
+fi
 
 echo "== untagged: the health check runs its query with no comment"
 check GET /health 200 ""
@@ -64,7 +83,7 @@ for id in 1 2 3 4 5 1 2 3; do
   check GET "/products/$id" 200 "$(new_trace)"
 done
 
-echo "== no traceparent: the app starts the trace itself"
+echo "== no traceparent on these two either way: with SQL_COMMENTS=trace the app starts the trace itself"
 check GET /orders/1 200 ""
 check GET /products 200 ""
 

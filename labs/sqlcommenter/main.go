@@ -26,6 +26,12 @@ type server struct {
 }
 
 func main() {
+	mode, err := parseCommentMode(os.Getenv("SQL_COMMENTS"))
+	if err != nil {
+		log.Fatal(err)
+	}
+	sqlComments = mode
+
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, databaseURL())
 	if err != nil {
@@ -49,7 +55,7 @@ func main() {
 	s.handle(mux, "GET /reports/sales", s.salesReport)
 
 	addr := ":" + envOr("PORT", "8080")
-	log.Printf("listening on %s", addr)
+	log.Printf("listening on %s, SQL comments: %s", addr, sqlComments)
 	log.Fatal(http.ListenAndServe(addr, mux))
 }
 
@@ -82,13 +88,17 @@ func waitForDatabase(ctx context.Context, pool *pgxpool.Pool) error {
 	return err
 }
 
-// handle registers a handler that continues (or starts) the request's trace and tags its SQL with it and the route.
+// handle registers a handler that tags the request's SQL with its route and, in the trace comment mode, continues (or
+// starts) the request's trace, tags the SQL with it too and echoes the traceparent it used in the response.
 func (s *server) handle(mux *http.ServeMux, pattern string, h http.HandlerFunc) {
 	route := routeOf(pattern)
 	mux.HandleFunc(pattern, func(w http.ResponseWriter, r *http.Request) {
-		tc := traceFromRequest(r)
-		w.Header().Set("traceparent", tc.Traceparent())
-		h(w, r.WithContext(withRequestTags(r.Context(), requestTags{Trace: tc, Route: route})))
+		tags := requestTags{Route: route}
+		if sqlComments == commentTrace {
+			tags.Trace = traceFromRequest(r)
+			w.Header().Set("traceparent", tags.Trace.Traceparent())
+		}
+		h(w, r.WithContext(withRequestTags(r.Context(), tags)))
 	})
 }
 

@@ -1,0 +1,92 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-12T19:14:21.373154Z",
+  "l7protocol": "postgres",
+  "duration": 1,
+  "elapsed": "0.000011s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "74",
+    "dbName": "shop",
+    "dbTransaction": "active",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1179-7-g080d884da",
+    "sequence": "70",
+    "source": "goproxy"
+  },
+  "uuid": "WSpYGkHhQCSk6OApjzoR6Q==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Describe Prepared Statement",
+  "location": "UPDATE products SET stock = stock - $2 WHERE id = $1 AND stock >= $2 RETURNING price :: float8",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "describe": {
+        "objectType": "OBJECT_TYPE_PREPARED_STATEMENT",
+        "name": "stmtcache_28efe4d63e54930bd42869a514e349a7d2e554e593aae139",
+        "parseRequest": {
+          "name": "stmtcache_28efe4d63e54930bd42869a514e349a7d2e554e593aae139",
+          "query": "UPDATE products SET stock = stock - $2 WHERE id = $1 AND stock >= $2 RETURNING price::float8"
+        }
+      }
+    },
+    "response": {
+      "describe": {
+        "messages": [
+          {
+            "parameterDescription": {
+              "parameterOids": [
+                23,
+                23
+              ]
+            }
+          },
+          {
+            "rowDescription": {
+              "fields": [
+                {
+                  "name": "price",
+                  "dataTypeOid": 701,
+                  "dataTypeSize": 8,
+                  "typeModifier": -1
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "RGVzY3JpYmUgUHJlcGFyZWQgU3RhdGVtZW50",
+    "postgres:query": "VVBEQVRFIHByb2R1Y3RzIFNFVCBzdG9jayA9IHN0b2NrIC0gJDIgV0hFUkUgaWQgPSAkMSBBTkQgc3RvY2sgPj0gJDIgUkVUVVJOSU5HIHByaWNlIDo6IGZsb2F0OA==",
+    "postgres:query_name": "c3RtdGNhY2hlXzI4ZWZlNGQ2M2U1NDkzMGJkNDI4NjlhNTE0ZTM0OWE3ZDJlNTU0ZTU5M2FhZTEzOQ=="
+  },
+  "netinfo": {
+    "id": "1",
+    "startTime": "2026-10-12T19:14:19.636198Z",
+    "downstream": {
+      "established": "2026-10-12T19:14:19.631300Z",
+      "ipAddress": "127.0.0.1",
+      "port": 56176,
+      "bytesSent": "2944"
+    },
+    "upstream": {
+      "established": "2026-10-12T19:14:19.631660Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost",
+      "bytesSent": "1246"
+    },
+    "direction": "EGRESS"
+  }
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -82,16 +83,43 @@ func encodeCommentPart(s string) string {
 	return strings.ReplaceAll(url.PathEscape(s), "'", `\'`)
 }
 
-// tag appends the sqlcommenter comment for the request in ctx to sql. A statement run outside a request (start-up,
-// the health check) is returned unchanged.
+// commentMode is what the app writes into the SQL it runs, chosen at start-up with the SQL_COMMENTS variable, so one
+// app can stand in for a service at each level of instrumentation.
+type commentMode string
+
+const (
+	// commentTrace traces each request (continuing an inbound traceparent or starting a trace) and comments its SQL
+	// with the route and the traceparent, as an OpenTelemetry sqlcommenter integration does. This is the default.
+	commentTrace commentMode = "trace"
+	// commentRoute traces nothing and comments SQL with the route only, as Rails query log tags do without tracing.
+	commentRoute commentMode = "route"
+	// commentOff traces nothing and leaves SQL uncommented, as an uninstrumented service does.
+	commentOff commentMode = "off"
+)
+
+// sqlComments is the comment mode the app runs with; main sets it from SQL_COMMENTS.
+var sqlComments = commentTrace
+
+func parseCommentMode(s string) (commentMode, error) {
+	switch m := commentMode(strings.ToLower(strings.TrimSpace(s))); m {
+	case "":
+		return commentTrace, nil
+	case commentTrace, commentRoute, commentOff:
+		return m, nil
+	}
+	return "", fmt.Errorf("SQL_COMMENTS=%q: want trace, route or off", s)
+}
+
+// tag appends the sqlcommenter comment for the request in ctx to sql, as the comment mode allows. A statement run
+// outside a request (start-up, the health check) is returned unchanged.
 func tag(ctx context.Context, sql string) string {
 	tags, ok := tagsFrom(ctx)
-	if !ok {
+	if !ok || sqlComments == commentOff {
 		return sql
 	}
-	return sql + " " + sqlComment(map[string]string{
-		"db_driver":   "pgx",
-		"route":       tags.Route,
-		"traceparent": tags.Trace.Traceparent(),
-	})
+	comment := map[string]string{"db_driver": "pgx", "route": tags.Route}
+	if sqlComments == commentTrace {
+		comment["traceparent"] = tags.Trace.Traceparent()
+	}
+	return sql + " " + sqlComment(comment)
 }

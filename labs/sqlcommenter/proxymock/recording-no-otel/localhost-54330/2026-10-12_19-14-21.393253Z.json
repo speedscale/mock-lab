@@ -1,0 +1,193 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-10-12T19:14:21.393253Z",
+  "l7protocol": "postgres",
+  "duration": 2,
+  "elapsed": "0.002535s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbBackendPid": "84",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "demo",
+    "dissectorVersion": "2",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1179-7-g080d884da",
+    "sequence": "118",
+    "source": "goproxy"
+  },
+  "uuid": "6iJG/pCsSxWfndx6mcnANw==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Startup",
+  "location": "N/A",
+  "status": "OK",
+  "postgres": {
+    "request": {
+      "startup": {
+        "messages": [
+          {
+            "startup": {
+              "protocolVersion": 196608,
+              "parameters": {
+                "database": "shop",
+                "user": "demo"
+              }
+            }
+          },
+          {
+            "sasl": {
+              "mechanism": "SCRAM-SHA-256",
+              "data": "biwsbj0scj04bFkvSE5yVmN1QXJGZ3NSK1llWmd1MUI="
+            }
+          },
+          {
+            "sasl": {
+              "data": "Yz1iaXdzLHI9OGxZL0hOclZjdUFyRmdzUitZZVpndTFCSkE1eWRkdzZlRWgrWCs5OEgwdndsWWl0LHA9R0Vlcm9odTUxQ09OeU9iTEluMExFL2ZzUlJWdFFsbWZEVVlaZzFRZXVBMD0="
+            }
+          }
+        ]
+      }
+    },
+    "response": {
+      "startup": {
+        "messages": [
+          {
+            "sasl": {
+              "mechanisms": [
+                "SCRAM-SHA-256"
+              ]
+            }
+          },
+          {
+            "saslContinue": {
+              "data": "cj04bFkvSE5yVmN1QXJGZ3NSK1llWmd1MUJKQTV5ZGR3NmVFaCtYKzk4SDB2d2xZaXQscz1HZUQ0OWlkdzR0WXkxSHNHUWtocStnPT0saT00MDk2"
+            }
+          },
+          {
+            "saslFinal": {
+              "data": "dj0wQ3FjV3d4QTAzQU56NnB6VkhhVndFakt4bGdJNVBTNTduMWpkcW5NMjRNPQ=="
+            }
+          },
+          {
+            "authOk": {}
+          },
+          {
+            "parameterStatus": {
+              "name": "in_hot_standby",
+              "value": "off"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "integer_datetimes",
+              "value": "on"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "TimeZone",
+              "value": "Etc/UTC"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "IntervalStyle",
+              "value": "postgres"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "is_superuser",
+              "value": "on"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "application_name"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "default_transaction_read_only",
+              "value": "off"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "scram_iterations",
+              "value": "4096"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "DateStyle",
+              "value": "ISO, MDY"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "standard_conforming_strings",
+              "value": "on"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "session_authorization",
+              "value": "demo"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "client_encoding",
+              "value": "UTF8"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "server_version",
+              "value": "16.10 (Debian 16.10-1.pgdg13+1)"
+            }
+          },
+          {
+            "parameterStatus": {
+              "name": "server_encoding",
+              "value": "UTF8"
+            }
+          },
+          {
+            "backendKeyData": {
+              "processId": 84,
+              "secretKey": 156114504
+            }
+          }
+        ]
+      }
+    }
+  },
+  "signature": {
+    "postgres:msg_type": "U3RhcnR1cA=="
+  },
+  "netinfo": {
+    "id": "11",
+    "startTime": "2026-10-12T19:14:21.395794Z",
+    "downstream": {
+      "established": "2026-10-12T19:14:21.393014Z",
+      "ipAddress": "127.0.0.1",
+      "port": 56208
+    },
+    "upstream": {
+      "established": "2026-10-12T19:14:21.393202Z",
+      "ipAddress": "127.0.0.1",
+      "port": 54330,
+      "hostname": "localhost"
+    },
+    "direction": "EGRESS"
+  }
+}

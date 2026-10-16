@@ -10,6 +10,8 @@ SELECT id, customer, total::float8, created_at FROM orders WHERE id = $1 /*db_dr
 
 proxymock reads the comment and links each statement to the inbound request with the same trace id, exactly. The lab ships a recording with every case in it: overlapping requests, an untagged query, a prepared statement reused by later requests, and requests that arrive without a trace.
 
+It also ships the same load recorded from the same app with tracing switched off, so you can see what linking by timing gets right and what it gets wrong. See [4. Compare with no tracing](#4-compare-with-no-tracing).
+
 ## Prerequisites
 
 - Go 1.25 or newer
@@ -29,6 +31,14 @@ The lab pins Postgres 16.10 and binds it to `127.0.0.1:54330`, next to the agent
 - The trace context and the route template (such as `/orders/{id}`) go into the request context.
 - `tag(ctx, sql)` appends the comment in the sqlcommenter format: keys sorted, values URL-encoded and single-quoted.
 - The app echoes the `traceparent` it used in the response, so `curl -i` shows the trace id to look for.
+
+The `SQL_COMMENTS` environment variable picks how much of this the app does, so the same app can stand in for a service at each level of instrumentation:
+
+| `SQL_COMMENTS` | Traces requests | SQL comment | Stands in for |
+|---|---|---|---|
+| `trace` (default) | Yes, and echoes `traceparent` | `route` and `traceparent` | An OpenTelemetry sqlcommenter integration |
+| `route` | No | `route` only | Rails query log tags or marginalia without tracing |
+| `off` | No | None | A service with no SQL tagging |
 
 In a real service an OpenTelemetry SDK and a sqlcommenter integration do this for you. [Link queries to the request that ran them](https://docs.speedscale.com/proxymock/guides/link-queries-to-requests/) lists the setup for each framework.
 
@@ -53,7 +63,7 @@ proxymock only links a statement by trace id when the request with that trace id
 
 ## 1. Look at the committed recording
 
-`proxymock/recording` is one run of the capture in step 3. You can read it without starting anything:
+`proxymock/recording` is one run of the capture in step 3, with `SQL_COMMENTS=trace`. You can read it without starting anything:
 
 ```shell
 make test
@@ -75,6 +85,7 @@ make web
 - Open any Postgres pair. Its detail shows **Caused by** with the request that ran it, marked **by trace id** when the comment named that request and **by time** when proxymock inferred it.
 - Open the **Trace** lens on the Requests list. Database calls linked through their comment get a chain badge, and the header counts how many were linked by trace ID and how many by timing.
 - Add the filter **Trace ID** with the id from a `/reports/sales` request. The list narrows to that request and the queries it ran, even though three other reports were running at the same time.
+- Use the **Run** selector to switch between `recording` and `recording-no-otel`, the same load with no tracing. Step 4 walks through the difference.
 
 ## 2. Start Postgres
 
@@ -102,6 +113,36 @@ The load script prints the trace id of every request it sends:
 
 To drive the app by hand instead, start it with `PGPORT=15432 go run .` under `proxymock record --map 15432=postgres://localhost:54330 --app-port 8080` and send requests to port 4143.
 
+`TRACEPARENT=off` makes the load script send every request without a `traceparent`, as if nothing upstream traced them. Combine it with `SQL_COMMENTS` to record any level, for example `SQL_COMMENTS=route TRACEPARENT=off make capture RECORDING_DIR=proxymock/recording-route`.
+
+## 4. Compare with no tracing
+
+`proxymock/recording-no-otel` is the same load from the same app with `SQL_COMMENTS=off` and `TRACEPARENT=off`: no request carries a trace and no statement carries a comment. Record your own with:
+
+```shell
+make capture-no-otel
+```
+
+Then compare the two recordings:
+
+```shell
+make report RECORDING_DIR=proxymock/recording-no-otel
+```
+
+Every statement still links to a request, by timing, and the totals match the traced recording: 18 requests and 31 statements attributed. What changes is who ran what while requests overlapped:
+
+| | `recording` (`SQL_COMMENTS=trace`) | `recording-no-otel` |
+|---|---|---|
+| Linked by trace id | 20 | 0 |
+| Ambiguous: linked by timing while requests overlapped | 0 | 8 |
+| `GET /reports/sales` statements per request | 2.0, max 2 | 2.0, max 7 |
+| **N queries in this request** on the four reports | 2, 2, 2, 2 | 7, 1, 0, 0 |
+| **Caused by** on a report's aggregate query | The report with the same trace id, **by trace id** | Whichever report was in flight, **by time** |
+
+Each report runs the same two statements. Timing hands all eight of them to whichever report was in flight, so one report looks like it ran seven queries and two look like they ran none. `sql-report` flags it under the per-request table: `note: 8 statements ran while requests overlapped; per-request figures are approximate.` The order transaction, the order lookups and the product lookups ran one at a time, so timing links them correctly.
+
+Which report collects the statements depends on scheduling, so a new capture can give 7 rather than 8 ambiguous statements, or a busiest report of 8.
+
 ## Validated reference evidence
 
 [`evidence/reference.json`](evidence/reference.json) holds the `sql-report` figures for the committed recording, checked statement by statement against **Caused by**:
@@ -112,6 +153,8 @@ To drive the app by hand instead, start it with `PGPORT=15432 go run .` under `p
 - None are ambiguous. The four reports overlap, but their trace ids, not their timing, decided where their statements belong.
 
 `sql-report -o json` gives the same figures as `requestLoad.exactStatements`, `attributedStatements`, `ambiguousStatements` and `unattributedStatements`. A new capture gives the same counts; only the trace ids and timestamps change.
+
+[`evidence/reference-no-otel.json`](evidence/reference-no-otel.json) holds the figures for `proxymock/recording-no-otel`, including the queries per request of the four reports and how much they moved across five captures.
 
 ## Measurement boundaries
 

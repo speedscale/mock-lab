@@ -1,0 +1,15 @@
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+CREATE ROLE candidate LOGIN PASSWORD 'fixture-candidate';
+CREATE TABLE readiness_environment(environment text NOT NULL);
+INSERT INTO readiness_environment VALUES('isolated_fixture');
+CREATE TABLE readiness_orders(id text PRIMARY KEY,tenant text NOT NULL,business_key text NOT NULL,quantity integer NOT NULL,total_cents integer NOT NULL,UNIQUE(tenant,business_key));
+CREATE TABLE readiness_audit(id bigserial PRIMARY KEY,order_id text NOT NULL,tenant text NOT NULL,actor text NOT NULL,action text NOT NULL,outcome text NOT NULL);
+CREATE TABLE readiness_inventory(id integer PRIMARY KEY,quantity integer NOT NULL);
+INSERT INTO readiness_inventory VALUES(1,10);
+CREATE TABLE readiness_catalog(id integer PRIMARY KEY,version text NOT NULL);
+INSERT INTO readiness_catalog VALUES(1,'initial');
+CREATE TABLE orders(id uuid PRIMARY KEY,customer text NOT NULL,status text NOT NULL,total_cents integer NOT NULL,created_at timestamptz NOT NULL DEFAULT now());
+CREATE TABLE order_items(id bigserial PRIMARY KEY,order_id uuid NOT NULL REFERENCES orders(id),project_id text NOT NULL,name text NOT NULL,quantity integer NOT NULL,unit_price_cents integer NOT NULL);
+GRANT USAGE ON SCHEMA public TO candidate;
+GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO candidate;
+GRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO candidate;

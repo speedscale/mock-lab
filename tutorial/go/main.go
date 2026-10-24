@@ -47,17 +47,30 @@ func main() {
 		Now:      time.Now,
 	}
 
+	handler := app.Routes()
+	if os.Getenv("READINESS_FIXTURE") == "1" {
+		fixture, err := newReadinessFixture(store.pool, apiURL)
+		if err != nil {
+			log.Fatal(err)
+		}
+		handler = fixture.handler(handler)
+	}
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           app.Routes(),
+		Handler:           handler,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	log.Printf("tutorial-orders (go) listening on :%s version=%s slow=%s", port, version, strconv.FormatBool(slow))
 
+	drained := make(chan struct{})
 	go func() {
+		defer close(drained)
 		<-ctx.Done()
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if os.Getenv("READINESS_FIXTURE") == "1" && defect("R23") {
+			os.Exit(0)
+		}
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		_ = srv.Shutdown(shutdownCtx)
 	}()
@@ -65,4 +78,5 @@ func main() {
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
+	<-drained
 }

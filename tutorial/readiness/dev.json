@@ -1,0 +1,472 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "readiness-reference"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "database-init",
+        "namespace": "readiness-reference"
+      },
+      "data": {
+        "schema.sql": "CREATE EXTENSION IF NOT EXISTS pg_stat_statements;\nCREATE ROLE candidate LOGIN PASSWORD 'fixture-candidate';\nCREATE TABLE readiness_environment(environment text NOT NULL);\nINSERT INTO readiness_environment VALUES('isolated_fixture');\nCREATE TABLE readiness_orders(id text PRIMARY KEY,tenant text NOT NULL,business_key text NOT NULL,quantity integer NOT NULL,total_cents integer NOT NULL,UNIQUE(tenant,business_key));\nCREATE TABLE readiness_audit(id bigserial PRIMARY KEY,order_id text NOT NULL,tenant text NOT NULL,actor text NOT NULL,action text NOT NULL,outcome text NOT NULL);\nCREATE TABLE readiness_inventory(id integer PRIMARY KEY,quantity integer NOT NULL);\nINSERT INTO readiness_inventory VALUES(1,10);\nCREATE TABLE readiness_catalog(id integer PRIMARY KEY,version text NOT NULL);\nINSERT INTO readiness_catalog VALUES(1,'initial');\nCREATE TABLE orders(id uuid PRIMARY KEY,customer text NOT NULL,status text NOT NULL,total_cents integer NOT NULL,created_at timestamptz NOT NULL DEFAULT now());\nCREATE TABLE order_items(id bigserial PRIMARY KEY,order_id uuid NOT NULL REFERENCES orders(id),project_id text NOT NULL,name text NOT NULL,quantity integer NOT NULL,unit_price_cents integer NOT NULL);\nGRANT USAGE ON SCHEMA public TO candidate;\nGRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA public TO candidate;\nGRANT USAGE,SELECT ON ALL SEQUENCES IN SCHEMA public TO candidate;\n"
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "database",
+        "namespace": "readiness-reference"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "database"
+          }
+        },
+        "strategy": {
+          "type": "RollingUpdate",
+          "rollingUpdate": {
+            "maxUnavailable": 0,
+            "maxSurge": 1
+          }
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "database"
+            }
+          },
+          "spec": {
+            "terminationGracePeriodSeconds": 35,
+            "containers": [
+              {
+                "name": "database",
+                "image": "postgres:17@sha256:b8faeff7712663c2773a190181e1246e37e364b887611c04658c28b44e2408fe",
+                "args": [
+                  "-c",
+                  "shared_preload_libraries=pg_stat_statements"
+                ],
+                "env": [
+                  {
+                    "name": "POSTGRES_USER",
+                    "value": "verifier"
+                  },
+                  {
+                    "name": "POSTGRES_PASSWORD",
+                    "value": "fixture-verifier"
+                  },
+                  {
+                    "name": "POSTGRES_DB",
+                    "value": "readiness_reference"
+                  },
+                  {
+                    "name": "PGDATA",
+                    "value": "/var/lib/postgresql/data/pgdata"
+                  }
+                ],
+                "ports": [
+                  {
+                    "containerPort": 5432
+                  }
+                ],
+                "resources": {
+                  "requests": {
+                    "cpu": "100m",
+                    "memory": "128Mi"
+                  },
+                  "limits": {
+                    "memory": "768Mi"
+                  }
+                },
+                "volumeMounts": [
+                  {
+                    "name": "data",
+                    "mountPath": "/var/lib/postgresql/data"
+                  },
+                  {
+                    "name": "init",
+                    "mountPath": "/docker-entrypoint-initdb.d"
+                  }
+                ],
+                "readinessProbe": {
+                  "exec": {
+                    "command": [
+                      "pg_isready",
+                      "-U",
+                      "verifier",
+                      "-d",
+                      "readiness_reference"
+                    ]
+                  },
+                  "periodSeconds": 2
+                }
+              }
+            ],
+            "volumes": [
+              {
+                "name": "data",
+                "emptyDir": {
+                  "medium": "Memory",
+                  "sizeLimit": "512Mi"
+                }
+              },
+              {
+                "name": "init",
+                "configMap": {
+                  "name": "database-init"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "database",
+        "namespace": "readiness-reference"
+      },
+      "spec": {
+        "selector": {
+          "app": "database"
+        },
+        "ports": [
+          {
+            "port": 5432,
+            "targetPort": 5432
+          }
+        ],
+        "sessionAffinity": "None"
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "dependency",
+        "namespace": "readiness-reference"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "dependency"
+          }
+        },
+        "strategy": {
+          "type": "RollingUpdate",
+          "rollingUpdate": {
+            "maxUnavailable": 0,
+            "maxSurge": 1
+          }
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "dependency"
+            }
+          },
+          "spec": {
+            "terminationGracePeriodSeconds": 35,
+            "containers": [
+              {
+                "name": "dependency",
+                "image": "${DEPENDENCY_IMAGE}",
+                "env": [
+                  {
+                    "name": "READINESS_ENVIRONMENT",
+                    "value": "dev"
+                  },
+                  {
+                    "name": "READINESS_CONTROL_TOKEN",
+                    "value": "${READINESS_CONTROL_TOKEN}"
+                  }
+                ],
+                "args": [
+                  "readiness",
+                  "reference-dependency",
+                  "--listen",
+                  "0.0.0.0:8080",
+                  "--allow-dev-cluster-listener"
+                ],
+                "ports": [
+                  {
+                    "containerPort": 8080
+                  }
+                ],
+                "resources": {
+                  "requests": {
+                    "cpu": "100m",
+                    "memory": "128Mi"
+                  },
+                  "limits": {
+                    "memory": "512Mi"
+                  }
+                },
+                "readinessProbe": {
+                  "tcpSocket": {
+                    "port": 8080
+                  },
+                  "periodSeconds": 2
+                }
+              }
+            ],
+            "volumes": []
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "dependency",
+        "namespace": "readiness-reference"
+      },
+      "spec": {
+        "selector": {
+          "app": "dependency"
+        },
+        "ports": [
+          {
+            "port": 8080,
+            "targetPort": 8080
+          }
+        ],
+        "sessionAffinity": "None"
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "orders",
+        "namespace": "readiness-reference"
+      },
+      "spec": {
+        "replicas": 2,
+        "selector": {
+          "matchLabels": {
+            "app": "orders"
+          }
+        },
+        "strategy": {
+          "type": "RollingUpdate",
+          "rollingUpdate": {
+            "maxUnavailable": 0,
+            "maxSurge": 1
+          }
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "orders"
+            }
+          },
+          "spec": {
+            "terminationGracePeriodSeconds": 35,
+            "containers": [
+              {
+                "name": "app",
+                "lifecycle": {
+                  "preStop": {
+                    "exec": {
+                      "command": [
+                        "/bin/sleep",
+                        "3"
+                      ]
+                    }
+                  }
+                },
+                "image": "${APP_IMAGE}",
+                "env": [
+                  {
+                    "name": "READINESS_FIXTURE",
+                    "value": "1"
+                  },
+                  {
+                    "name": "DATABASE_URL",
+                    "value": "postgres://candidate:fixture-candidate@database:5432/readiness_reference?sslmode=disable"
+                  },
+                  {
+                    "name": "DEMO_API_URL",
+                    "value": "http://dependency:8080"
+                  },
+                  {
+                    "name": "READINESS_VARIANT",
+                    "value": "one"
+                  },
+                  {
+                    "name": "PORT",
+                    "value": "8080"
+                  }
+                ],
+                "ports": [
+                  {
+                    "containerPort": 8080
+                  }
+                ],
+                "resources": {
+                  "requests": {
+                    "cpu": "250m",
+                    "memory": "64Mi"
+                  },
+                  "limits": {
+                    "cpu": "1",
+                    "memory": "512Mi"
+                  }
+                },
+                "readinessProbe": {
+                  "httpGet": {
+                    "path": "/ready/readyz",
+                    "port": 8080
+                  },
+                  "periodSeconds": 1,
+                  "failureThreshold": 1
+                }
+              }
+            ],
+            "volumes": []
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "orders",
+        "namespace": "readiness-reference"
+      },
+      "spec": {
+        "selector": {
+          "app": "orders"
+        },
+        "ports": [
+          {
+            "port": 8080,
+            "targetPort": 8080
+          }
+        ],
+        "sessionAffinity": "ClientIP"
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ConfigMap",
+      "metadata": {
+        "name": "router",
+        "namespace": "readiness-reference"
+      },
+      "data": {
+        "default.conf": "server { listen 8080; location / { proxy_pass http://orders:8080; proxy_http_version 1.1; proxy_set_header Connection \"\"; proxy_read_timeout 40s; proxy_connect_timeout 1s; proxy_next_upstream off; } }"
+      }
+    },
+    {
+      "apiVersion": "apps/v1",
+      "kind": "Deployment",
+      "metadata": {
+        "name": "router",
+        "namespace": "readiness-reference"
+      },
+      "spec": {
+        "replicas": 1,
+        "selector": {
+          "matchLabels": {
+            "app": "router"
+          }
+        },
+        "strategy": {
+          "type": "RollingUpdate",
+          "rollingUpdate": {
+            "maxUnavailable": 0,
+            "maxSurge": 1
+          }
+        },
+        "template": {
+          "metadata": {
+            "labels": {
+              "app": "router"
+            }
+          },
+          "spec": {
+            "terminationGracePeriodSeconds": 35,
+            "containers": [
+              {
+                "name": "router",
+                "image": "nginx:1.27-alpine",
+                "ports": [
+                  {
+                    "containerPort": 8080
+                  }
+                ],
+                "volumeMounts": [
+                  {
+                    "name": "config",
+                    "mountPath": "/etc/nginx/conf.d"
+                  }
+                ],
+                "resources": {
+                  "requests": {
+                    "cpu": "100m",
+                    "memory": "32Mi"
+                  },
+                  "limits": {
+                    "memory": "128Mi"
+                  }
+                },
+                "readinessProbe": {
+                  "tcpSocket": {
+                    "port": 8080
+                  },
+                  "periodSeconds": 2
+                }
+              }
+            ],
+            "volumes": [
+              {
+                "name": "config",
+                "configMap": {
+                  "name": "router"
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Service",
+      "metadata": {
+        "name": "router",
+        "namespace": "readiness-reference"
+      },
+      "spec": {
+        "selector": {
+          "app": "router"
+        },
+        "ports": [
+          {
+            "port": 8080,
+            "targetPort": 8080
+          }
+        ],
+        "sessionAffinity": "None"
+      }
+    }
+  ]
+}

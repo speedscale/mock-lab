@@ -1,6 +1,6 @@
 # Measured readiness reference
 
-The Go orders service can enable additional fixture routes with `READINESS_FIXTURE=1`. They exercise real Postgres state, idempotency, competing writes, authorization, cache expiry, bounded admission, dependency recovery, correlated logs and business audit events. Normal tutorial routes remain available. `READINESS_DEFECT=R01` through the supported requirement IDs seed corresponding behavior defects; `APP_SLOW=1` enables the original order-history amplification case.
+The Go orders service can enable additional fixture routes with `READINESS_FIXTURE=1`. They exercise real Postgres state, idempotency, competing writes, authorization, cache expiry, bounded admission, dependency recovery, correlated logs and business audit events. Normal tutorial routes remain available. `READINESS_DEFECT=R01` through the supported requirement IDs seed corresponding behavior defects; The original order-history amplification case is retained at fixture commit `97773ac`; the repaired handler uses one aggregate query even with `APP_SLOW=1`. Reproduce the failure from that commit, then compare the repair commit against the same protected profile.
 
 Use a Speedscale review build containing `proxymock readiness`. This adapter measures the reference service; it does not infer these contracts for arbitrary applications. The verifier, its budgets and its pinned recording must remain outside application repair permissions.
 

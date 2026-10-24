@@ -350,21 +350,7 @@ func (a *App) listOrders(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, listResponse{Orders: orders, GeneratedAt: a.stamp()})
 }
 
-// recentOrders runs S6, or under APP_SLOW=1 the planted N+1: S5 then S4 per order.
+// recentOrders fetches orders and item counts in one query.
 func (a *App) recentOrders(ctx context.Context, cutoff time.Time) ([]OrderRow, error) {
-	if !a.Slow {
-		return a.Store.ListRecentWithCounts(ctx, cutoff)
-	}
-	rows, err := a.Store.ListRecent(ctx, cutoff)
-	if err != nil {
-		return nil, err
-	}
-	for i := range rows {
-		lines, err := a.Store.GetLines(ctx, rows[i].ID)
-		if err != nil {
-			return nil, err
-		}
-		rows[i].ItemCount = len(lines)
-	}
-	return rows, nil
+	return a.Store.ListRecentWithCounts(ctx, cutoff)
 }

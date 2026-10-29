@@ -5,6 +5,8 @@
 // honors HTTP(S)_PROXY, but — like the C++ demo — does not read SSL_CERT_FILE on
 // its own, so we set CURLOPT_CAINFO. CURLOPT_PROXY is also set from the env so a
 // PHP build that disabled libcurl's env proxy still records. Run: php app.php
+require __DIR__ . '/runtime.php';
+
 $DOWNSTREAM = getenv('DOWNSTREAM_URL') ?: 'https://demo-api.trafficreplay.com';
 $PORT = intval(getenv('PORT') ?: '8080');
 

@@ -1,10 +1,8 @@
 # PHP demo app
 
-The PHP version of the [mock-lab](../../README.md) proxymock demo. It serves an HTTP API on
-`:8080` and fulfills each request by calling the CNCF downstream API
-(`DOWNSTREAM_URL`, default `https://demo-api.trafficreplay.com`; set `PORT` to change the port).
-Needs PHP 8.1+ with the `curl` extension (Homebrew `php`, `php-cli` + `php-curl` on Debian/Ubuntu;
-preinstalled in the devcontainer).
+The PHP version of the [mock-lab](../../README.md) proxymock demo. It serves an HTTP API on `:8080` and fulfills each request by calling the CNCF downstream API (`DOWNSTREAM_URL`, default `https://demo-api.trafficreplay.com`; set `PORT` to change the port). Requires PHP 8.3.36+, 8.4.27+, or 8.5.12+ within those release branches, with the `curl` extension. CI and the devcontainer use PHP 8.3.36. Rebuild existing devcontainers to install it. The app rejects unpatched or unsupported runtime branches before opening its listening socket.
+
+These minimum versions include the fixes for [CVE-2026-109618 and CVE-2026-109619](https://www.php.net/archive/2026.php).
 
 Use the installed [agent skills](../../README.md#agent-skills) to create tests from this app's recording and schema. The dashboard is optional.
 
@@ -26,14 +24,14 @@ proxymock replay --test-against http://localhost:8080   # 4. replay (or use Repl
 ```
 
 `proxymock record` exports the proxy and TLS settings. PHP's curl extension is libcurl, so
-`HTTP_PROXY`/`HTTPS_PROXY` are honored, but — like C++ — libcurl does **not** read
+`HTTP_PROXY`/`HTTPS_PROXY` are honored, but libcurl does **not** read
 `SSL_CERT_FILE`. The app sets `CURLOPT_CAINFO` from that env var, and also sets
 `CURLOPT_PROXY` from it so a PHP build that disabled libcurl's env proxy still records.
 Without the CAINFO wiring, the downstream HTTPS call through proxymock fails verification.
 
 ## Auth flow (two moving IDs)
 
-This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. Capture this flow with `../../shared/tests/run_tests.sh --recording` in a second terminal. The optional [dashboard](../../shared/README.md) also drives it and requires Go. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them — see [`./proxymock/`](./proxymock/) for the ready-to-run recording + blueprint.
+This app also serves `POST /oauth/token`, `POST /api/orders` (Bearer-protected, validates the project against the downstream), and `GET /api/orders/{order_id}` (Bearer-protected). The `access_token` and `order_id` are generated fresh on every call. Capture this flow with `../../shared/tests/run_tests.sh --recording` in a second terminal. The optional [dashboard](../../shared/README.md) also drives it and requires Go. On replay those two IDs are stale, so a committed *smart replace* blueprint re-chains them. See [`./proxymock/`](./proxymock/) for the ready-to-run recording + blueprint.
 
 Endpoints and the API contract: see the [root README](../../README.md) and [`openapi.yaml`](../../shared/openapi.yaml).
 

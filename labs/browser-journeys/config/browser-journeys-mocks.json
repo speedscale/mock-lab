@@ -1,0 +1,13 @@
+{
+  "id": "browser-journeys-mocks",
+  "version": 3,
+  "generator": {
+    "stages": [{ "virtualUsers": { "virtualUsers": "1", "requestDelay": {} } }],
+    "browser": { "workers": 2, "journeyTimeout": "60s" }
+  },
+  "rules": [
+    { "metricName": "browserLcpP95", "type": "TOO_HIGH", "value": 5000, "action": "ALERT" },
+    { "metricName": "browserJourneyPassPct", "type": "TOO_LOW", "value": 100, "action": "ALERT" }
+  ],
+  "cluster": { "replayMode": "generator-only", "logsCollected": false, "logLevel": "info" }
+}

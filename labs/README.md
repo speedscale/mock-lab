@@ -14,5 +14,6 @@ Companion scenarios. Each directory has its own README and is independent of the
 | [contract-testing](contract-testing/README.md) | Compare a deliberately invalid vendor capture with the clean baseline using an OpenAPI contract |
 | [sqlcommenter](sqlcommenter/README.md) | which inbound request ran each SQL query, exactly, from the trace id the app writes into a SQL comment |
 | [chaos](chaos/README.md) | Verify a Node storefront against API and latency requirements using recorded inventory traffic |
+| [browser-journeys](browser-journeys/README.md) | Run Playwright tests with a frontend's API calls answered from a recording, or compared with it, and see which call broke a journey |
 
 The reference API and traffic tools live in [shared/](../shared/README.md). The reusable baseline lives in the root [proxymock workspace](../proxymock/README.md).

@@ -95,10 +95,10 @@ proxymock replay --in proxymock/recording --browser journeys \
 The journey passes with no API running, and the command exits 0:
 
 ```text
-  ✓ shopper loads the item list (items.spec.ts:3) 178ms
+  ✓ shopper loads the item list (items.spec.ts:3) 132ms
 
 Browser journeys: 1 passed, 0 failed, 0 skipped
-Web vitals (p95 across journeys): LCP 20ms, FCP 20ms, TTFB 3.3ms, CLS 0
+Web vitals (p95 across journeys): LCP 28ms, FCP 28ms, TTFB 14.9ms, CLS 0
 ```
 
 `--test-against` is the frontend, and relative URLs in a spec resolve against it. `--browser-proxy` sends the browser's other traffic through the mock server.
@@ -114,10 +114,10 @@ make replay-failing
 The command exits 1:
 
 ```text
-  ✓ shopper loads the item list (items.spec.ts:3) 164ms
-  ✗ shopper sees a checkout button (checkout.spec.ts:5) 3.164s
+  ✓ shopper loads the item list (items.spec.ts:3) 169ms
+  ✗ shopper sees a checkout button (checkout.spec.ts:5) 3.179s
       Error: expect(locator).toBeVisible() failed
-  ✗ shopper pages through the items (next-page.spec.ts:4) 3.151s
+  ✗ shopper pages through the items (next-page.spec.ts:4) 3.139s
       Error: expect(locator).toHaveText(expected) failed
       not in the recording: GET http://api.localtest.me:8081/items?page=2
 
@@ -166,7 +166,7 @@ make replay
 The frontend's code did not change, and the journey fails, naming the call:
 
 ```text
-  ✗ shopper loads the item list (items.spec.ts:3) 5.153s
+  ✗ shopper loads the item list (items.spec.ts:3) 5.145s
       Error: expect(locator).toHaveText(expected) failed
       answered differently from the recording: GET http://api.localtest.me:8081/items (Body JSON)
 
@@ -209,7 +209,7 @@ The journey and the recording are staged in the cluster's forwarder, with no clo
   mocks:     the browser's API calls, by a responder in the generator pod
 result: Passed (success rate 100.0%)
 goals (0 of 2 missed):
-  PASS browserLcpP95: expected <= 5,000, actual 28
+  PASS browserLcpP95: expected <= 5,000, actual 24
   PASS browserJourneyPassPct: expected >= 100, actual 100
 ```
 
@@ -262,9 +262,10 @@ make cloud-failing
 The command prints a `report at:` link. With a cloud report, `--wait` follows the replay until it finishes and exits 0, so read the verdict in the report. Open the report's **Journeys** tab:
 
 - The top of the tab counts the journeys and shows p95 web vitals.
-- Expand **shopper pages through the items** to see its steps. Each step shows how many calls it made, and the click on **Next page** names the call the recording could not answer.
-- Expand **shopper sees a checkout button**. No call is flagged. Under its steps are the screenshot Playwright took when it failed and the downloads.
-- Select **Open trace** to replay the journey in Playwright's trace viewer inside the dashboard. It shows each action, a snapshot of the page, the console and the network calls. The trace is read in your browser.
+- Expand **shopper pages through the items** to see its steps. Each step shows how many calls it made, and the click on **Next page** says `Not in the recording, so the mock could not answer: GET http://api.localtest.me:8081/items?page=2`. The **Errors** tab counts the same call as a failed **Browser Call** assertion.
+- Expand **shopper sees a checkout button**. No call is flagged, so the failure is the frontend's.
+- Under a failed journey's steps are the screenshot Playwright took when it failed and the downloads. Here the screenshot shows the page's own message, `API call failed: GET /items?page=2 answered 404`.
+- Select **Open trace** to replay the journey in Playwright's trace viewer inside the dashboard. It shows each action, a snapshot of the page, the console and the network calls, with the 404 in the **Network** tab. The trace is read in your browser.
 
 Now run the backend change with the cloud comparing the answers:
 
@@ -276,7 +277,7 @@ make change-api
 make cloud-real
 ```
 
-In this report, the **Journeys** tab names `GET http://api.localtest.me:8081/items` under the click that made it, as answered differently from the recording, with `(Body JSON)` as what differed. The **Errors** tab shows the same call as a failed **Browser Call** assertion. Restore the API with `make restore-api` when you finish.
+In this report, the **Journeys** tab says `Answered differently from the recording by the real API: GET http://api.localtest.me:8081/items (Body JSON)` under the click that made the call, and the **Overview** names the same call on the failed journey. Restore the API with `make restore-api` when you finish.
 
 To start the same replay from the dashboard, open `/replay-launcher?snapshotId=<snapshot id>` with the snapshot id the command printed, then follow [these steps](https://docs.speedscale.com/guides/browser-journeys/run-in-cluster/#from-the-dashboard).
 
@@ -294,6 +295,6 @@ make clean
 
 - **A cloud run with mocks on shows every call as a passthrough.** Don't reuse one test config id for mocks on and `--no-mocks`. A cloud-free run stages its config in the cluster's forwarder, and a later cloud run with the same id reads the staged copy, including whether it observes the real APIs. That is why `config/` has one file per mode.
 - **A call shows as failed with no status, and is not named as a miss.** A frontend that never reads a failed response's body leaves the request open until the page closes, and Playwright reports it as aborted. `app/site/index.html` reads the body before checking the status for that reason. If your own frontend does not, the journey still fails, but the miss may not be named.
-- **`make up` stops with an image pull error.** Check the runtime has room. A generator-browser image is about 2 GB once unpacked, and the pod also takes a 1 GiB memory-backed `/dev/shm`.
+- **`make up` stops with an image pull error.** Check the runtime has room. The `generator-browser` image is about 1 GB to pull, and the pod also takes a 1 GiB memory-backed `/dev/shm`.
 - **`proxymock record --browser` says it cannot find Playwright.** Run it from this directory, after `make install`.
 - **The result lists a plain request count and no goals.** The replay ran as a request replay, not a browser one. Check `proxymock version` and the operator's image are both v2.5.1274 or newer.

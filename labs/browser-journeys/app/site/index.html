@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Demo shop SPA</title>
+<style>
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 3rem auto; max-width: 32rem; padding: 0 1rem; }
+  button { font: inherit; padding: .4rem .9rem; margin-right: .5rem; }
+  #error { color: #b3261e; }
+  li { margin: .2rem 0; }
+</style>
+</head>
+<body>
+<h1>Demo shop SPA</h1>
+<button id="load">Load items</button>
+<button id="next">Next page</button>
+<p id="error" role="alert"></p>
+<ul id="items"></ul>
+<script>
+// The API lives on another host, so a browser sends a CORS preflight before each
+// call: the custom X-Shop header makes the request non-simple on purpose.
+const API = 'http://api.localtest.me:8081';
+let page = 0;
+
+async function loadPage(next) {
+  document.getElementById('error').textContent = '';
+  try {
+    const query = next > 1 ? '?page=' + next : '';
+    const res = await fetch(API + '/items' + query, { headers: { 'X-Shop': 'demo' } });
+    const body = await res.text();
+    if (!res.ok) throw new Error('GET /items' + query + ' answered ' + res.status);
+    const items = JSON.parse(body);
+    document.getElementById('items').innerHTML = items.map((i) => '<li>' + i.name + '</li>').join('');
+    page = next;
+  } catch (e) {
+    document.getElementById('error').textContent = 'API call failed: ' + e.message;
+  }
+}
+
+document.getElementById('load').addEventListener('click', () => loadPage(1));
+document.getElementById('next').addEventListener('click', () => loadPage(page + 1));
+</script>
+</body>
+</html>

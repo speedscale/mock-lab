@@ -1,0 +1,66 @@
+# The frontend and the API it calls. Their content comes from ConfigMaps that
+# scripts/deploy.sh creates from app/, so the cluster runs the same files as your
+# machine and there are no images to build.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-spa
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: shop-spa}
+  template:
+    metadata:
+      labels: {app: shop-spa}
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:1.29-alpine
+        ports: [{containerPort: 80}]
+        volumeMounts:
+        - {name: site, mountPath: /usr/share/nginx/html/index.html, subPath: index.html}
+      volumes:
+      - name: site
+        configMap: {name: shop-spa}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop-spa
+spec:
+  selector: {app: shop-spa}
+  ports: [{port: 80, targetPort: 80}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: shop-api}
+  template:
+    metadata:
+      labels: {app: shop-api}
+    spec:
+      containers:
+      - name: api
+        image: node:24-alpine
+        command: [node, /app/server.js]
+        ports: [{containerPort: 8081}]
+        readinessProbe:
+          tcpSocket: {port: 8081}
+          periodSeconds: 2
+        volumeMounts:
+        - {name: api, mountPath: /app}
+      volumes:
+      - name: api
+        configMap: {name: shop-api}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop-api
+spec:
+  selector: {app: shop-api}
+  ports: [{port: 8081, targetPort: 8081}]

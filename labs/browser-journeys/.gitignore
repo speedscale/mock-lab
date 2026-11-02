@@ -1,0 +1,9 @@
+node_modules/
+bin/
+test-results/
+browser-artifacts/
+proxymock/my-recording/
+proxymock/results/
+proxymock/*.log
+proxymock/recording/.replay/
+proxymock/recording/*/.replay/

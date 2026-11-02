@@ -1,0 +1,8 @@
+{
+  "name": "browser-journeys-lab",
+  "private": true,
+  "description": "Playwright for the browser journeys lab. The version matches the generator-browser image.",
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

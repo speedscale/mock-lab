@@ -123,3 +123,14 @@ jobs:
       - name: Exercise starter paths and report coverage
         working-directory: labs/chaos
         run: npm run coverage
+
+  reference-server:
+    name: Reference backend contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - run: go test -race ./...
+        working-directory: shared/server

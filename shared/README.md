@@ -35,3 +35,9 @@ Drive the language app from another terminal:
 Use `DELAY=0` to skip the pause between calls. `PORT` overrides the target port.
 
 Recordings and their companion documents live in the [root proxymock workspace](../proxymock/README.md) and each language's own workspace. The deliberately invalid vendor capture belongs to the [contract-testing lab](../labs/contract-testing/README.md).
+
+## Outerspace upstreams
+
+The reference server also serves `/outerspace/spacex/rockets.json`, `/outerspace/spacex/rockets/{id}`, `/outerspace/spacex/launches/latest`, `/outerspace/spacex/launches.json`, `/outerspace/numbers/random/math` and `/outerspace/nasa/planetary/apod`. These are frozen, synthetic demo responses for [outerspace-go](https://github.com/speedscale/outerspace-go), preserving the fields it consumes. They are not current SpaceX, Numbers API or NASA data. No API key is needed.
+
+The static export includes the same seven objects under `outerspace/`. Publish that prefix alongside the existing dataset before pointing outerspace at the hosted backend. The launch list uses GET so it works on S3; outerspace computes its date-filtered summary locally. Unknown rocket IDs return 404. Run `cd shared/server && go test ./...` to verify the HTTP responses match the exported bytes.

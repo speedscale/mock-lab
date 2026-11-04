@@ -1,0 +1,30 @@
+{
+  "last_ais_update": null,
+  "legacy_id": "RACHEL",
+  "model": null,
+  "type": "Tug",
+  "roles": [
+    "ASDS Tug"
+  ],
+  "imo": 7600378,
+  "mmsi": 367488370,
+  "abs": 576417,
+  "class": 7611785,
+  "mass_kg": 312072,
+  "mass_lbs": 688000,
+  "year_built": 1976,
+  "home_port": "Port Canaveral",
+  "status": "",
+  "speed_kn": null,
+  "course_deg": null,
+  "latitude": null,
+  "longitude": null,
+  "link": "https://www.marinetraffic.com/en/ais/details/ships/shipid:447352/mmsi:367488370/imo:7600378/vessel:RACHEL",
+  "image": "https://i.imgur.com/IpYJWUW.jpg",
+  "name": "RACHEL",
+  "active": false,
+  "launches": [
+    "5eb87d19ffd86e000604b366"
+  ],
+  "id": "5ea6ed30080df4000697c916"
+}

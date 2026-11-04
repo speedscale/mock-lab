@@ -1,0 +1,34 @@
+{
+  "last_ais_update": null,
+  "legacy_id": null,
+  "model": null,
+  "type": "Cargo",
+  "roles": [
+    "Fairing Recovery",
+    "Support Ship"
+  ],
+  "imo": 9529695,
+  "mmsi": 368456000,
+  "abs": 1220625,
+  "class": 9195228,
+  "mass_kg": 2719740,
+  "mass_lbs": 5996000,
+  "year_built": 2009,
+  "home_port": "Port Canaveral",
+  "status": null,
+  "speed_kn": null,
+  "course_deg": null,
+  "latitude": null,
+  "longitude": null,
+  "link": "https://www.marinetraffic.com/en/ais/details/ships/shipid:454731/mmsi:368456000/imo:9529695/vessel:BOB",
+  "image": "https://i.imgur.com/Wr1slIc.png",
+  "name": "Bob",
+  "active": true,
+  "launches": [
+    "618faad2563d69573ed8ca9d",
+    "6161c94c6db1a92bfba85349",
+    "5fe3afc1b3467846b3242164",
+    "6243ada6af52800c6e919253"
+  ],
+  "id": "618fad7e563d69573ed8caa9"
+}

@@ -1,0 +1,36 @@
+{
+  "last_ais_update": null,
+  "legacy_id": null,
+  "model": null,
+  "type": "Cargo",
+  "roles": [
+    "Fairing Recovery",
+    "Support Ship"
+  ],
+  "imo": 9529889,
+  "mmsi": 368485000,
+  "abs": 1223077,
+  "class": 9195307,
+  "mass_kg": 2719740,
+  "mass_lbs": 5996000,
+  "year_built": 2009,
+  "home_port": "Port Canaveral",
+  "status": null,
+  "speed_kn": null,
+  "course_deg": null,
+  "latitude": null,
+  "longitude": null,
+  "link": "https://www.marinetraffic.com/en/ais/details/ships/shipid:454774/mmsi:368485000/imo:9529889/vessel:DOUG",
+  "image": "https://i.imgur.com/XF1FBB8.png",
+  "name": "Doug",
+  "active": true,
+  "launches": [
+    "607a37565a906a44023e0866",
+    "5fe3b15eb3467846b324216d",
+    "6161d2006db1a92bfba85356",
+    "61d5eca1f88e4c5fc91f1eb7",
+    "61e048bbbe8d8b66799018d0",
+    "6243ade2af52800c6e919255"
+  ],
+  "id": "614251b711a64135defb3654"
+}

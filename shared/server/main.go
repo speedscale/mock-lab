@@ -99,6 +99,7 @@ func main() {
 	projectsDelay := durationFromEnv("PROJECTS_DELAY")
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /spacex/", serveSpaceX)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"status": "ok"})
 	})
@@ -263,6 +264,9 @@ func writeJSON(w http.ResponseWriter, v any) {
 // paths, ready to `aws s3 sync` behind CloudFront. Path-only routes (no query
 // strings) keep the static origin dumb.
 func exportStatic(dir string) error {
+	if err := exportSpaceX(dir); err != nil {
+		return err
+	}
 	write := func(urlPath string, v any) error {
 		out := filepath.Join(dir, filepath.FromSlash(urlPath))
 		if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {

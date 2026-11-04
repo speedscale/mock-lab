@@ -17,6 +17,17 @@ on:
 # Builds and smoke-tests every demo app against the bundled reference downstream
 # (server/), so CI is fully self-contained — no external endpoint, no AWS.
 jobs:
+  downstream-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - name: Test shared downstream and static export
+        working-directory: shared/server
+        run: go test ./...
+
   validate:
     name: ${{ matrix.lang }}
     runs-on: ubuntu-latest

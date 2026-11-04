@@ -35,3 +35,7 @@ Drive the language app from another terminal:
 Use `DELAY=0` to skip the pause between calls. `PORT` overrides the target port.
 
 Recordings and their companion documents live in the [root proxymock workspace](../proxymock/README.md) and each language's own workspace. The deliberately invalid vendor capture belongs to the [contract-testing lab](../labs/contract-testing/README.md).
+
+The static export also includes `/spacex/v5/launches/latest` and `/spacex/v4/ships/{id}` for the legacy Java demo. These are archived SpaceX API responses captured on December 1, 2023, rather than current launch or ship data. The supported ship IDs are `614251b711a64135defb3654` (Doug), `5ea6ed30080df4000697c916` (RACHEL), and `618fad7e563d69573ed8caa9` (Bob). Unknown paths return 404. Only response bodies are retained; request headers and credentials are excluded.
+
+To publish the compatibility data, export to a fresh directory and copy only its `spacex/` prefix to the demo bucket with `application/json` content type. Do not sync with `--delete` at the bucket root. Verify all four objects on the dev distribution before publishing to the production demo distribution.

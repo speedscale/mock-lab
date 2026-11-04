@@ -99,6 +99,9 @@ func main() {
 	projectsDelay := durationFromEnv("PROJECTS_DELAY")
 
 	mux := http.NewServeMux()
+	if err := registerOuterspace(mux); err != nil {
+		log.Fatalf("outerspace data: %v", err)
+	}
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, map[string]string{"status": "ok"})
 	})
@@ -310,6 +313,9 @@ func exportStatic(dir string) error {
 		"error": "not found",
 		"hint":  "see / for the list of available endpoints",
 	}); err != nil {
+		return err
+	}
+	if err := exportOuterspace(dir); err != nil {
 		return err
 	}
 	log.Printf("exported static tree to %s", dir)

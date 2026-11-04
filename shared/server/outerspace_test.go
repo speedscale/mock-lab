@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -45,4 +46,34 @@ func TestOuterspaceHTTPMatchesStaticExport(t *testing.T) {
 	if res.Code != http.StatusNotFound {
 		t.Fatalf("unknown rocket: HTTP %d", res.Code)
 	}
+}
+
+func TestOuterspaceConcurrentResponses(t *testing.T) {
+	mux := http.NewServeMux()
+	if err := registerOuterspace(mux); err != nil {
+		t.Fatal(err)
+	}
+	const path = "/outerspace/spacex/launches/latest"
+	first := httptest.NewRecorder()
+	mux.ServeHTTP(first, httptest.NewRequest("GET", path, nil))
+	expected := append([]byte(nil), first.Body.Bytes()...)
+	start := make(chan struct{})
+	var workers sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			<-start
+			for j := 0; j < 20; j++ {
+				res := httptest.NewRecorder()
+				mux.ServeHTTP(res, httptest.NewRequest("GET", path, nil))
+				if res.Code != http.StatusOK || !bytes.Equal(res.Body.Bytes(), expected) {
+					t.Error("concurrent response differs from the endpoint contract")
+					return
+				}
+			}
+		}()
+	}
+	close(start)
+	workers.Wait()
 }

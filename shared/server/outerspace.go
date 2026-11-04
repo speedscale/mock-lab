@@ -23,9 +23,10 @@ func registerOuterspace(mux *http.ServeMux) error {
 		return err
 	}
 	for path, body := range objects {
+		response := append(body, '\n')
 		mux.HandleFunc("GET /outerspace/"+path, func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write(append(body, '\n'))
+			_, _ = w.Write(response)
 		})
 	}
 	return nil

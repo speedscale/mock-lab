@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNCF project explorer</title>
+<style>
+  :root { color-scheme: light; }
+  body { font: 16px/1.5 system-ui, sans-serif; margin: 0; color: #1d1d1f; background: #fff; }
+  header { background: #0b3b60; color: #fff; padding: .8rem 1.5rem; display: flex; gap: 2rem; align-items: baseline; flex-wrap: wrap; }
+  header h1 { font-size: 1.2rem; margin: 0; }
+  nav a { color: #cfe6ff; margin-right: 1rem; text-decoration: none; }
+  nav a[aria-current="page"] { color: #fff; font-weight: 600; text-decoration: underline; }
+  main { max-width: 56rem; margin: 1.5rem auto; padding: 0 1.5rem; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: 1rem; }
+  .card { border: 1px solid #d0d7de; border-radius: 8px; padding: 1rem; }
+  .card strong { display: block; font-size: 2rem; }
+  table { border-collapse: collapse; width: 100%; margin-top: 1rem; }
+  th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid #e5e7eb; }
+  td.num, th.num { text-align: right; }
+  .filters { display: flex; gap: 1rem; flex-wrap: wrap; }
+  input, select, button { font: inherit; padding: .35rem .6rem; }
+  #error { color: #b3261e; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: .3rem 1rem; }
+  dt { font-weight: 600; }
+</style>
+</head>
+<body>
+<header>
+  <h1>CNCF project explorer</h1>
+  <nav aria-label="Main">
+    <a href="#/">Overview</a>
+    <a href="#/projects">Projects</a>
+    <a href="#/categories">Categories</a>
+  </nav>
+</header>
+<main>
+  <p id="error" role="alert"></p>
+  <div id="view"></div>
+</main>
+<script>
+/*CONFIG*/
+const API = window.EXPLORER.apiBase;
+const view = document.getElementById('view');
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = (n) => n.toLocaleString('en-US');
+
+// The API is on another host, so JSON POSTs get a CORS preflight, as a real
+// cross-origin frontend's do. The body is read before the status is checked:
+// a response nobody reads stays open, and Playwright reports it as aborted.
+async function api(method, path) {
+  const res = await fetch(API + path, method === 'POST'
+    ? { method, headers: { 'Content-Type': 'application/json' }, body: '{}' }
+    : {});
+  const body = await res.text();
+  if (!res.ok) throw new Error(method + ' ' + path + ' answered ' + res.status);
+  return JSON.parse(body);
+}
+
+async function overview() {
+  view.innerHTML = '<h2>Overview</h2><p>Loading projects…</p>';
+  const projects = await api('GET', '/v1/projects');
+  const count = (m) => projects.filter((p) => p.maturity === m).length;
+  view.innerHTML = `
+    <h2>Overview</h2>
+    <section class="cards" aria-label="Projects by maturity">
+      ${['Graduated', 'Incubating', 'Sandbox'].map((m) => `
+        <div class="card" data-test="maturity-${m.toLowerCase()}"><strong>${count(m)}</strong>${m}</div>`).join('')}
+    </section>
+    <h3>Most starred</h3>
+    <ol data-test="top-projects">
+      ${projects.slice(0, 5).map((p) => `<li><a href="#/projects/${p.id}">${esc(p.name)}</a> · ${fmt(p.stars)} stars</li>`).join('')}
+    </ol>`;
+}
+
+let searchTimer;
+async function projectList() {
+  view.innerHTML = `
+    <h2>Projects</h2>
+    <div class="filters">
+      <label>Search projects <input id="q" type="search" autocomplete="off"></label>
+      <label>Maturity
+        <select id="maturity">
+          <option value="">All</option><option>Graduated</option><option>Incubating</option><option>Sandbox</option>
+        </select>
+      </label>
+    </div>
+    <p id="result-count" role="status"></p>
+    <table data-test="project-table">
+      <thead><tr><th>Project</th><th>Maturity</th><th>Category</th><th class="num">Stars</th></tr></thead>
+      <tbody></tbody>
+    </table>`;
+  const q = document.getElementById('q');
+  const maturity = document.getElementById('maturity');
+  async function load() {
+    const params = new URLSearchParams();
+    // SITE_BUG=search: the regression the lab's gate catches.
+    if (q.value) params.set(window.EXPLORER.bug === 'search' ? 'query' : 'q', q.value);
+    if (maturity.value) params.set('maturity', maturity.value);
+    const query = params.toString();
+    const rows = await api('GET', '/v1/projects' + (query ? '?' + query : ''));
+    document.getElementById('result-count').textContent = rows.length + (rows.length === 1 ? ' project' : ' projects');
+    view.querySelector('tbody').innerHTML = rows.map((p) => `
+      <tr><td><a href="#/projects/${p.id}">${esc(p.name)}</a></td><td>${p.maturity}</td><td>${esc(p.category)}</td><td class="num">${fmt(p.stars)}</td></tr>`).join('');
+  }
+  q.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(() => load().catch(showError), 300); });
+  maturity.addEventListener('change', () => load().catch(showError));
+  await load();
+}
+
+async function projectDetail(id) {
+  view.innerHTML = '<p>Loading project…</p>';
+  const p = await api('GET', '/v1/projects/' + encodeURIComponent(id));
+  view.innerHTML = `
+    <p><a href="#/projects">← All projects</a></p>
+    <h2>${esc(p.name)}</h2>
+    <p>${esc(p.description)}</p>
+    <dl>
+      <dt>Maturity</dt><dd>${p.maturity}</dd>
+      <dt>Category</dt><dd>${esc(p.category)} / ${esc(p.subcategory)}</dd>
+      <dt>Repository</dt><dd>${esc(p.repo)}</dd>
+      <dt>Stars</dt><dd>${fmt(p.stars)}</dd>
+      <dt>License</dt><dd>${esc(p.license)}</dd>
+      <dt>Accepted</dt><dd>${p.accepted}</dd>
+    </dl>
+    <p><button id="track" ${p.tracking ? 'disabled' : ''}>Track project</button>
+       <span id="track-status" role="status">${p.tracking ? 'Tracking' : ''}</span></p>`;
+  document.getElementById('track').addEventListener('click', async (e) => {
+    e.target.disabled = true;
+    try {
+      await api('POST', '/v1/projects/' + encodeURIComponent(id) + '/track');
+      document.getElementById('track-status').textContent = 'Tracking';
+    } catch (err) {
+      e.target.disabled = false;
+      showError(err);
+    }
+  });
+}
+
+async function categories() {
+  view.innerHTML = '<h2>Categories</h2><p>Loading categories…</p>';
+  const rows = await api('GET', '/v1/categories');
+  view.innerHTML = `
+    <h2>Categories</h2>
+    <table data-test="category-table">
+      <thead><tr><th>Category</th><th class="num">Projects</th></tr></thead>
+      <tbody>${rows.map((c) => `<tr><td>${esc(c.category)}</td><td class="num">${c.count}</td></tr>`).join('')}</tbody>
+    </table>`;
+}
+
+function showError(e) {
+  document.getElementById('error').textContent = 'API call failed: ' + e.message;
+}
+
+function route() {
+  document.getElementById('error').textContent = '';
+  const hash = location.hash.replace(/^#/, '') || '/';
+  for (const a of document.querySelectorAll('nav a')) {
+    const target = a.getAttribute('href').slice(1);
+    const current = target === '/' ? hash === '/' : hash.startsWith(target);
+    if (current) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  }
+  const detail = hash.match(/^\/projects\/([a-z0-9-]+)$/);
+  const render = detail ? () => projectDetail(detail[1])
+    : hash === '/projects' ? projectList
+    : hash === '/categories' ? categories
+    : overview;
+  render().catch(showError);
+}
+window.addEventListener('hashchange', route);
+route();
+</script>
+</body>
+</html>

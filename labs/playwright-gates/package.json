@@ -1,0 +1,8 @@
+{
+  "name": "playwright-gates-lab",
+  "private": true,
+  "description": "Playwright for the playwright-gates lab. The version matches the generator-browser image.",
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

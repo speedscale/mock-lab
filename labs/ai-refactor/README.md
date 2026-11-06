@@ -21,7 +21,13 @@ cd mock-lab/labs/ai-refactor
 
 Activate proxymock with `proxymock init` and complete browser sign-in. The normal [free signup](https://app.speedscale.com/signup) is the same one used by the repository's quickstart; [free-use eligibility](https://speedscale.com/terms-service/) applies. Reuse an existing activated configuration if you have one.
 
-Connect your agent with `proxymock mcp install --yes`, then install the [Speedscale skills](https://github.com/speedscale/skills) with `npx skills add speedscale/skills` if they are not already available. Restart the agent in this lab directory so it loads the MCP server and skills. This is a local workstation exercise; it needs Go and proxymock, with no Docker setup or cloud snapshot.
+Open this lab in your installed coding agent and complete its normal project setup. Select that client explicitly when connecting proxymock. For Codex, run:
+
+```bash
+proxymock mcp install --client codex --skills --yes
+```
+
+Replace `codex` with your client, such as `claude-code` or `cursor`. `--skills` installs the bundled [Speedscale skills](https://github.com/speedscale/skills), so a separate Node.js or `npx` setup is unnecessary. Restart the agent in this lab directory so it loads the MCP server and skills. This is a local workstation exercise; it needs Go and proxymock, with no Docker setup or cloud snapshot.
 
 ## Ask your agent to finish the refactor
 

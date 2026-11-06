@@ -494,13 +494,22 @@ func statsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
-	var projects []project
+	var projects []map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&projects); err != nil {
 		http.Error(w, `{"error":"bad downstream response"}`, http.StatusBadGateway)
 		return
 	}
 
-	writeJSON(w, http.StatusOK, summarizeProjects(projects))
+	byMaturity := map[string]int{}
+	for _, p := range projects {
+		if m, ok := p["maturity"].(string); ok {
+			byMaturity[m]++
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"total":       len(projects),
+		"by_maturity": byMaturity,
+	})
 }
 
 // tokenHandler issues a fresh bearer token (moving ID #1).

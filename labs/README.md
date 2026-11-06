@@ -4,6 +4,7 @@ Companion scenarios. Each directory has its own README and is independent of the
 
 | Lab | What it demonstrates |
 | --- | --- |
+| [ai-refactor](ai-refactor/README.md) | Use an agent and proxymock replay to catch a typed-client refactor that returns HTTP 200 with an empty response field |
 | [pyroscope](pyroscope/README.md) | CPU profile + proxymock replay to find a bottleneck, prove the response did not change, and measure again |
 | [prometheus](prometheus/README.md) | p95 latency from connection queueing, not CPU |
 | [tempo](tempo/README.md) | a serial dependency waterfall made visible in traces |

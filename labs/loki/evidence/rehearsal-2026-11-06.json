@@ -1,0 +1,79 @@
+{
+  "date": "2026-11-06",
+  "source_commit": "badd90dc9f753f0e8a9e5d3740711215a7d63caf",
+  "baseline_source_sha256": "916ca10f72487feb2848600e6407bb1dac58cc55d23cfb9b611da0e67a29ab0d",
+  "candidate_source_sha256": "743bfd79f3d6590b98ca64a6425a478f87bffdaf039e7e8a0aed91e11beb6c78",
+  "platform": "macOS arm64, shared host",
+  "proxymock": "v2.5.1335-3-ge089a8fbd, dev configuration",
+  "fixture": "Local synthetic pricing catalog, 10 ms delay during capture; recorded responses during replay",
+  "capture": {
+    "inbound": 8,
+    "outbound": 11,
+    "repricing_calls": 4,
+    "trigger_response": {
+      "currency": "USD",
+      "last_settled_price_cents": 12999,
+      "repricing_window_ms": 900000,
+      "sku": "SSC-7300",
+      "state": "REPRICING",
+      "unit_price_cents": 0
+    }
+  },
+  "load_shape": {
+    "vus": 4,
+    "times": 25,
+    "recorded_inputs": 8,
+    "total": 800
+  },
+  "real_pricing_stopped_during_replays": true,
+  "passthrough_enabled": false,
+  "response_body_comparison": {
+    "pairs": 8,
+    "byte_identical": true,
+    "stable_differences": 0
+  },
+  "phases": {
+    "baseline-clean": {
+      "functional_pairs": 8,
+      "mismatches": 0,
+      "load_requests": 800,
+      "failed_requests": 0,
+      "p95_ms": 431,
+      "p99_ms": 435,
+      "pricing_calls": 1100,
+      "retry_events": 300,
+      "retry_exhausted_events": 100,
+      "price_sources": {
+        "live": 700,
+        "last_settled": 100
+      },
+      "mock_hits": 1116,
+      "loki_quoted_requests": 800.0
+    },
+    "candidate": {
+      "functional_pairs": 8,
+      "mismatches": 0,
+      "load_requests": 800,
+      "failed_requests": 0,
+      "p95_ms": 2,
+      "p99_ms": 3,
+      "pricing_calls": 800,
+      "retry_events": 0,
+      "retry_exhausted_events": 0,
+      "price_sources": {
+        "live": 700,
+        "last_settled": 100
+      },
+      "mock_hits": 810,
+      "loki_quoted_requests": 800.0
+    }
+  },
+  "limitations": [
+    "Controlled synthetic pricing lab; live capture delay is 10 ms per pricing call.",
+    "Both replay builds use identical recorded dependency responses and native mocks; output recording is enabled for both.",
+    "Load mode does not score every response body; the eight-input functional run, strict body hashes and native baseline gate establish response equality.",
+    "Loki ingestion is separated before the load window so its counts cover exactly 800 quotes.",
+    "An earlier baseline window included probe/functional ingestion; it is retained but excluded from the comparison.",
+    "Millisecond percentiles are quantized; no production throughput or capacity claim is made."
+  ]
+}

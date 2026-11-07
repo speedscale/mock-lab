@@ -1,0 +1,160 @@
+diff --git a/labs/loki/internal/checkout/checkout.go b/labs/loki/internal/checkout/checkout.go
+index d44f592..a9668cb 100644
+--- a/labs/loki/internal/checkout/checkout.go
++++ b/labs/loki/internal/checkout/checkout.go
+@@ -26,8 +26,7 @@ const (
+ 	maxQuantity      = 99
+ 	pricingCallLimit = 5 * time.Second
+ 
+-	// The pricing client makes one call and then retries an unsettled answer
+-	// three more times before giving up.
++	// Retry only while the dependency has no usable price.
+ 	pricingAttempts    = 4
+ 	pricingBaseBackoff = 60 * time.Millisecond
+ 
+@@ -163,17 +162,13 @@ func (s *Service) Handler() http.HandlerFunc {
+ 	}
+ }
+ 
+-// resolvePrice asks the pricing dependency for a price and retries while the
+-// answer is unsettled.
++// resolvePrice retries until the dependency publishes a usable price.
+ func (s *Service) resolvePrice(ctx context.Context, logger *slog.Logger, sku string) (resolvedPrice, error) {
+-	var latest priceResponse
+-
+ 	for attempt := 1; attempt <= pricingAttempts; attempt++ {
+ 		price, err := s.fetchPrice(ctx, sku)
+ 		if err != nil {
+ 			return resolvedPrice{}, err
+ 		}
+-		latest = price
+ 
+ 		if price.State == stateSettled {
+ 			return resolvedPrice{
+@@ -184,6 +179,24 @@ func (s *Service) resolvePrice(ctx context.Context, logger *slog.Logger, sku str
+ 			}, nil
+ 		}
+ 
++		if price.State == stateRepricing && price.LastSettledPriceCents > 0 {
++			logger.Warn("using the published price during repricing",
++				"event", "pricing_repricing_settled_price_used",
++				"sku", sku,
++				"dep_state", price.State,
++				"attempts", attempt,
++				"repricing_window_ms", price.RepricingWindowMS,
++				"fallback_price_cents", price.LastSettledPriceCents,
++				"price_source", sourceLastSettled,
++			)
++			return resolvedPrice{
++				unitPriceCents: price.LastSettledPriceCents,
++				currency:       price.Currency,
++				source:         sourceLastSettled,
++				attempts:       attempt,
++			}, nil
++		}
++
+ 		if attempt < pricingAttempts {
+ 			backoff := pricingBaseBackoff << (attempt - 1)
+ 			logger.Warn("pricing lookup is not settled, retrying",
+@@ -202,25 +215,7 @@ func (s *Service) resolvePrice(ctx context.Context, logger *slog.Logger, sku str
+ 		}
+ 	}
+ 
+-	if latest.LastSettledPriceCents <= 0 {
+-		return resolvedPrice{}, errors.New("pricing never settled and published no last settled price")
+-	}
+-
+-	logger.Error("pricing retries exhausted, falling back to the last settled price",
+-		"event", "pricing_retry_exhausted",
+-		"sku", sku,
+-		"dep_state", latest.State,
+-		"attempts", pricingAttempts,
+-		"repricing_window_ms", latest.RepricingWindowMS,
+-		"fallback_price_cents", latest.LastSettledPriceCents,
+-		"price_source", sourceLastSettled,
+-	)
+-	return resolvedPrice{
+-		unitPriceCents: latest.LastSettledPriceCents,
+-		currency:       latest.Currency,
+-		source:         sourceLastSettled,
+-		attempts:       pricingAttempts,
+-	}, nil
++	return resolvedPrice{}, errors.New("pricing never settled and published no last settled price")
+ }
+ 
+ func (s *Service) fetchPrice(ctx context.Context, sku string) (priceResponse, error) {
+diff --git a/labs/loki/internal/checkout/checkout_test.go b/labs/loki/internal/checkout/checkout_test.go
+index 6bb4efc..875c363 100644
+--- a/labs/loki/internal/checkout/checkout_test.go
++++ b/labs/loki/internal/checkout/checkout_test.go
+@@ -6,6 +6,7 @@ import (
+ 	"log/slog"
+ 	"net/http"
+ 	"net/http/httptest"
++	"sync/atomic"
+ 	"testing"
+ )
+ 
+@@ -116,3 +117,62 @@ func TestUnknownDependencyStateIsAnError(t *testing.T) {
+ 		t.Fatalf("status = %d, want 502", recorder.Code)
+ 	}
+ }
++
++func TestRepricingCallBudget(t *testing.T) {
++	cases := []struct {
++		name      string
++		responses []priceResponse
++		status    int
++		calls     int32
++	}{
++		{
++			name: "published price is usable immediately",
++			responses: []priceResponse{{SKU: "SSC-7300", Currency: "USD", State: stateRepricing,
++				LastSettledPriceCents: 12999, RepricingWindowMS: 900000}},
++			status: http.StatusOK, calls: 1,
++		},
++		{
++			name: "missing price retries until settled",
++			responses: []priceResponse{
++				{SKU: "SSC-7300", Currency: "USD", State: stateRepricing},
++				{SKU: "SSC-7300", Currency: "USD", State: stateRepricing},
++				{SKU: "SSC-7300", Currency: "USD", State: stateSettled, UnitPriceCents: 12999},
++			},
++			status: http.StatusOK, calls: 3,
++		},
++		{
++			name:      "missing price exhausts retries",
++			responses: []priceResponse{{SKU: "SSC-7300", Currency: "USD", State: stateRepricing}},
++			status:    http.StatusBadGateway, calls: 4,
++		},
++		{
++			name: "negative price exhausts retries",
++			responses: []priceResponse{{SKU: "SSC-7300", Currency: "USD", State: stateRepricing,
++				LastSettledPriceCents: -1}},
++			status: http.StatusBadGateway, calls: 4,
++		},
++	}
++	for _, tc := range cases {
++		t.Run(tc.name, func(t *testing.T) {
++			var calls atomic.Int32
++			service := newTestService(t, func(w http.ResponseWriter, _ *http.Request) {
++				index := min(int(calls.Add(1))-1, len(tc.responses)-1)
++				_ = json.NewEncoder(w).Encode(tc.responses[index])
++			})
++			recorder := httptest.NewRecorder()
++			service.Handler()(recorder, httptest.NewRequest(http.MethodGet, "/api/quote?sku=SSC-7300&qty=2", nil))
++			if recorder.Code != tc.status {
++				t.Fatalf("status = %d, want %d", recorder.Code, tc.status)
++			}
++			if calls.Load() != tc.calls {
++				t.Errorf("pricing calls = %d, want %d", calls.Load(), tc.calls)
++			}
++			if tc.status == http.StatusOK {
++				quote := decodeQuote(t, recorder)
++				if quote.UnitPriceCents != 12999 || quote.TotalCents != 25998 || quote.Currency != "USD" {
++					t.Fatalf("unexpected quote %+v", quote)
++				}
++			}
++		})
++	}
++}

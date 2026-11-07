@@ -25,6 +25,13 @@ CONFIG
 rm -rf "$out"
 background "$work/record.log" "$proxymock" record --out "$out"
 wait_for_port 4140
+# The port opens before the proxy forwards. Warm it up with a request to the
+# frontend, whose directory is dropped below, so the first journey's API call
+# is not the one that waits.
+for _ in $(seq 1 60); do
+  curl -sf -o /dev/null -m 5 -x http://localhost:4140 "$frontend/" && break
+  sleep 0.5
+done
 npx playwright test -c "$work/record.config.mjs" --reporter=line
 stop_all
 

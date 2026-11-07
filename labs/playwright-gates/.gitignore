@@ -1,0 +1,9 @@
+node_modules/
+test-results/
+playwright-report/
+browser-artifacts/
+proxymock/results/
+proxymock/my-recording/
+proxymock/my-api-recording/
+proxymock/*.log
+proxymock/**/.replay/

@@ -1,0 +1,77 @@
+{
+  "assertionGroups": [
+    {
+      "configs": [
+        {
+          "type": "httpStatusCode"
+        },
+        {
+          "type": "httpHeaders"
+        },
+        {
+          "type": "httpResponseCookies"
+        },
+        {
+          "type": "httpResponseBody"
+        },
+        {
+          "type": "httpResponseContentType"
+        }
+      ]
+    }
+  ],
+  "cluster": {
+    "cleanup": "inventory",
+    "logLevel": "info",
+    "logsCollected": true,
+    "replayMode": "full-replay",
+    "sidecar_tls_out": true
+  },
+  "generator": {
+    "stages": [
+      {
+        "virtualUsers": {
+          "requestDelay": {},
+          "virtualUsers": "1"
+        }
+      }
+    ]
+  },
+  "id": "playwright-gates-perf",
+  "responder": {
+    "numReplicas": 1,
+    "passthrough_mode": true
+  },
+  "rules": [
+    {
+      "metricName": "browserJourneyPassPct",
+      "type": "TOO_LOW",
+      "value": 100,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "browserLcpP95",
+      "type": "TOO_HIGH",
+      "value": 250,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "browserFcpP95",
+      "type": "TOO_HIGH",
+      "value": 200,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "browserTtfbP95",
+      "type": "TOO_HIGH",
+      "value": 100,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "browserClsP95",
+      "type": "TOO_HIGH",
+      "value": 0.1,
+      "action": "ALERT"
+    }
+  ]
+}

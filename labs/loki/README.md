@@ -165,6 +165,28 @@ The split of quotes by price source is identical, which is the point: the
 service always made the same decision, and it took four dependency calls and
 420 ms of backoff to reach it.
 
+## Optional reference fix
+
+The checked-in app intentionally retains the retry loop for the exercise. A tested solution and four pricing-call boundary cases are available as [use-published-price.patch](fixes/use-published-price.patch). The patch uses a positive last-settled price immediately, keeps one repricing event, and retains retries and HTTP 502 when no usable price is published.
+
+From the repository root, apply only the regression tests first:
+
+```sh
+git apply --include='labs/loki/internal/checkout/checkout_test.go' labs/loki/fixes/use-published-price.patch
+cd labs/loki
+go test ./internal/checkout -run TestRepricingCallBudget -count=1 -v
+```
+
+The published-price case fails with `pricing calls = 4, want 1`; the no-price and eventual-settlement cases pass. From the repository root, apply the implementation and run the suite:
+
+```sh
+git apply --include='labs/loki/internal/checkout/checkout.go' labs/loki/fixes/use-published-price.patch
+cd labs/loki
+go test ./... -count=1
+```
+
+The [November 6 rehearsal](evidence/rehearsal-2026-11-06.json) records a fresh capture and baseline/candidate comparison with the real pricing process stopped. It used isolated ports and 800 requests per build. All eight functional response bodies were byte-identical, while the repricing path changed from four pricing calls to one. These are controlled local results, not production capacity figures.
+
 ## Measurement boundaries
 
 - Alloy assigns Loki timestamps as it reads the file, so a line's position in

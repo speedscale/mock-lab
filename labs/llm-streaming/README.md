@@ -27,7 +27,7 @@ The [LLM streaming metrics guide](https://docs.speedscale.com/guides/replay/llm-
 
 ## Prerequisites
 
-- Go 1.23 or newer, `curl` and `nc`
+- Go 1.23 or newer, `curl`, `nc` and `jq`
 - proxymock 2.5.1370 or newer, installed, initialized and on `PATH`
 
 Run every command below from this `labs/llm-streaming` directory of your `mock-lab` clone.
@@ -66,7 +66,7 @@ The lab includes a recording made this way in `proxymock/recording`, so you can 
 make replay
 ```
 
-This runs:
+This empties `proxymock/results/replay` and runs:
 
 ```shell
 proxymock replay --in proxymock/recording --test-against http://localhost:8000 \
@@ -156,7 +156,14 @@ make record RECORDING_DIR=proxymock/recorded-no-usage USAGE=false
 make record RECORDING_DIR=proxymock/recorded-usage
 ```
 
-Replay each with `make replay RECORDING_DIR=...`. The run without usage reports `llm.token-count-approx-pct` of 100, 40 output tokens instead of 160, and an ITL p50 of about 21 ms. With usage, the same server measures 160 tokens and an ITL p50 of about 4.4 ms. Gate on `llm.token-count-approx-pct > 0` when token rates matter.
+A passing replay prints only the metrics it gates on, so `make llm-metrics` replays a recording and prints every LLM metric of the run:
+
+```shell
+make llm-metrics RECORDING_DIR=proxymock/recorded-no-usage
+make llm-metrics RECORDING_DIR=proxymock/recorded-usage
+```
+
+The run without usage reports `llm.token-count-approx-pct` of 100, 40 output tokens instead of 160, and an ITL p50 of about 21 ms. With usage, the same server measures 160 tokens and an ITL p50 of about 4.4 ms. Gate on `llm.token-count-approx-pct > 0` when token rates matter.
 
 ## 7. Load and other formats
 

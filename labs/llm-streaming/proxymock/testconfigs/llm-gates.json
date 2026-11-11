@@ -1,0 +1,72 @@
+{
+  "assertionGroups": [
+    {
+      "configs": [
+        {
+          "type": "httpStatusCode"
+        },
+        {
+          "config": {
+            "headers": "Content-Type"
+          },
+          "type": "httpHeaders"
+        },
+        {
+          "type": "httpResponseSchema"
+        },
+        {
+          "type": "httpResponseContentType"
+        }
+      ]
+    }
+  ],
+  "cluster": {
+    "cleanup": "inventory",
+    "logLevel": "info",
+    "logsCollected": true,
+    "replayMode": "full-replay",
+    "sidecar_tls_out": true
+  },
+  "generator": {
+    "stages": [
+      {
+        "virtualUsers": {
+          "requestDelay": {},
+          "virtualUsers": "1"
+        }
+      }
+    ]
+  },
+  "id": "llm-gates",
+  "responder": {
+    "numReplicas": 1,
+    "passthrough_mode": true
+  },
+  "rules": [
+    {
+      "action": "ALERT",
+      "metricName": "passAssertPct",
+      "type": "TOO_LOW",
+      "value": 100
+    },
+    {
+      "metricName": "llmTtftP95",
+      "type": "TOO_HIGH",
+      "value": 800,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "llmItlP95",
+      "type": "TOO_HIGH",
+      "value": 40,
+      "action": "ALERT"
+    },
+    {
+      "metricName": "llmIncompleteCount",
+      "type": "TOO_HIGH",
+      "value": 0,
+      "action": "ALERT"
+    }
+  ],
+  "version": 3
+}

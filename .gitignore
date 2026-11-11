@@ -80,6 +80,9 @@
 /labs/prometheus/proxymock/
 /labs/prometheus/bin/
 /labs/prometheus/proxymock.log
+/labs/grpc/bin/
+/labs/grpc/.run/
+/labs/grpc/proxymock/results/
 # agent tutorial app -- scratch proxymock workspaces, venvs and build output
 /tutorial/*/proxymock/
 /tutorial/*/proxymock.log

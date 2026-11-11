@@ -18,5 +18,6 @@ Companion scenarios. Each directory has its own README and is independent of the
 | [browser-journeys](browser-journeys/README.md) | Run Playwright tests with a frontend's API calls answered from a recording, or compared with it, and see which call broke a journey |
 | [playwright-gates](playwright-gates/README.md) | Use an agent and the browser-journey-tests skill to turn an ordinary Playwright suite into a regression gate and a web-vitals and API-load performance gate |
 | [llm-streaming](llm-streaming/README.md) | Record streamed LLM chat traffic, replay it to measure time to first token and inter-token latency, and fail the replay when a slower model server regresses them |
+| [grpc](grpc/README.md) | Read recorded gRPC and protobuf bodies as Protoscope and as named JSON from the service's `.proto`, with Pub/Sub, gRPC health and OTLP calls named by the built-in schemas and gRPC error details decoded |
 
 The reference API and traffic tools live in [shared/](../shared/README.md). The reusable baseline lives in the root [proxymock workspace](../proxymock/README.md).

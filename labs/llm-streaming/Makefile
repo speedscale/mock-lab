@@ -1,4 +1,4 @@
-.PHONY: test build server slow-server record replay replay-goals load clean
+.PHONY: test build server slow-server record replay replay-goals llm-metrics load clean
 
 PROXYMOCK ?= proxymock
 RECORDING_DIR ?= proxymock/recording
@@ -32,15 +32,30 @@ record: build
 	PROXYMOCK="$(PROXYMOCK)" RECORDING_DIR="$(RECORDING_DIR)" FORMAT="$(FORMAT)" \
 		REQUESTS="$(REQUESTS)" USAGE="$(USAGE)" ./scripts/record.sh
 
+# Each replay starts from an empty --out folder. proxymock scores the replay
+# verdict from every pair in that folder, so pairs left by a replay of another
+# recording fail the run with "refUuid ... not found in --in".
 replay:
+	rm -rf "$(RESULTS_DIR)/replay"
 	$(PROXYMOCK) replay --in "$(RECORDING_DIR)" --test-against "$(TARGET_URL)" \
 		--out "$(RESULTS_DIR)/replay" \
 		--fail-if 'llm.ttft-p95 > $(TTFT_P95_MS)' \
 		--fail-if 'llm.itl-p95 > $(ITL_P95_MS)'
 
 replay-goals:
+	rm -rf "$(RESULTS_DIR)/goals"
 	$(PROXYMOCK) replay --in "$(RECORDING_DIR)" --test-against "$(TARGET_URL)" \
 		--out "$(RESULTS_DIR)/goals" --test-config llm-gates
+
+# A passing replay prints only the metrics it gates on. This prints every LLM
+# metric of the run, such as llm.output-tokens and llm.token-count-approx-pct.
+llm-metrics:
+	rm -rf "$(RESULTS_DIR)/metrics" "$(RESULTS_DIR)/metrics.json"
+	mkdir -p "$(RESULTS_DIR)"
+	$(PROXYMOCK) replay --in "$(RECORDING_DIR)" --test-against "$(TARGET_URL)" \
+		--out "$(RESULTS_DIR)/metrics" --output json > "$(RESULTS_DIR)/metrics.json"
+	jq '.endpoints[] | select(.url == "-ALL-") | .metrics | with_entries(select(.key | startswith("llm.")))' \
+		"$(RESULTS_DIR)/metrics.json"
 
 load:
 	$(PROXYMOCK) replay --in "$(RECORDING_DIR)" --test-against "$(TARGET_URL)" \

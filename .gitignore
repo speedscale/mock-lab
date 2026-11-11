@@ -118,3 +118,10 @@ node_modules/
 /labs/credentials/proxymock/recording/.replay/
 /labs/credentials/proxymock/recording/*/.replay/
 /labs/credentials/proxymock.log
+# LLM streaming lab: keep the recording and test config, ignore new captures and results
+/labs/llm-streaming/proxymock/*
+!/labs/llm-streaming/proxymock/recording/
+!/labs/llm-streaming/proxymock/testconfigs/
+/labs/llm-streaming/proxymock/recording/.replay/
+/labs/llm-streaming/bin/
+/labs/llm-streaming/proxymock.log

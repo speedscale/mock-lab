@@ -24,7 +24,7 @@ Pub/Sub is the Go client library's own fake, `pstest`, which speaks the real `go
 ## Prerequisites
 
 - Go 1.26 or newer, and `nc`
-- proxymock with the built-in schemas. `proxymock protos list` prints a `Built in:` line when yours has them; the `.proto` here needs them to compile, because it imports `google/api` and `google/type` without carrying those files.
+- proxymock with the built-in schemas. `proxymock protos list` prints a `Built in:` line when yours has them; the `.proto` here needs them to compile, because it imports `google/api` and `google/type` without carrying those files. The same release replays gRPC error statuses as responses, which step 4 relies on.
 
 Run every command below from this `labs/grpc` directory of your `mock-lab` clone.
 
@@ -97,9 +97,7 @@ make replay
 
 `scripts/replay.sh` starts `proxymock mock`, which answers the service's Pub/Sub and OTLP calls from the recording on the same ports it recorded through, starts the orders service against them, and runs `proxymock replay` with the recorded client calls. Neither the Pub/Sub fake nor the OTLP collector runs, and nothing leaves the machine.
 
-Eight of the ten recorded calls replay with responses that match the recording, `WatchOrder`'s three stream messages included.
-
-**Known issue:** the rejected `CreateOrder` and the `GetOrder` for a missing order are reported as failed, although the service returns exactly the recorded error status and the status-code mismatch column shows 0%. proxymock replay treats any gRPC error status as a failed request instead of a response to compare. Until that is fixed, a recording with expected gRPC errors does not replay green.
+All ten recorded calls replay with responses that match the recording, `WatchOrder`'s three stream messages included, and `proxymock` exits 0. The rejected `CreateOrder` and the `GetOrder` for a missing order pass too: replay compares the gRPC status the service returns, `InvalidArgument` and `NotFound`, with the recorded one. A service that started answering a different status would fail the replay, even with the same empty body.
 
 To run the pieces yourself, `make mock` runs the mocks in the foreground. Then start the service against them with `PORT=9090 PUBSUB_ADDR=localhost:18085 OTLP_ADDR=localhost:14317 ./bin/orders`.
 

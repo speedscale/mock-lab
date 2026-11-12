@@ -17,7 +17,7 @@ c++ -std=c++17 main.cpp -o app -lcurl
 
 ## proxymock: record, mock, replay
 
-> First time only: install proxymock and run `proxymock init --api-key <key>` once (free key at [app.speedscale.com/signup](https://app.speedscale.com/signup)). In a Codespace the CLI is preinstalled.
+> First time only: [install proxymock](https://docs.speedscale.com/proxymock/getting-started/installation/) and run `proxymock init` once to sign in through your browser. In a Codespace the CLI is preinstalled; activate it with `proxymock init --api-key <key>` (free key at [app.speedscale.com/signup](https://app.speedscale.com/signup)).
 
 ```shell
 c++ -std=c++17 main.cpp -o app -lcurl

@@ -18,7 +18,7 @@ kotlinc App.kt -include-runtime -d app.jar && java -jar app.jar
 
 ## proxymock: record, mock, replay
 
-> First time only: install proxymock and run `proxymock init --api-key <key>` once (free key at [app.speedscale.com/signup](https://app.speedscale.com/signup)). In a Codespace the CLI is preinstalled.
+> First time only: [install proxymock](https://docs.speedscale.com/proxymock/getting-started/installation/) and run `proxymock init` once to sign in through your browser. In a Codespace the CLI is preinstalled; activate it with `proxymock init --api-key <key>` (free key at [app.speedscale.com/signup](https://app.speedscale.com/signup)).
 
 ```shell
 # Kotlin's JVM HTTP client ignores HTTP_PROXY/HTTPS_PROXY, same as Java. Point

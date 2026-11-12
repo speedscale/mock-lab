@@ -26,13 +26,13 @@ git clone https://github.com/<your-user>/mock-lab.git
 cd mock-lab/languages/node
 ```
 
-Install proxymock and run `proxymock init --api-key <key>` first. Get a free key at [app.speedscale.com/signup](https://app.speedscale.com/signup). Follow the app README for runtime and proxy setup. Record a small session or use the committed recording, then ask the installed skills to create the tests. Start your editor or coding agent in the app directory; new recordings and results stay in that app's `proxymock/` workspace.
+[Install proxymock](https://docs.speedscale.com/proxymock/getting-started/installation/) and run `proxymock init` first; it signs you in through your browser. Use `proxymock init --api-key <key>` only in CI or other headless environments. Follow the app README for runtime and proxy setup. Record a small session or use the committed recording, then ask the installed skills to create the tests. Start your editor or coding agent in the app directory; new recordings and results stay in that app's `proxymock/` workspace.
 
 ### GitHub Codespaces
 
 [![Open in GitHub Codespaces](.github/codespaces-badge.svg)](https://codespaces.new/speedscale/mock-lab)
 
-The runtimes and proxymock CLI are preinstalled. Activate proxymock with your API key, then enter `languages/node` or another language directory. To work in your own fork, create a Codespace from that fork.
+The runtimes and proxymock CLI are preinstalled. Activate proxymock with `proxymock init --api-key <key>` (free key at [app.speedscale.com/signup](https://app.speedscale.com/signup)), then enter `languages/node` or another language directory. To work in your own fork, create a Codespace from that fork.
 
 ## Work through the agent tutorial
 
@@ -46,15 +46,17 @@ The [lab catalog](labs/README.md) has exercises for profiles, metrics, traces, l
 
 The [shared tools](shared/README.md) provide a reference downstream API, a dashboard, and a traffic driver for the language apps. Their downstream contract is [shared/openapi.yaml](shared/openapi.yaml).
 
-The root [proxymock workspace](proxymock/README.md) holds the reusable baseline recording, app contract, smart-replace blueprint, and schema-coverage test configuration. Run its examples from the repository root. The language workspaces hold captures from their own runtimes.
+The root [proxymock workspace](proxymock/README.md) holds the reusable baseline recording, app contract, smart-replace blueprint, and schema-coverage test configuration. Run its examples from the repository root. Each language directory has its own `proxymock/` workspace with the same layout: a capture from that runtime, the app contract at `proxymock/applications/my-app.openapi.yaml`, a blueprint and the schema-coverage test configuration. Open a language directory in your editor and use its workspace.
 
 ## Agent skills
 
-Install the [Speedscale agent skills](https://github.com/speedscale/skills) into your agent:
+Install the [Speedscale agent skills](https://github.com/speedscale/skills) with the proxymock MCP server. Preview with `--dry-run`, then run it without that flag, replacing `claude-code` with your agent:
 
 ```shell
-npx skills add speedscale/skills
+proxymock mcp install --client claude-code --skills --dry-run
 ```
+
+Bundled skills are supported for Claude Code, Codex, Kiro, Kilo Code and Hermes Agent. For another agent, use `npx skills add speedscale/skills`. See [MCP setup](https://docs.speedscale.com/proxymock/how-it-works/mcp/) for client names and scope.
 
 From the app directory, ask your agent: "Use this recording to create and run regression, contract, load and chaos tests. Show proposed expectations and budgets for review before saving them." Then ask it to use the results and OpenAPI schema to improve coverage and nonfunctional checks. The skills choose the scenarios and native commands from the app and traffic; this repository supplies their inputs.
 

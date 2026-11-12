@@ -4,7 +4,7 @@ This is a standard proxymock workspace. Its recording has eight inbound language
 
 The workspace keeps the recording together with its companion documents: `applications/my-app.openapi.yaml` describes the recorded app workload, `blueprints/mocklab-smart-replace.json` chains fresh access tokens and order IDs during replay, and `testconfigs/schema-coverage.json` defines coverage goals. Keep these standard directory names so proxymock can discover the documents from `--in proxymock/recording`.
 
-Run these commands from the repository root. Activate proxymock first with `proxymock init --api-key <key>`.
+Run these commands from the repository root. Activate proxymock first with `proxymock init`, which signs you in through your browser, or with `proxymock init --api-key <key>` in CI.
 
 ## Mock and replay offline
 

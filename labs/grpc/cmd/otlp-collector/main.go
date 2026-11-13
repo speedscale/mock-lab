@@ -7,6 +7,8 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
 	collectortrace "go.opentelemetry.io/proto/otlp/collector/trace/v1"
 	"google.golang.org/grpc"
@@ -38,6 +40,16 @@ func main() {
 	}
 	srv := grpc.NewServer()
 	collectortrace.RegisterTraceServiceServer(srv, receiver{})
+	// A script's background jobs start with SIGINT ignored, and Go keeps that
+	// disposition unless the signal is registered, so register it explicitly.
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sig
+		srv.GracefulStop()
+	}()
 	log.Printf("otlp collector listening on %s", lis.Addr())
-	log.Fatal(srv.Serve(lis))
+	if err := srv.Serve(lis); err != nil {
+		log.Fatal(err)
+	}
 }

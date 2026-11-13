@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package acme.orders.v1;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/timestamp.proto";
+import "google/type/money.proto";
+
+option go_package = "github.com/speedscale/mock-lab/grpc/gen/acme/orders/v1;ordersv1";
+
+// Orders takes and tracks orders. Its messages use the field shapes that are
+// hardest to read as raw protobuf: nested messages, an enum, a double, a
+// packed repeated int32, a oneof, a timestamp and a server stream.
+service Orders {
+  rpc CreateOrder(CreateOrderRequest) returns (Order) {
+    option (google.api.http) = {
+      post: "/v1/orders"
+      body: "*"
+    };
+  }
+  rpc GetOrder(GetOrderRequest) returns (Order) {
+    option (google.api.http) = {get: "/v1/orders/{order_id}"};
+  }
+  // WatchOrder streams an order's status changes until it ships.
+  rpc WatchOrder(WatchOrderRequest) returns (stream OrderEvent);
+}
+
+enum OrderStatus {
+  ORDER_STATUS_UNSPECIFIED = 0;
+  ORDER_STATUS_PENDING = 1;
+  ORDER_STATUS_PAID = 2;
+  ORDER_STATUS_SHIPPED = 3;
+}
+
+message Address {
+  string line1 = 1;
+  string city = 2;
+  string postal_code = 3;
+  string country_code = 4;
+}
+
+message LineItem {
+  string sku = 1;
+  int32 quantity = 2;
+  google.type.Money unit_price = 3;
+}
+
+message Order {
+  string order_id = 1;
+  string customer_id = 2;
+  repeated LineItem items = 3;
+  google.type.Money total = 4;
+  OrderStatus status = 5;
+  double weight_kg = 6;
+  // the warehouses that hold the items, packed on the wire
+  repeated int32 warehouse_ids = 7;
+  oneof fulfillment {
+    Address ship_to = 8;
+    string pickup_store_id = 9;
+  }
+  google.protobuf.Timestamp created_at = 10;
+}
+
+message CreateOrderRequest {
+  string customer_id = 1 [(google.api.field_behavior) = REQUIRED];
+  repeated LineItem items = 2 [(google.api.field_behavior) = REQUIRED];
+  oneof fulfillment {
+    Address ship_to = 3;
+    string pickup_store_id = 4;
+  }
+}
+
+message GetOrderRequest {
+  string order_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message WatchOrderRequest {
+  string order_id = 1 [(google.api.field_behavior) = REQUIRED];
+}
+
+message OrderEvent {
+  string order_id = 1;
+  OrderStatus status = 2;
+  string note = 3;
+  google.protobuf.Timestamp at = 4;
+}

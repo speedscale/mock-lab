@@ -1,0 +1,104 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-11-16T19:17:37.882352Z",
+  "isTls": true,
+  "l7protocol": "mssql",
+  "duration": 1,
+  "elapsed": "0.000949s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbTransaction": "idle",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "undefined",
+    "sequence": "83",
+    "source": "goproxy"
+  },
+  "uuid": "8i/zcj7bTCevOy6UfgO3QA==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "PreLogin",
+  "location": "unrecognized",
+  "status": "OK",
+  "mssql": {
+    "request": {
+      "prelogin": {
+        "version": "9.0.0.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "instance": "MSSQLServer",
+        "threadID": 1044578304,
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    "response": {
+      "prelogin": {
+        "version": "16.0.4325.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      }
+    },
+    "session": {
+      "clientPrelogin": {
+        "version": "9.0.0.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "instance": "MSSQLServer",
+        "threadID": 1044578304,
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "serverPrelogin": {
+        "version": "16.0.4325.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "encrypted": true
+    }
+  },
+  "signature": {
+    "mssql:msg_type": "UHJlTG9naW4="
+  },
+  "netinfo": {
+    "id": "14",
+    "startTime": "2026-11-16T19:17:37.892980Z",
+    "downstream": {
+      "established": "2026-11-16T19:17:37.882148Z",
+      "ipAddress": "127.0.0.1",
+      "port": 60885
+    },
+    "upstream": {
+      "established": "2026-11-16T19:17:37.882292Z",
+      "ipAddress": "127.0.0.1",
+      "port": 14330,
+      "hostname": "localhost"
+    },
+    "direction": "EGRESS"
+  }
+}

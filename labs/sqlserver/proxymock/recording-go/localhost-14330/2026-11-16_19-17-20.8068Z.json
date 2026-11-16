@@ -1,0 +1,106 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-11-16T19:17:20.806800Z",
+  "isTls": true,
+  "l7protocol": "mssql",
+  "duration": 2,
+  "elapsed": "0.002246s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbTransaction": "idle",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "undefined",
+    "sequence": "3",
+    "source": "goproxy"
+  },
+  "uuid": "LnwRlUu0R0aLXaMGS9jdfQ==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "PreLogin",
+  "location": "unrecognized",
+  "status": "OK",
+  "mssql": {
+    "request": {
+      "prelogin": {
+        "version": "2.0.2817.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "traceID": "Sat75bkYS5mZR3eFnlwVWX5AXwWXcEE5lE5ZtV4pNOgAAAAA",
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      }
+    },
+    "response": {
+      "prelogin": {
+        "version": "16.0.4325.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      }
+    },
+    "session": {
+      "clientPrelogin": {
+        "version": "2.0.2817.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "traceID": "Sat75bkYS5mZR3eFnlwVWX5AXwWXcEE5lE5ZtV4pNOgAAAAA",
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "serverPrelogin": {
+        "version": "16.0.4325.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ]
+      },
+      "encrypted": true
+    }
+  },
+  "signature": {
+    "mssql:msg_type": "UHJlTG9naW4="
+  },
+  "netinfo": {
+    "id": "4",
+    "startTime": "2026-11-16T19:17:20.825414Z",
+    "downstream": {
+      "established": "2026-11-16T19:17:20.806432Z",
+      "ipAddress": "127.0.0.1",
+      "port": 60481
+    },
+    "upstream": {
+      "established": "2026-11-16T19:17:20.806691Z",
+      "ipAddress": "127.0.0.1",
+      "port": 14330,
+      "hostname": "localhost"
+    },
+    "direction": "EGRESS"
+  }
+}

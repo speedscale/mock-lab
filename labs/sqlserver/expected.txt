@@ -1,0 +1,17 @@
+GET /health 200 {"status":"ok"}
+GET /products?category=bikes 200 {"products":[{"id":1,"sku":"BK-ROAD-58","name":"Road bike, 58 cm","price_cents":129900,"stock":4},{"id":2,"sku":"BK-MTN-L","name":"Mountain bike, large","price_cents":154900,"stock":2},{"id":3,"sku":"BK-CITY-M","name":"City bike, medium","price_cents":74900,"stock":6}]}
+GET /products?category=parts 200 {"products":[{"id":7,"sku":"TR-700-28","name":"Tire 700×28c","price_cents":4500,"stock":30},{"id":8,"sku":"CH-11S","name":"Chain, 11 speed","price_cents":3900,"stock":1},{"id":9,"sku":"PD-CLIP","name":"Clipless pedals","price_cents":8900,"stock":8}]}
+GET /products/1 200 {"id":1,"sku":"BK-ROAD-58","name":"Road bike, 58 cm","price_cents":129900,"stock":4}
+GET /products/4 200 {"id":4,"sku":"HL-AERO","name":"Aero helmet","price_cents":18900,"stock":12}
+GET /products/99 404 {"error":"not found"}
+POST /orders 201 {"id":1,"product_id":4,"quantity":2,"total_cents":37800}
+POST /orders 201 {"id":2,"product_id":8,"quantity":1,"total_cents":3900}
+POST /orders 409 {"error":"out of stock"}
+POST /orders 404 {"error":"not found"}
+POST /orders 201 {"id":3,"product_id":1,"quantity":1,"total_cents":129900}
+GET /orders/1 200 {"id":1,"product_id":4,"name":"Aero helmet","quantity":2,"total_cents":37800}
+GET /orders/3 200 {"id":3,"product_id":1,"name":"Road bike, 58 cm","quantity":1,"total_cents":129900}
+GET /orders/42 404 {"error":"not found"}
+GET /products/8 200 {"id":8,"sku":"CH-11S","name":"Chain, 11 speed","price_cents":3900,"stock":0}
+GET /reports/top-products?limit=2 200 {"orders":3,"top":[{"id":4,"name":"Aero helmet","sold":2},{"id":1,"name":"Road bike, 58 cm","sold":1}]}
+GET /products/1 200 {"id":1,"sku":"BK-ROAD-58","name":"Road bike, 58 cm","price_cents":129900,"stock":3}

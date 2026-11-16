@@ -1,0 +1,352 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-11-16T19:17:28.385446Z",
+  "isTls": true,
+  "l7protocol": "mssql",
+  "duration": 1,
+  "elapsed": "0.001271s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbApplication": "shop-java",
+    "dbBackendPid": "66",
+    "dbName": "shop",
+    "dbTransaction": "idle",
+    "dbUser": "app",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "undefined",
+    "sequence": "113",
+    "source": "goproxy"
+  },
+  "uuid": "7ap2GH4+Ry2cId0S61WRVA==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "sp_executesql",
+  "location": "SELECT id, sku, name, price_cents, stock FROM dbo.products WHERE id =  @P0 ",
+  "status": "OK",
+  "mssql": {
+    "request": {
+      "rpc": {
+        "headers": {
+          "outstandingRequestCount": 1
+        },
+        "calls": [
+          {
+            "procID": "PROC_ID_SP_EXECUTESQL",
+            "params": [
+              {
+                "type": {
+                  "type": "DATA_TYPE_NVARCHAR",
+                  "maxLength": 8000,
+                  "collation": {
+                    "lcid": 1033,
+                    "flags": 13,
+                    "sortID": 52
+                  }
+                },
+                "value": {
+                  "asString": "SELECT id, sku, name, price_cents, stock FROM dbo.products WHERE id =  @P0 "
+                }
+              },
+              {
+                "type": {
+                  "type": "DATA_TYPE_NVARCHAR",
+                  "maxLength": 8000,
+                  "collation": {
+                    "lcid": 1033,
+                    "flags": 13,
+                    "sortID": 52
+                  }
+                },
+                "value": {
+                  "asString": "@P0 int"
+                }
+              },
+              {
+                "type": {
+                  "type": "DATA_TYPE_INTN",
+                  "maxLength": 4
+                },
+                "value": {
+                  "asInt": "1"
+                }
+              }
+            ],
+            "statement": "SELECT id, sku, name, price_cents, stock FROM dbo.products WHERE id =  @P0 "
+          }
+        ]
+      }
+    },
+    "response": {
+      "tokens": {
+        "tokens": [
+          {
+            "colMetadata": {
+              "columns": [
+                {
+                  "name": "id",
+                  "type": {
+                    "type": "DATA_TYPE_INT4",
+                    "maxLength": 4
+                  },
+                  "identity": true
+                },
+                {
+                  "name": "sku",
+                  "type": {
+                    "type": "DATA_TYPE_BIGVARCHAR",
+                    "maxLength": 20,
+                    "collation": {
+                      "lcid": 1033,
+                      "flags": 13,
+                      "sortID": 52
+                    }
+                  },
+                  "updateable": 2
+                },
+                {
+                  "name": "name",
+                  "type": {
+                    "type": "DATA_TYPE_NVARCHAR",
+                    "maxLength": 200,
+                    "collation": {
+                      "lcid": 1033,
+                      "flags": 13,
+                      "sortID": 52
+                    }
+                  },
+                  "updateable": 2
+                },
+                {
+                  "name": "price_cents",
+                  "type": {
+                    "type": "DATA_TYPE_INT4",
+                    "maxLength": 4
+                  },
+                  "updateable": 2
+                },
+                {
+                  "name": "stock",
+                  "type": {
+                    "type": "DATA_TYPE_INT4",
+                    "maxLength": 4
+                  },
+                  "updateable": 2
+                }
+              ]
+            }
+          },
+          {
+            "row": {
+              "values": [
+                {
+                  "asInt": "1"
+                },
+                {
+                  "asString": "BK-ROAD-58"
+                },
+                {
+                  "asString": "Road bike, 58 cm"
+                },
+                {
+                  "asInt": "129900"
+                },
+                {
+                  "asInt": "3"
+                }
+              ]
+            }
+          },
+          {
+            "doneInProc": {
+              "more": true,
+              "count": true,
+              "curCmd": 193,
+              "rowCount": "1"
+            }
+          },
+          {
+            "returnStatus": {}
+          },
+          {
+            "doneProc": {
+              "curCmd": 224
+            }
+          }
+        ]
+      }
+    },
+    "session": {
+      "clientPrelogin": {
+        "version": "12.10.2.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "traceID": "Cj7l9dvRN0KZ5405KU0pSG7BK9SOp6tNtCSWUTO+lRYBAAAA",
+        "options": [
+          0,
+          1,
+          5
+        ]
+      },
+      "serverPrelogin": {
+        "version": "16.0.4325.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "options": [
+          0,
+          1,
+          5
+        ]
+      },
+      "login": {
+        "tdsVersion": 1946157060,
+        "packetSize": 8000,
+        "clientProgVersion": 201982464,
+        "clientPID": 16585,
+        "optionFlags1": 224,
+        "optionFlags2": 3,
+        "optionFlags3": 24,
+        "hostname": "mattop-2.local",
+        "username": "app",
+        "appName": "shop-java",
+        "serverName": "localhost",
+        "libraryName": "Microsoft JDBC Driver 12.10",
+        "database": "shop",
+        "clientID": "VGpVYDcZ",
+        "authMethod": "LOGIN_AUTH_METHOD_SQL_LOGIN",
+        "passwordPresent": true,
+        "featureExt": [
+          {
+            "featureID": 4,
+            "data": "AQ=="
+          },
+          {
+            "featureID": 9,
+            "data": "Ag=="
+          },
+          {
+            "featureID": 10
+          },
+          {
+            "featureID": 11
+          },
+          {
+            "featureID": 1
+          }
+        ]
+      },
+      "loginResponse": {
+        "tokens": [
+          {
+            "envChange": {
+              "type": "ENV_CHANGE_TYPE_DATABASE",
+              "newValue": "shop",
+              "oldValue": "master"
+            }
+          },
+          {
+            "info": {
+              "number": 5701,
+              "state": 2,
+              "message": "Changed database context to 'shop'.",
+              "serverName": "23095601388c",
+              "lineNumber": 1
+            }
+          },
+          {
+            "envChange": {
+              "type": "ENV_CHANGE_TYPE_SQL_COLLATION",
+              "newBytes": "CQTQADQ="
+            }
+          },
+          {
+            "envChange": {
+              "type": "ENV_CHANGE_TYPE_LANGUAGE",
+              "newValue": "us_english"
+            }
+          },
+          {
+            "info": {
+              "number": 5703,
+              "state": 1,
+              "message": "Changed language setting to us_english.",
+              "serverName": "23095601388c",
+              "lineNumber": 1
+            }
+          },
+          {
+            "loginAck": {
+              "interface": 1,
+              "tdsVersion": 1946157060,
+              "progName": "Microsoft SQL Server\u0000\u0000",
+              "progVersion": "16.0.4325"
+            }
+          },
+          {
+            "envChange": {
+              "type": "ENV_CHANGE_TYPE_PACKET_SIZE",
+              "newValue": "8000",
+              "oldValue": "4096"
+            }
+          },
+          {
+            "featureExtAck": {
+              "features": [
+                {
+                  "featureID": 4,
+                  "data": "AQ=="
+                },
+                {
+                  "featureID": 9,
+                  "data": "AgE="
+                },
+                {
+                  "featureID": 10,
+                  "data": "AQ=="
+                },
+                {
+                  "featureID": 11,
+                  "data": "AA=="
+                },
+                {
+                  "featureID": 1,
+                  "data": "AAkAYIEU/+f//wACAgcBBAEABQT/////BgEABwECCAgAAAAAAAAAAAkE/////w=="
+                }
+              ]
+            }
+          },
+          {
+            "done": {}
+          }
+        ]
+      },
+      "encrypted": true
+    },
+    "spid": 66
+  },
+  "signature": {
+    "mssql:msg_type": "c3BfZXhlY3V0ZXNxbA==",
+    "mssql:query": "U0VMRUNUIGlkLCBza3UsIG5hbWUsIHByaWNlX2NlbnRzLCBzdG9jayBGUk9NIGRiby5wcm9kdWN0cyBXSEVSRSBpZCA9IEBQMA=="
+  },
+  "netinfo": {
+    "id": "4",
+    "startTime": "2026-11-16T19:17:27.969296Z",
+    "downstream": {
+      "established": "2026-11-16T19:17:27.904876Z",
+      "ipAddress": "127.0.0.1",
+      "port": 60561,
+      "bytesSent": "7956"
+    },
+    "upstream": {
+      "established": "2026-11-16T19:17:27.905614Z",
+      "ipAddress": "127.0.0.1",
+      "port": 14330,
+      "hostname": "localhost",
+      "bytesSent": "4697"
+    },
+    "direction": "EGRESS"
+  }
+}

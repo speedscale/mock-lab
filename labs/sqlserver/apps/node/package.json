@@ -1,0 +1,13 @@
+{
+  "name": "shop-node",
+  "private": true,
+  "description": "Node.js version of the sqlserver lab's shop API, on the mssql package (tedious).",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "mssql": "12.7.14"
+  }
+}

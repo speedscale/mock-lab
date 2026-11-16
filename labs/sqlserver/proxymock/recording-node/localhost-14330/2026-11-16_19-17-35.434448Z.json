@@ -1,0 +1,112 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-11-16T19:17:35.434448Z",
+  "isTls": true,
+  "l7protocol": "mssql",
+  "duration": 1,
+  "elapsed": "0.000546s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbTransaction": "idle",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "undefined",
+    "sequence": "2",
+    "source": "goproxy"
+  },
+  "uuid": "k15PJdJyQgm6VQez6WCpXg==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "PreLogin",
+  "location": "unrecognized",
+  "status": "OK",
+  "mssql": {
+    "request": {
+      "prelogin": {
+        "version": "20.3.9.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "traceID": "Vebb1nFQUQet8rxGchugn04U/q+6dL/tfuK9C5G1+ZulsZe1",
+        "fedAuthRequired": true,
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    },
+    "response": {
+      "prelogin": {
+        "version": "16.0.4325.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      }
+    },
+    "session": {
+      "clientPrelogin": {
+        "version": "20.3.9.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "traceID": "Vebb1nFQUQet8rxGchugn04U/q+6dL/tfuK9C5G1+ZulsZe1",
+        "fedAuthRequired": true,
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "serverPrelogin": {
+        "version": "16.0.4325.0",
+        "encryption": "PRELOGIN_ENCRYPTION_ON",
+        "options": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6
+        ]
+      },
+      "encrypted": true
+    }
+  },
+  "signature": {
+    "mssql:msg_type": "UHJlTG9naW4="
+  },
+  "netinfo": {
+    "id": "3",
+    "startTime": "2026-11-16T19:17:35.457669Z",
+    "downstream": {
+      "established": "2026-11-16T19:17:35.432222Z",
+      "ipAddress": "127.0.0.1",
+      "port": 60738
+    },
+    "upstream": {
+      "established": "2026-11-16T19:17:35.432516Z",
+      "ipAddress": "127.0.0.1",
+      "port": 14330,
+      "hostname": "localhost"
+    },
+    "direction": "EGRESS"
+  }
+}

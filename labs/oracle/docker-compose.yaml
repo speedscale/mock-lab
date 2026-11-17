@@ -1,0 +1,23 @@
+# Oracle Database 23ai Free for the oracle lab. It listens on 127.0.0.1:15210,
+# so it can run next to an Oracle you already have on 1521. The faststart image
+# holds a database that is already created, so it is ready in about a minute,
+# and it runs natively on amd64 and arm64.
+services:
+  oracle:
+    image: gvenzl/oracle-free:23-slim-faststart
+    environment:
+      ORACLE_PASSWORD: ${ORACLE_PASSWORD:-LabAdmin2026}
+      # the image creates this user in FREEPDB1 on first start; db/schema.sql
+      # creates the lab's tables and procedure in its schema
+      APP_USER: shop
+      APP_USER_PASSWORD: ${APP_USER_PASSWORD:-LabShop2026}
+    ports:
+      - "127.0.0.1:${ORACLE_HOST_PORT:-15210}:1521"
+    volumes:
+      - ./db:/lab:ro
+    healthcheck:
+      test: ["CMD", "/opt/oracle/healthcheck.sh"]
+      interval: 5s
+      timeout: 10s
+      retries: 60
+      start_period: 10s

@@ -1,0 +1,58 @@
+{
+  "assertionGroups": [
+    {
+      "configs": [
+        {
+          "type": "httpStatusCode"
+        },
+        {
+          "config": {
+            "headers": "Content-Type"
+          },
+          "type": "httpHeaders"
+        },
+        {
+          "type": "httpResponseSchema"
+        },
+        {
+          "type": "httpResponseContentType"
+        }
+      ]
+    }
+  ],
+  "cluster": {
+    "cleanup": "inventory",
+    "logLevel": "info",
+    "logsCollected": true,
+    "replayMode": "full-replay",
+    "sidecar_tls_out": true
+  },
+  "generator": {
+    "stages": [
+      {
+        "virtualUsers": {
+          "requestDelay": {},
+          "virtualUsers": "1"
+        }
+      }
+    ]
+  },
+  "id": "oracle-lab",
+  "responder": {
+    "numReplicas": 1,
+    "passthrough_mode": true,
+    "oracle": {
+      "username": "shop",
+      "password": "LabShop2026"
+    }
+  },
+  "rules": [
+    {
+      "action": "ALERT",
+      "metricName": "passAssertPct",
+      "type": "TOO_LOW",
+      "value": 100
+    }
+  ],
+  "version": 3
+}

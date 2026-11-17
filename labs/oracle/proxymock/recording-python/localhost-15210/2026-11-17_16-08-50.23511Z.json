@@ -7,7 +7,7 @@
   "elapsed": "0.000364s",
   "tags": {
     "captureMode": "proxy",
-    "dbApplication": "/Users/matthewleray/s2/worktrees/mock-lab-s-14311-oracle-lab/labs/oracle/apps/python/.venv/bin/python",
+    "dbApplication": "python",
     "dbBackendPid": "55",
     "dbName": "FREEPDB1",
     "dbTransaction": "idle",
@@ -150,7 +150,7 @@
         "protocolCharacteristics": 20376,
         "nsiFlags": 132,
         "connectFlags2": 1,
-        "connectData": "(DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=localhost)(PORT=11521))(CONNECT_DATA=(SERVICE_NAME=FREEPDB1)(CID=(PROGRAM=/Users/matthewleray/s2/worktrees/mock-lab-s-14311-oracle-lab/labs/oracle/apps/python/.venv/bin/python)(HOST=mattop-2.local)(USER=matthewleray))(CONNECTION_ID=e09YB+xEqu7JIcR4NsZcyw==)))",
+        "connectData": "(DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=localhost)(PORT=11521))(CONNECT_DATA=(SERVICE_NAME=FREEPDB1)(CID=(PROGRAM=python)(HOST=lab-host)(USER=lab-user))(CONNECTION_ID=e09YB+xEqu7JIcR4NsZcyw==)))",
         "largeSDU": 8192,
         "largeTDU": 8192
       },

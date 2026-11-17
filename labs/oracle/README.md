@@ -161,7 +161,7 @@ The first pass sold the last chain again, so on the second pass the `UPDATE` tha
 make load APP=node
 ```
 
-Four virtual users replay the recording in a loop for 30 seconds, each with its own Oracle session, as fast as the server answers. On a laptop that was about 137,000 statements for the Node.js recording, roughly 4,600 a second.
+Four virtual users replay the recording in a loop for 30 seconds, each with its own Oracle session, as fast as the server answers. On a laptop that was about 281,000 statements for the Node.js recording, roughly 9,400 a second, with none failed.
 
 The table's **RESULT MISMATCH** column shows the same effect as step 6: the `UPDATE` of the stock differs from the recording almost every time, because the stock runs out in the first few loops. Load-test mode reports it without failing on it. While the test runs, the sessions show up in Oracle under the program name the app's driver recorded:
 

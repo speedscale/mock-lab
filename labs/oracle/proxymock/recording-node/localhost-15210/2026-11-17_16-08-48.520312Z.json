@@ -34,7 +34,7 @@
         "tdu": 65535,
         "protocolCharacteristics": 4878,
         "nsiFlags": 8,
-        "connectData": "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=11521))(CONNECT_DATA=(SERVICE_NAME=FREEPDB1)(CID=(PROGRAM=node)(HOST=mattop-2.local)(USER=matthewleray))(CONNECTION_ID=2SetbkK1Rkq9D5uRK+TxVw==)))",
+        "connectData": "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=11521))(CONNECT_DATA=(SERVICE_NAME=FREEPDB1)(CID=(PROGRAM=node)(HOST=lab-host)(USER=lab-user))(CONNECTION_ID=2SetbkK1Rkq9D5uRK+TxVw==)))",
         "largeSDU": 8192,
         "largeTDU": 2097152
       }
@@ -60,7 +60,7 @@
         "tdu": 65535,
         "protocolCharacteristics": 4878,
         "nsiFlags": 8,
-        "connectData": "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=11521))(CONNECT_DATA=(SERVICE_NAME=FREEPDB1)(CID=(PROGRAM=node)(HOST=mattop-2.local)(USER=matthewleray))(CONNECTION_ID=2SetbkK1Rkq9D5uRK+TxVw==)))",
+        "connectData": "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=localhost)(PORT=11521))(CONNECT_DATA=(SERVICE_NAME=FREEPDB1)(CID=(PROGRAM=node)(HOST=lab-host)(USER=lab-user))(CONNECTION_ID=2SetbkK1Rkq9D5uRK+TxVw==)))",
         "largeSDU": 8192,
         "largeTDU": 2097152
       },

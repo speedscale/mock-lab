@@ -1,0 +1,181 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-11-17T16:08:41.253606Z",
+  "l7protocol": "oracle",
+  "duration": 1,
+  "elapsed": "0.000106s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbName": "FREEPDB1",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1407-4-g31e1f02a3",
+    "sequence": "5",
+    "source": "goproxy"
+  },
+  "uuid": "cCXV2huARKKwzsp7PCzjdQ==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Security Negotiation",
+  "location": "FREEPDB1",
+  "status": "OK",
+  "oracle": {
+    "request": {
+      "securityNegotiation": {
+        "version": 396361728,
+        "services": [
+          {
+            "type": "SECURITY_SERVICE_TYPE_SUPERVISOR",
+            "subPackets": [
+              {
+                "type": 5,
+                "valueFromService": true
+              },
+              {
+                "type": 1,
+                "data": "CQkJCQkJCQk="
+              },
+              {
+                "type": 1,
+                "data": "3q2+7wADAAAABAAEAAEAAgAD"
+              }
+            ]
+          },
+          {
+            "type": "SECURITY_SERVICE_TYPE_AUTHENTICATION",
+            "status": 64767,
+            "subPackets": [
+              {
+                "type": 5,
+                "valueFromService": true
+              },
+              {
+                "type": 3,
+                "data": "4OE="
+              },
+              {
+                "type": 6,
+                "valueFromService": true
+              }
+            ]
+          },
+          {
+            "type": "SECURITY_SERVICE_TYPE_ENCRYPTION",
+            "algorithms": [
+              0,
+              15,
+              16,
+              17
+            ]
+          },
+          {
+            "type": "SECURITY_SERVICE_TYPE_DATA_INTEGRITY",
+            "algorithms": [
+              0,
+              3,
+              4,
+              5,
+              6
+            ]
+          }
+        ]
+      }
+    },
+    "response": {
+      "securityNegotiation": {
+        "services": [
+          {
+            "type": "SECURITY_SERVICE_TYPE_SUPERVISOR",
+            "status": 31,
+            "version": 387592192,
+            "subPackets": [
+              {
+                "type": 5,
+                "valueFromService": true
+              },
+              {
+                "type": 6,
+                "valueFromService": true
+              },
+              {
+                "type": 1,
+                "data": "3q2+7wADAAAAAgAEAAE="
+              }
+            ]
+          },
+          {
+            "type": "SECURITY_SERVICE_TYPE_AUTHENTICATION",
+            "status": 64511,
+            "version": 387592192
+          },
+          {
+            "type": "SECURITY_SERVICE_TYPE_ENCRYPTION",
+            "algorithms": [
+              0
+            ],
+            "version": 387592192
+          },
+          {
+            "type": "SECURITY_SERVICE_TYPE_DATA_INTEGRITY",
+            "algorithms": [
+              0
+            ],
+            "version": 387592192
+          }
+        ]
+      }
+    },
+    "session": {
+      "connect": {
+        "version": 319,
+        "versionMin": 300,
+        "serviceOptions": 3137,
+        "sdu": 8192,
+        "tdu": 65535,
+        "protocolCharacteristics": 20376,
+        "nsiFlags": 129,
+        "connectFlags2": 1,
+        "connectData": "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(PORT=11521)(HOST=127.0.0.1)(HOSTNAME=localhost))(CONNECT_DATA=(CID=(PROGRAM=JDBC Thin Client)(HOST=mattop-2.local)(USER=matthewleray))(SERVICE_NAME=FREEPDB1)(CONNECTION_ID=W4u1Wp7YR8eJeRFgv1/4yw==)))",
+        "largeSDU": 8192,
+        "largeTDU": 2097152
+      },
+      "accept": {
+        "version": 319,
+        "serviceOptions": 2113,
+        "sdu": 8192,
+        "tdu": 2097152,
+        "nsiFlags1": 193,
+        "nsiFlags2": 1,
+        "flags2": 436207616,
+        "extra": "VI8Ey2lss5KdHTcV4kofmQ=="
+      },
+      "serviceName": "FREEPDB1"
+    }
+  },
+  "signature": {
+    "oracle:msg_type": "U2VjdXJpdHkgTmVnb3RpYXRpb24="
+  },
+  "netinfo": {
+    "id": "4",
+    "startTime": "2026-11-17T16:08:41.243694Z",
+    "downstream": {
+      "established": "2026-11-17T16:08:41.239565Z",
+      "ipAddress": "127.0.0.1",
+      "port": 57574,
+      "bytesSent": "470"
+    },
+    "upstream": {
+      "established": "2026-11-17T16:08:41.239691Z",
+      "ipAddress": "127.0.0.1",
+      "port": 15210,
+      "hostname": "localhost",
+      "bytesSent": "188"
+    },
+    "direction": "EGRESS"
+  }
+}

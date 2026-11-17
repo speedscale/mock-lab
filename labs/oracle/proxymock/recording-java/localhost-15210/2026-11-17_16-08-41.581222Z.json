@@ -1,0 +1,484 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-11-17T16:08:41.581222Z",
+  "l7protocol": "oracle",
+  "duration": 1,
+  "elapsed": "0.001889s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbApplication": "JDBC Thin Client",
+    "dbBackendPid": "51",
+    "dbName": "FREEPDB1",
+    "dbTransaction": "idle",
+    "dbUser": "SHOP",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1407-4-g31e1f02a3",
+    "sequence": "82",
+    "source": "goproxy"
+  },
+  "uuid": "Ky2kmq53R7ybdbX9FAG5mQ==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Execute",
+  "location": "SELECT o.id, o.product_id, p.name, o.quantity, o.total_cents FROM orders o JOIN products p ON p.id = o.product_id WHERE o.id = :1 ",
+  "status": "OK",
+  "oracle": {
+    "request": {
+      "call": {
+        "function": "FUNCTION_CODE_EXECUTE",
+        "seq": 45,
+        "execute": {
+          "sql": "SELECT o.id, o.product_id, p.name, o.quantity, o.total_cents FROM orders o JOIN products p ON p.id = o.product_id WHERE o.id = :1 ",
+          "options": 32809,
+          "prefetchRows": 10,
+          "binds": [
+            {
+              "name": "1",
+              "type": {
+                "type": "DATA_TYPE_NUMBER",
+                "maxSize": 22,
+                "charsetForm": 1,
+                "charsetID": 873,
+                "flags": 3
+              },
+              "direction": "BIND_DIRECTION_IN"
+            }
+          ],
+          "bindRows": [
+            {
+              "values": [
+                {
+                  "asNumber": "1"
+                }
+              ]
+            }
+          ],
+          "execFlags": [
+            1,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1,
+            0,
+            32768,
+            0,
+            0,
+            0
+          ],
+          "rawText": true,
+          "prefetchBufferSize": 4294967295
+        }
+      }
+    },
+    "response": {
+      "call": {
+        "columns": [
+          {
+            "name": "ID",
+            "type": {
+              "type": "DATA_TYPE_NUMBER",
+              "maxSize": 22,
+              "precision": 10
+            },
+            "udsFlags": 48,
+            "position": 0
+          },
+          {
+            "name": "PRODUCT_ID",
+            "type": {
+              "type": "DATA_TYPE_NUMBER",
+              "maxSize": 22,
+              "precision": 10
+            },
+            "position": 1
+          },
+          {
+            "name": "NAME",
+            "type": {
+              "type": "DATA_TYPE_VARCHAR",
+              "maxSize": 400,
+              "charsetForm": 1,
+              "charsetID": 873,
+              "charSize": 100,
+              "flags": 128,
+              "contFlags": "4096",
+              "oacColumnID": 16382
+            },
+            "position": 2
+          },
+          {
+            "name": "QUANTITY",
+            "type": {
+              "type": "DATA_TYPE_NUMBER",
+              "maxSize": 22,
+              "precision": 10
+            },
+            "position": 3
+          },
+          {
+            "name": "TOTAL_CENTS",
+            "type": {
+              "type": "DATA_TYPE_NUMBER",
+              "maxSize": 22,
+              "precision": 10
+            },
+            "position": 4
+          }
+        ],
+        "rows": [
+          {
+            "values": [
+              {
+                "asNumber": "1"
+              },
+              {
+                "asNumber": "4"
+              },
+              {
+                "asString": "Aero helmet"
+              },
+              {
+                "asNumber": "2"
+              },
+              {
+                "asNumber": "37800"
+              }
+            ]
+          }
+        ],
+        "status": {
+          "errorNumber": 1403,
+          "message": "ORA-01403: no data found",
+          "rowCount": "1",
+          "cursorID": 1,
+          "errorPosition": 66,
+          "sqlType": 3,
+          "callStatus": 1,
+          "rowid": "AAAR50AAYAAAAAkAAC",
+          "endToEndSeqNum": 313,
+          "callNumber": 45,
+          "successIters": 1
+        },
+        "cursorID": 1,
+        "outValues": [
+          2146779,
+          0,
+          1,
+          0,
+          0,
+          0
+        ],
+        "describe": {
+          "prefix": "tf7SOE4na7B8wPUrHRVu0Hh+CxERCSo=",
+          "columnArrayFlags": 130,
+          "currentDate": "eH4LEREJKg==",
+          "dcbMdbz": 8168,
+          "dcbMnpr": 2,
+          "dcbMxpr": 2
+        },
+        "rowHeader": {
+          "flags": 34,
+          "numIters": 10
+        }
+      }
+    },
+    "session": {
+      "connect": {
+        "version": 319,
+        "versionMin": 300,
+        "serviceOptions": 3137,
+        "sdu": 8192,
+        "tdu": 65535,
+        "protocolCharacteristics": 20376,
+        "nsiFlags": 129,
+        "connectFlags2": 1,
+        "connectData": "(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(PORT=11521)(HOST=127.0.0.1)(HOSTNAME=localhost))(CONNECT_DATA=(CID=(PROGRAM=JDBC Thin Client)(HOST=mattop-2.local)(USER=matthewleray))(SERVICE_NAME=FREEPDB1)(CONNECTION_ID=W4u1Wp7YR8eJeRFgv1/4yw==)))",
+        "largeSDU": 8192,
+        "largeTDU": 2097152
+      },
+      "accept": {
+        "version": 319,
+        "serviceOptions": 2113,
+        "sdu": 8192,
+        "tdu": 2097152,
+        "nsiFlags1": 193,
+        "nsiFlags2": 1,
+        "flags2": 436207616,
+        "extra": "VI8Ey2lss5KdHTcV4kofmQ=="
+      },
+      "clientProtocol": {
+        "versions": "BgUEAwIB",
+        "banner": "Java_TTC-8.2.0",
+        "raw": "BgUEAwIBAEphdmFfVFRDLTguMi4wAA=="
+      },
+      "serverProtocol": {
+        "versions": "Bg==",
+        "banner": "Linux390x/Linux-2.4.x",
+        "charsetID": 873,
+        "ncharsetID": 2000,
+        "serverFlags": 33,
+        "compileCaps": "BgEBAe8PARsBAQEBAQEBf/8DEAMDAQH/Af//AQ4BAf8BBgz2CX8FD/8NCwD/AwAAAAAABwICBA==",
+        "runtimeCaps": "AgEAARgAfwECAAAAAA==",
+        "raw": "BgBMaW51eDM5MHgvTGludXgtMi40LngAaQMhCgBmA0ADAUADZgMBZgNIAwFIA2YDAWYDUgMBUgNmAwFmA2EDAWEDZgMBZgMfAwgfA2YDAQBkAAAAYAEkDwULDAMMDAUEBQ0GCQcIBQUFBQUPBQUFBQUKBQUFBQUEBQYHCAgjRyNHCBEjCBFBsEcAgwNpB9ADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADcGAQEB7w8BGwEBAQEBAQF//wMQAwMBAf8B//8BDgEB/wEGDPYJfwUP/w0LAP8DAAAAAAAHAgIEDQIBAAEYAH8BAgAAAAA="
+      },
+      "user": "SHOP",
+      "serviceName": "FREEPDB1",
+      "authResponse": {
+        "params": [
+          {
+            "key": "AUTH_VERSION_STRING",
+            "value": "- Develop, Learn, and Run for Free"
+          },
+          {
+            "key": "AUTH_VERSION_SQL",
+            "value": "26"
+          },
+          {
+            "key": "AUTH_XACTION_TRAITS",
+            "value": "3"
+          },
+          {
+            "key": "AUTH_VERSION_NO",
+            "value": "387592192"
+          },
+          {
+            "key": "AUTH_VERSION_STATUS",
+            "value": "0"
+          },
+          {
+            "key": "AUTH_CAPABILITY_TABLE"
+          },
+          {
+            "key": "AUTH_LAST_LOGIN",
+            "value": "787E0B11110929000000000000"
+          },
+          {
+            "key": "AUTH_DBNAME",
+            "value": "FREEPDB1"
+          },
+          {
+            "key": "AUTH_DB_MOUNT_ID\u0000",
+            "value": "1521584933"
+          },
+          {
+            "key": "AUTH_DB_ID\u0000",
+            "value": "3638231841"
+          },
+          {
+            "key": "AUTH_USER_ID",
+            "value": "136"
+          },
+          {
+            "key": "AUTH_SESSION_ID",
+            "value": "51"
+          },
+          {
+            "key": "AUTH_SERIAL_NUM",
+            "value": "55934"
+          },
+          {
+            "key": "AUTH_INSTANCE_NO",
+            "value": "1"
+          },
+          {
+            "key": "AUTH_FAILOVER_ID",
+            "value": "1"
+          },
+          {
+            "key": "AUTH_SERVER_PID",
+            "value": "414"
+          },
+          {
+            "key": "AUTH_SC_SERVER_HOST",
+            "value": "bb0e593d3e47"
+          },
+          {
+            "key": "AUTH_SC_DBUNIQUE_NAME",
+            "value": "FREE"
+          },
+          {
+            "key": "AUTH_SC_INSTANCE_NAME",
+            "value": "FREE"
+          },
+          {
+            "key": "AUTH_SC_INSTANCE_ID",
+            "value": "1"
+          },
+          {
+            "key": "AUTH_SC_INSTANCE_START_TIME",
+            "value": "2026-11-17 16:08:05.000000000 -05:00"
+          },
+          {
+            "key": "AUTH_SC_DB_DOMAIN"
+          },
+          {
+            "key": "AUTH_SC_SERVICE_NAME",
+            "value": "freepdb1"
+          },
+          {
+            "key": "AUTH_ONS_RLB_SUBSCR_PATTERN",
+            "value": "%\"eventType=database/event/servicemetrics/freepdb1\"\u0000"
+          },
+          {
+            "key": "AUTH_ONS_HA_SUBSCR_PATTERN",
+            "value": "(\"eventType=database/event/service\") | (\"eventType=database/event/host\")\u0000"
+          },
+          {
+            "key": "AUTH_SC_REAL_DBUNIQUE_NAME",
+            "value": "FREE"
+          },
+          {
+            "key": "AUTH_INSTANCENAME",
+            "value": "FREE"
+          },
+          {
+            "key": "AUTH_NLS_LXLAN\u0000",
+            "value": "AMERICAN"
+          },
+          {
+            "key": "AUTH_NLS_LXCTERRITORY\u0000",
+            "value": "AMERICA"
+          },
+          {
+            "key": "AUTH_NLS_LXCCURRENCY\u0000",
+            "value": "$"
+          },
+          {
+            "key": "AUTH_NLS_LXCISOCURR\u0000",
+            "value": "AMERICA"
+          },
+          {
+            "key": "AUTH_NLS_LXCNUMERICS\u0000",
+            "value": ".,"
+          },
+          {
+            "key": "AUTH_NLS_LXCDATEFM\u0000",
+            "value": "DD-MON-RR"
+          },
+          {
+            "key": "AUTH_NLS_LXCDATELANG\u0000",
+            "value": "AMERICAN"
+          },
+          {
+            "key": "AUTH_NLS_LXCSORT\u0000",
+            "value": "BINARY"
+          },
+          {
+            "key": "AUTH_NLS_LXCCALENDAR\u0000",
+            "value": "GREGORIAN"
+          },
+          {
+            "key": "AUTH_NLS_LXCUNIONCUR\u0000",
+            "value": "$"
+          },
+          {
+            "key": "AUTH_NLS_LXCTIMEFM\u0000",
+            "value": "HH.MI.SSXFF AM"
+          },
+          {
+            "key": "AUTH_NLS_LXCSTMPFM\u0000",
+            "value": "DD-MON-RR HH.MI.SSXFF AM"
+          },
+          {
+            "key": "AUTH_NLS_LXCTTZNFM\u0000",
+            "value": "HH.MI.SSXFF AM TZR"
+          },
+          {
+            "key": "AUTH_NLS_LXCSTZNFM\u0000",
+            "value": "DD-MON-RR HH.MI.SSXFF AM TZR"
+          },
+          {
+            "key": "AUTH_NLS_LXLENSEMANTICS\u0000",
+            "value": "BYTE"
+          },
+          {
+            "key": "AUTH_NLS_LXNCHARCONVEXCP\u0000",
+            "value": "FALSE"
+          },
+          {
+            "key": "AUTH_NLS_LXCOMP\u0000",
+            "value": "BINARY"
+          },
+          {
+            "key": "AUTH_MAX_OPEN_CURSORS",
+            "value": "300"
+          },
+          {
+            "key": "AUTH_PDB_UID\u0000",
+            "value": "3638231841"
+          },
+          {
+            "key": "AUTH_MAX_IDEN_LENGTH",
+            "value": "128"
+          },
+          {
+            "key": "AUTH_FLAGS",
+            "value": "1"
+          },
+          {
+            "key": "AUTH_SERVER_TYPE",
+            "value": "1"
+          },
+          {
+            "key": "AUTH_RESET_STATE",
+            "value": "0"
+          }
+        ],
+        "secretKeys": [
+          "AUTH_SVR_RESPONSE"
+        ],
+        "secretPositions": [
+          44
+        ],
+        "secretFlags": [
+          0
+        ],
+        "end": {
+          "callStatus": 1,
+          "endToEndSeqNum": 270,
+          "callNumber": 2
+        },
+        "piggybacks": [
+          {
+            "opcode": 5,
+            "data": "AQEQARUWAAEICEFNRVJJQ0FOARAAAQcHQU1FUklDQQEJAAEBASQAAAEHB0FNRVJJQ0EBAQABAgIuLAECAAEICEFMMzJVVEY4AQoAAQkJR1JFR09SSUFOAQwAAQkJREQtTU9OLVJSAQcAAQgIQU1FUklDQU4BCAABBgZCSU5BUlkBCwABDg5ISC5NSS5TU1hGRiBBTQE5AAEYGERELU1PTi1SUiBISC5NSS5TU1hGRiBBTQE6AAESEkhILk1JLlNTWEZGIEFNIFRaUgE7AAEcHERELU1PTi1SUiBISC5NSS5TU1hGRiBBTSBUWlIBPAABAQEkATQAAQYGQklOQVJZATIAAQQEQllURQE9AAEFBUZBTFNFAT4AAQsLgACBkLA8PIAAAAABowABFBQAAAABAAAAiAAAAFkAAAADAAAAcAGqARMTIkRCX0RFVkVMT1BFUl9ST0xFIgABxwA="
+          }
+        ]
+      },
+      "ttcFieldVersion": 24
+    },
+    "sid": 51,
+    "serial": 55934
+  },
+  "signature": {
+    "oracle:msg_type": "RXhlY3V0ZQ==",
+    "oracle:query": "U0VMRUNUIG8uaWQsIG8ucHJvZHVjdF9pZCwgcC5uYW1lLCBvLnF1YW50aXR5LCBvLnRvdGFsX2NlbnRzIEZST00gb3JkZXJzIG8gSk9JTiBwcm9kdWN0cyBwIE9OIHAuaWQgPSBvLnByb2R1Y3RfaWQgV0hFUkUgby5pZCA9IDox"
+  },
+  "netinfo": {
+    "id": "4",
+    "startTime": "2026-11-17T16:08:41.243694Z",
+    "downstream": {
+      "established": "2026-11-17T16:08:41.239565Z",
+      "ipAddress": "127.0.0.1",
+      "port": 57574,
+      "bytesSent": "8269"
+    },
+    "upstream": {
+      "established": "2026-11-17T16:08:41.239691Z",
+      "ipAddress": "127.0.0.1",
+      "port": 15210,
+      "hostname": "localhost",
+      "bytesSent": "12176"
+    },
+    "direction": "EGRESS"
+  }
+}

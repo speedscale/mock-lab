@@ -1,0 +1,101 @@
+{
+  "msgType": "rrpair",
+  "resource": "my-app",
+  "ts": "2026-11-17T16:08:34.252130Z",
+  "l7protocol": "oracle",
+  "duration": 12,
+  "elapsed": "0.012327s",
+  "tags": {
+    "captureMode": "proxy",
+    "dbName": "FREEPDB1",
+    "k8sAppLabel": "my-app",
+    "proxyLocation": "out",
+    "proxyProtocol": "tcp:http",
+    "proxyType": "dual",
+    "proxyVersion": "v2.5.1407-4-g31e1f02a3",
+    "sequence": "3",
+    "source": "goproxy"
+  },
+  "uuid": "81cJuGuWQsS+Hz1MA6QCtQ==",
+  "direction": "OUT",
+  "cluster": "undefined",
+  "namespace": "undefined",
+  "service": "my-app",
+  "command": "Connect",
+  "location": "FREEPDB1",
+  "status": "OK",
+  "oracle": {
+    "request": {
+      "connect": {
+        "version": 317,
+        "versionMin": 300,
+        "serviceOptions": 2049,
+        "sdu": 65535,
+        "tdu": 65535,
+        "protocolCharacteristics": 20376,
+        "nsiFlags": 1,
+        "connectData": "(DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=localhost)(PORT=11521))(CONNECT_DATA=(SERVICE_NAME=FREEPDB1)(CID=(PROGRAM=./bin/shop)(HOST=mattop-2.local)(USER=matthewleray))))",
+        "largeSDU": 2097152,
+        "largeTDU": 2097152,
+        "connectDataOffset": 70
+      }
+    },
+    "response": {
+      "accept": {
+        "version": 317,
+        "serviceOptions": 2049,
+        "sdu": 65536,
+        "tdu": 2097152,
+        "nsiFlags1": 65,
+        "nsiFlags2": 1,
+        "extra": "AA=="
+      }
+    },
+    "session": {
+      "connect": {
+        "version": 317,
+        "versionMin": 300,
+        "serviceOptions": 2049,
+        "sdu": 65535,
+        "tdu": 65535,
+        "protocolCharacteristics": 20376,
+        "nsiFlags": 1,
+        "connectData": "(DESCRIPTION=(ADDRESS=(PROTOCOL=tcp)(HOST=localhost)(PORT=11521))(CONNECT_DATA=(SERVICE_NAME=FREEPDB1)(CID=(PROGRAM=./bin/shop)(HOST=mattop-2.local)(USER=matthewleray))))",
+        "largeSDU": 2097152,
+        "largeTDU": 2097152,
+        "connectDataOffset": 70
+      },
+      "accept": {
+        "version": 317,
+        "serviceOptions": 2049,
+        "sdu": 65536,
+        "tdu": 2097152,
+        "nsiFlags1": 65,
+        "nsiFlags2": 1,
+        "extra": "AA=="
+      },
+      "serviceName": "FREEPDB1"
+    }
+  },
+  "signature": {
+    "oracle:msg_type": "Q29ubmVjdA=="
+  },
+  "netinfo": {
+    "id": "4",
+    "startTime": "2026-11-17T16:08:34.252095Z",
+    "downstream": {
+      "established": "2026-11-17T16:08:34.251988Z",
+      "ipAddress": "127.0.0.1",
+      "port": 57500,
+      "bytesSent": "401"
+    },
+    "upstream": {
+      "established": "2026-11-17T16:08:34.252054Z",
+      "ipAddress": "127.0.0.1",
+      "port": 15210,
+      "hostname": "localhost",
+      "bytesSent": "41"
+    },
+    "direction": "EGRESS"
+  }
+}

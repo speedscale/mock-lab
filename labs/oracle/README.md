@@ -14,7 +14,7 @@ All four connect over plain TCP. The lab does not cover TCPS: the database would
 ## Prerequisites
 
 - Docker with Compose. The lab runs the `gvenzl/oracle-free:23-slim-faststart` image of Oracle Database 23ai Free, which runs natively on amd64 and arm64. It is a large image, about 7 GB, and once it is pulled it starts in well under a minute.
-- proxymock installed, initialized and on `PATH`, in a release with Oracle replay. An earlier release cannot run steps 3 to 7.
+- proxymock v2.5.1421 or later, installed, initialized and on `PATH`. Steps 3 to 7 use the `oracle://` port map, the Oracle mock and the Oracle replay, which earlier releases do not have.
 - For the apps you want to run: Go 1.25, JDK 17 and Maven, Node.js 20, Python 3.10.
 
 Run every command below from this `oracle` directory of your `mock-lab` clone. `make build` builds all four apps; `make build-go` (or `-java`, `-node`, `-python`) builds one.
@@ -161,7 +161,9 @@ The first pass sold the last chain again, so on the second pass the `UPDATE` tha
 make load APP=node
 ```
 
-Four virtual users replay the recording in a loop for 30 seconds, each with its own Oracle session, as fast as the server answers. On a laptop that was about 281,000 statements for the Node.js recording, roughly 9,400 a second, with none failed.
+Four virtual users replay the recording in a loop for 30 seconds, each with its own Oracle session, as fast as the server answers. The run should end with no failed statements.
+
+Keep the throughput numbers to yourself. Oracle's license terms do not allow publishing the results of benchmarks run against Oracle Database without Oracle's consent; see [Benchmark results](https://docs.speedscale.com/proxymock/databases/record/oracle/#benchmarks).
 
 The table's **RESULT MISMATCH** column shows the same effect as step 6: the `UPDATE` of the stock differs from the recording almost every time, because the stock runs out in the first few loops. Load-test mode reports it without failing on it. While the test runs, the sessions show up in Oracle under the program name the app's driver recorded:
 
@@ -176,5 +178,6 @@ SQL
 These come from proxymock, not the lab; [Record Oracle](https://docs.speedscale.com/proxymock/databases/record/oracle/) lists them all.
 
 - The mock and the replay need the database password of each user the app signs in as.
-- The lab does not cover TCPS, and proxymock does not record, mock or replay sessions that use Native Network Encryption.
-- The replay compares status and errors with the recording, not the rows a statement returns.
+- The lab does not cover TCPS or Native Network Encryption (NNE). proxymock records and mocks NNE sessions from go-ora and other clients that use Oracle's legacy negotiation, and the replay negotiates NNE when the database requires it. A modern JDBC thin client that requires NNE is not recorded and cannot be mocked; connect it over TCPS instead. See [Native Network Encryption](https://docs.speedscale.com/proxymock/databases/record/oracle/#nne).
+- Thick-mode clients, the ones that load the Oracle Call Interface (OCI), such as SQL\*Plus and godror, are not supported.
+- The lab's replay checks `requests.result-match-pct`, which compares each statement's status and error with the recording, not the rows it returns.

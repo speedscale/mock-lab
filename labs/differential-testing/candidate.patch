@@ -1,0 +1,113 @@
+--- a/main.go
++++ b/main.go
+@@ -4,6 +4,7 @@ import (
+ 	"bytes"
+ 	"crypto/rand"
+ 	"encoding/json"
++	"errors"
+ 	"fmt"
+ 	"log"
+ 	"net/http"
+@@ -52,9 +53,7 @@ type quote struct {
+ }
+ 
+ type chargeResult struct {
+-	Status        int
+-	ChargeID      string
+-	DeclineReason string
++	ChargeID string
+ }
+ 
+ func envOr(key, fallback string) string {
+@@ -137,22 +136,17 @@ func checkoutHandler(w http.ResponseWriter, r *http.Request) {
+ 		writeJSON(w, status, map[string]any{"error": err.Error()})
+ 		return
+ 	}
+-	res := charge(q.TotalCents, c.CardToken)
+-	switch {
+-	case res.Status == http.StatusCreated:
+-		body := quoteBody(q)
+-		body["status"] = "paid"
+-		body["order_id"] = newOrderID()
+-		body["charge_id"] = res.ChargeID
+-		body["created"] = time.Now().UTC().Format(time.RFC3339)
+-		writeJSON(w, http.StatusCreated, body)
+-	case res.Status == http.StatusPaymentRequired:
+-		writeJSON(w, http.StatusPaymentRequired, map[string]any{"status": "declined", "reason": res.DeclineReason})
+-	default:
+-		// The processor is down or unreachable. The card was never judged.
+-		w.Header().Set("Retry-After", "30")
+-		writeJSON(w, http.StatusServiceUnavailable, map[string]any{"status": "payment_unavailable", "retryable": true})
++	res, err := charge(q.TotalCents, c.CardToken)
++	if err != nil {
++		writeJSON(w, http.StatusPaymentRequired, map[string]any{"status": "declined", "reason": err.Error()})
++		return
+ 	}
++	body := quoteBody(q)
++	body["status"] = "paid"
++	body["order_id"] = newOrderID()
++	body["charge_id"] = res.ChargeID
++	body["created"] = time.Now().UTC().Format(time.RFC3339)
++	writeJSON(w, http.StatusCreated, body)
+ }
+ 
+ func readCart(w http.ResponseWriter, r *http.Request) (cart, bool) {
+@@ -180,12 +174,20 @@ func priceCart(c cart) (quote, int, error) {
+ 	return priceSubtotal(subtotal, c.Region), http.StatusOK, nil
+ }
+ 
+-// priceSubtotal works in integer cents and rounds tax half up.
++// priceSubtotal applies the regional rate through the shared pricing helper.
+ func priceSubtotal(subtotalCents int64, region string) quote {
+-	tax := (subtotalCents*taxPPM[region] + 500000) / 1000000
++	tax := applyRate(subtotalCents, taxRate(region))
+ 	return quote{SubtotalCents: subtotalCents, TaxCents: tax, TotalCents: subtotalCents + tax}
+ }
+ 
++func taxRate(region string) float64 {
++	return float64(taxPPM[region]) / 1e6
++}
++
++func applyRate(cents int64, rate float64) int64 {
++	return int64(float64(cents) * rate)
++}
++
+ func quoteBody(q quote) map[string]any {
+ 	return map[string]any{
+ 		"subtotal": money(q.SubtotalCents),
+@@ -214,9 +216,8 @@ func fetchProduct(sku string) (product, int, error) {
+ 	return p, http.StatusOK, nil
+ }
+ 
+-// charge reports the processor's status so the caller can tell a declined
+-// card from a processor that did not answer.
+-func charge(amountCents int64, cardToken string) chargeResult {
++// charge returns the processor's charge, or an error when no charge was made.
++func charge(amountCents int64, cardToken string) (chargeResult, error) {
+ 	payload, _ := json.Marshal(map[string]any{
+ 		"amount_cents": amountCents,
+ 		"currency":     "USD",
+@@ -224,7 +225,7 @@ func charge(amountCents int64, cardToken string) chargeResult {
+ 	})
+ 	resp, err := client.Post(paymentsURL+"/v1/charges", "application/json", bytes.NewReader(payload))
+ 	if err != nil {
+-		return chargeResult{Status: http.StatusServiceUnavailable}
++		return chargeResult{}, errors.New("payment_failed")
+ 	}
+ 	defer resp.Body.Close()
+ 	var body struct {
+@@ -234,7 +235,13 @@ func charge(amountCents int64, cardToken string) chargeResult {
+ 		} `json:"error"`
+ 	}
+ 	_ = json.NewDecoder(resp.Body).Decode(&body)
+-	return chargeResult{Status: resp.StatusCode, ChargeID: body.ID, DeclineReason: body.Error.DeclineCode}
++	if resp.StatusCode != http.StatusCreated {
++		if body.Error.DeclineCode != "" {
++			return chargeResult{}, errors.New(body.Error.DeclineCode)
++		}
++		return chargeResult{}, errors.New("payment_failed")
++	}
++	return chargeResult{ChargeID: body.ID}, nil
+ }
+ 
+ func money(cents int64) string {

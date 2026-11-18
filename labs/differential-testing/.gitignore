@@ -1,0 +1,4 @@
+/proxymock/*
+!/proxymock/recording/
+/proxymock/recording/.replay/
+/.bin/

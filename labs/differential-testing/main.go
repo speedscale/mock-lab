@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -64,8 +65,16 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
-// Honor the proxy for loopback dependencies as well.
+// Honor the proxy for loopback dependencies as well. NO_PROXY lists
+// host:port entries that are called directly instead.
 func proxyFromEnvAnyHost(req *http.Request) (*url.URL, error) {
+	for _, k := range []string{"NO_PROXY", "no_proxy"} {
+		for _, h := range strings.Split(os.Getenv(k), ",") {
+			if h = strings.TrimSpace(h); h != "" && h == req.URL.Host {
+				return nil, nil
+			}
+		}
+	}
 	keys := []string{"HTTP_PROXY", "http_proxy"}
 	if req.URL.Scheme == "https" {
 		keys = []string{"HTTPS_PROXY", "https_proxy"}

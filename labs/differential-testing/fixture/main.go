@@ -8,6 +8,13 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
+)
+
+// Cached reads are quick. A no-cache read pays for a full lookup.
+const (
+	cachedLookup = 2 * time.Millisecond
+	coldLookup   = 15 * time.Millisecond
 )
 
 type product struct {
@@ -28,6 +35,11 @@ func main() {
 	catalog := http.NewServeMux()
 	catalog.HandleFunc("GET /healthz", ok)
 	catalog.HandleFunc("GET /v1/skus/{sku}", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Cache-Control") == "no-cache" {
+			time.Sleep(coldLookup)
+		} else {
+			time.Sleep(cachedLookup)
+		}
 		p, found := products[r.PathValue("sku")]
 		if !found {
 			writeJSON(w, http.StatusNotFound, map[string]any{"error": map[string]any{"code": "sku_not_found"}})

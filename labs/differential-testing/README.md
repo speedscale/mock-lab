@@ -173,6 +173,8 @@ proxymock report --in proxymock/results/scope-upgrade --baseline proxymock/resul
 
 The report lists every endpoint whose p95 got worse. All five got slower, because every one of them reads the catalog.
 
+Now try the upgrade with the catalog mocked, using the mock command from the first exercise without `NO_PROXY`. The same gated replay passes both checks at a p95 of about 5 ms, because the mock answers at recorded speed and never sees the slower reads. Keep the dependencies you own real when timing matters.
+
 | Build | Unit tests | Response gate | Latency budget |
 | --- | --- | --- | --- |
 | Current | Pass | Pass | Pass, about 8 ms |

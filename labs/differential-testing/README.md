@@ -115,7 +115,7 @@ The [replay verdict guide](https://docs.speedscale.com/proxymock/guides/replay-v
 
 ## When the change only shows up as time
 
-The exercise above mocks both dependencies. That's right for the payment processor, which you don't own. A mock answers at the speed it was recorded, though, so it hides a change in how your service uses a dependency you do own. Our own indexer hit this: a database driver upgrade made every insert wait for the database to flush its buffer, every correctness check passed, and indexing got about seven times slower in production. The release gate we built afterward keeps the databases we own real and replays only the outside services from the recording.
+The exercise above mocks both dependencies. That's right for the payment processor, which you don't own. A mock answers at the speed it was recorded, though, so it hides a change in how your service uses a dependency you do own. Our own indexer hit this: a database driver upgrade made every log insert wait for the database to flush its buffer. Every correctness check passed, and in production the indexer fell behind for the few high-volume customers whose traffic was heavy on logs. The release gate we built afterward keeps the databases we own real and replays only the outside services from the recording.
 
 This exercise does the same. The catalog belongs to the checkout team, so it runs for real. The payment processor stays mocked.
 

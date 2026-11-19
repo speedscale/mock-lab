@@ -11,6 +11,8 @@ NEW MISMATCH: POST /api/checkout recorded 503 -> observed 402
 
 The first is a customer who paid in the recording and is declined by the new build. The second is a payment processor outage that the new build reports to the customer as a declined card.
 
+A [second exercise](#when-the-change-only-shows-up-as-time) keeps the catalog real and catches a client upgrade that changes no response at all, only how long each one takes.
+
 ## What's in the recording
 
 Twelve inbound requests and the 23 dependency calls the service made to answer them: 18 to the catalog and 5 to the payment processor. Two of the recorded payment calls are failures you could not ask a real processor to produce on demand, a declined card (402) and a processor outage (503).
@@ -110,6 +112,71 @@ Restart terminal 1 with the mock command, then repeat the gated replay with `--o
 | `repair.patch` | Pass | Twelve requests pass, exit 0 |
 
 The [replay verdict guide](https://docs.speedscale.com/proxymock/guides/replay-verdicts/) explains the status and body checks and the exit codes.
+
+## When the change only shows up as time
+
+The exercise above mocks both dependencies. That's right for the payment processor, which you don't own. A mock answers at the speed it was recorded, though, so it hides a change in how your service uses a dependency you do own. Our own indexer hit this: a database driver upgrade made every insert wait for the database to flush its buffer, every correctness check passed, and indexing got about seven times slower in production. The release gate we built afterward keeps the databases we own real and replays only the outside services from the recording.
+
+This exercise does the same. The catalog belongs to the checkout team, so it runs for real. The payment processor stays mocked.
+
+`upgrade.patch` stands in for a catalog client upgrade. The new client sends every read with `Cache-Control: no-cache`. The catalog honors it and skips its cache, so each read takes 15 ms instead of 2 ms. The responses are identical.
+
+Reset `main.go` if you applied the earlier patches:
+
+```bash
+git checkout -- main.go
+```
+
+In terminal 1, start the catalog. The fixture also starts a stand-in processor on port 8092, which this exercise doesn't use:
+
+```bash
+go run ./fixture
+```
+
+In terminal 2, start the service with only the processor mocked. `NO_PROXY` sends catalog calls straight to the catalog, and payment calls still go through proxymock:
+
+```bash
+NO_PROXY=localhost:8091 proxymock mock --in proxymock/recording --no-passthrough --out proxymock/results/mocked-scope -- go run .
+```
+
+In terminal 3, save a baseline from the current build:
+
+```bash
+proxymock replay --in proxymock/recording --test-against localhost:8080 --out proxymock/results/scope-baseline
+```
+
+The latency table at the end of the output shows a p95 of about 8 ms. Now apply the upgrade. The unit tests pass:
+
+```bash
+git apply upgrade.patch
+go test ./...
+```
+
+Restart terminal 2 with the same mock command, then replay with the response gate and a latency budget:
+
+```bash
+proxymock replay --in proxymock/recording --test-against localhost:8080 --baseline proxymock/results/scope-baseline --fail-on-new-mismatch --fail-if "latency.p95 > 12" --out proxymock/results/scope-upgrade
+```
+
+```text
+Replay verdict: proxymock/results/scope-upgrade/replay-verdict.json (pass)
+ ✘ failed eval "latency.p95 > 12.00" - observed latency.p95 was 35.00
+```
+
+Every response matches the baseline, so the verdict is `pass`. The latency budget fails the command with exit code 1. Set the budget from your own baseline. Here 12 ms is about one and a half times the baseline p95. In my runs the upgraded build was about five times slower: p95 went from about 8 ms to 35 ms, and throughput fell from about 170 to 37 requests per second.
+
+To see where the time went, compare the two runs:
+
+```bash
+proxymock report --in proxymock/results/scope-upgrade --baseline proxymock/results/scope-baseline --format prompt
+```
+
+The report lists every endpoint whose p95 got worse. All five got slower, because every one of them reads the catalog.
+
+| Build | Unit tests | Response gate | Latency budget |
+| --- | --- | --- | --- |
+| Current | Pass | Pass | Pass, about 8 ms |
+| `upgrade.patch` | Pass | Pass | Fails, about 35 ms, exit 1 |
 
 ## Capture a new recording
 

@@ -1,6 +1,6 @@
 # Oracle: record, mock and replay a database
 
-A shop API that keeps its products and orders in Oracle Database, written four times: in Go, Java, Node.js and Python, each with that language's usual Oracle driver in thin mode. Each one is recorded with proxymock, run with Oracle mocked, and its recorded SQL replayed against the real database, as a regression test and as a load test.
+A shop API that keeps its products and orders in Oracle Database, written four times: in Go, Java (Spring Boot), Node.js and Python, each with that language's usual Oracle driver in thin mode. Each one is recorded with proxymock, run with Oracle mocked, and its recorded SQL replayed against the real database, as a regression test and as a load test.
 
 | Language | Driver | How its SQL crosses the wire |
 |---|---|---|
@@ -20,6 +20,17 @@ All four connect over plain TCP. The lab does not cover TCPS: the database would
 Run every command below from this `oracle` directory of your `mock-lab` clone. `make build` builds all four apps; `make build-go` (or `-java`, `-node`, `-python`) builds one.
 
 The lab binds Oracle to `127.0.0.1:15210`, so it can run next to an Oracle you already have on 1521. Every app listens on `:8080` and reads `DB_HOST`, `DB_PORT` and `DB_SERVICE`, which default to `localhost:11521` and `FREEPDB1`: 11521 is the port proxymock listens on for Oracle in every step below.
+
+## Spring Boot demo
+
+Run these from `labs/oracle` in a demo checkout. Use the lab's synthetic shop data for both the live and mocked runs.
+
+1. Build the app with `make build-java`. Run `make web` and choose **recording-java** in the **Run** selector. Open a `POST /orders` and show the bind values, stock update, generated order ID and commit in the Oracle recording.
+2. Run `make up` ahead of time to pull and start Oracle Free. Run `make record APP=java` to capture 17 fresh requests through JDBC Thin. This replaces the local Java recording in the checkout.
+3. Pause the database with `docker compose pause oracle`. Run `make mock APP=java` to repeat the same requests using the captured Oracle replies, with passthrough disabled. Unpause Oracle with `docker compose unpause oracle`. The mock also works from the committed recording before starting the database.
+4. Run `make outage-java` for a separate timeout example against the real database. The script reads a product, pauses the lab container, checks for HTTP 503 from Spring Boot, then resumes Oracle and checks for the original HTTP 200. It resumes the database on exit if interrupted. The JDBC read timeout defaults to two seconds and can be set with `DB_READ_TIMEOUT_MS`.
+
+`make replay-db APP=java` also runs the captured SQL against the disposable lab database. It verifies statement outcomes and Oracle errors.
 
 ## The app
 

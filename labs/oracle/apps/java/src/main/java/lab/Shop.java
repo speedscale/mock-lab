@@ -1,11 +1,7 @@
 package lab;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.InetSocketAddress;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.sql.CallableStatement;
 import java.sql.Connection;
@@ -13,6 +9,8 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLRecoverableException;
+import java.sql.SQLTimeoutException;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -21,13 +19,21 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.springframework.core.env.Environment;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
-/** The Java version of the oracle lab's shop API, on the Oracle JDBC thin driver (ojdbc11). */
+/** The shop API uses Oracle JDBC Thin to run orders and reports. */
+@RestController
 public final class Shop {
-    private static final Pattern ID_ROUTE = Pattern.compile("^/(products|orders)/([^/]+)$");
     private static final Pattern JSON_INT = Pattern.compile("\"(\\w+)\"\\s*:\\s*(-?\\d+)");
 
     private final String url;
@@ -35,9 +41,14 @@ public final class Shop {
     // a small pool of open connections, so prepared statements are reused across requests as an app pool does
     private final BlockingQueue<Connection> pool = new ArrayBlockingQueue<>(4);
 
-    private Shop(String url, Properties props) {
-        this.url = url;
-        this.props = props;
+    public Shop(Environment env) {
+        this.url = "jdbc:oracle:thin:@//" + env.getProperty("DB_HOST", "localhost") + ":"
+                + env.getProperty("DB_PORT", "11521") + "/" + env.getProperty("DB_SERVICE", "FREEPDB1");
+        this.props = new Properties();
+        props.setProperty("user", env.getProperty("DB_USER", "shop"));
+        props.setProperty("password", env.getProperty("DB_PASSWORD", "LabShop2026"));
+        props.setProperty("oracle.net.CONNECT_TIMEOUT", "2000ms");
+        props.setProperty("oracle.jdbc.ReadTimeout", env.getProperty("DB_READ_TIMEOUT_MS", "2000"));
     }
 
     static final class HttpError extends Exception {
@@ -47,29 +58,6 @@ public final class Shop {
             super(message);
             this.status = status;
         }
-    }
-
-    record Reply(int status, Object body) {}
-
-    private static String env(String name, String def) {
-        String v = System.getenv(name);
-        return v == null || v.isEmpty() ? def : v;
-    }
-
-    public static void main(String[] args) throws IOException {
-        String url = "jdbc:oracle:thin:@//" + env("DB_HOST", "localhost") + ":" + env("DB_PORT", "11521")
-                + "/" + env("DB_SERVICE", "FREEPDB1");
-        Properties props = new Properties();
-        props.setProperty("user", env("DB_USER", "shop"));
-        props.setProperty("password", env("DB_PASSWORD", "LabShop2026"));
-        Shop shop = new Shop(url, props);
-        int port = Integer.parseInt(env("PORT", "8080"));
-        HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-        server.createContext("/", shop::handle);
-        server.setExecutor(Executors.newFixedThreadPool(4));
-        server.start();
-        System.out.println("shop-java listening on :" + port + ", database "
-                + env("DB_HOST", "localhost") + ":" + env("DB_PORT", "11521"));
     }
 
     private Connection take() throws SQLException {
@@ -90,61 +78,33 @@ public final class Shop {
         }
     }
 
-    private void handle(HttpExchange ex) throws IOException {
-        Reply reply;
-        try {
-            reply = route(ex);
-        } catch (HttpError e) {
-            reply = new Reply(e.status, Map.of("error", e.getMessage()));
-        } catch (SQLException e) {
-            System.err.println(e);
-            reply = new Reply(500, Map.of("error", "database: " + e.getMessage()));
-        }
-        byte[] body = Json.write(reply.body()).getBytes(StandardCharsets.UTF_8);
-        ex.getResponseHeaders().set("Content-Type", "application/json");
-        ex.sendResponseHeaders(reply.status(), body.length);
-        ex.getResponseBody().write(body);
-        ex.close();
+    private static ResponseEntity<String> reply(int status, Object body) {
+        return ResponseEntity.status(status).contentType(MediaType.APPLICATION_JSON).body(Json.write(body));
     }
 
-    private Reply route(HttpExchange ex) throws HttpError, SQLException, IOException {
-        String method = ex.getRequestMethod();
-        String path = ex.getRequestURI().getPath();
-        Map<String, String> query = query(ex.getRequestURI().getRawQuery());
-        if (method.equals("GET") && path.equals("/health")) {
-            return health();
-        }
-        if (method.equals("GET") && path.equals("/products")) {
-            return listProducts(query.getOrDefault("category", ""));
-        }
-        if (method.equals("POST") && path.equals("/orders")) {
-            return placeOrder(ex.getRequestBody());
-        }
-        if (method.equals("GET") && path.equals("/reports/top-products")) {
-            int limit;
-            try {
-                limit = positive(query.get("limit"));
-            } catch (HttpError e) {
-                limit = 3;
-            }
-            return topProducts(limit);
-        }
-        Matcher m = ID_ROUTE.matcher(path);
-        if (method.equals("GET") && m.matches()) {
-            int id = positive(m.group(2));
-            return m.group(1).equals("products") ? getProduct(id) : getOrder(id);
-        }
-        throw new HttpError(404, "not found");
+    @ExceptionHandler(HttpError.class)
+    public ResponseEntity<String> handleHttpError(HttpError error) {
+        return reply(error.status, Map.of("error", error.getMessage()));
     }
 
-    private Reply health() throws SQLException {
+    @ExceptionHandler(SQLException.class)
+    public ResponseEntity<String> handleDatabaseError(SQLException error) {
+        System.err.println(error);
+        if (error instanceof SQLRecoverableException || error instanceof SQLTimeoutException) {
+            return reply(503, Map.of("error", "database unavailable"));
+        }
+        return reply(500, Map.of("error", "database: " + error.getMessage()));
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<String> health() throws SQLException {
         Connection c = take();
         try (PreparedStatement st = c.prepareStatement("SELECT 1 FROM dual")) {
             st.executeQuery().close();
         } finally {
             give(c);
         }
-        return new Reply(200, Map.of("status", "ok"));
+        return reply(200, Map.of("status", "ok"));
     }
 
     private static Map<String, Object> product(ResultSet rs) throws SQLException {
@@ -157,7 +117,9 @@ public final class Shop {
         return p;
     }
 
-    private Reply listProducts(String category) throws SQLException {
+    @GetMapping("/products")
+    public ResponseEntity<String> listProducts(@RequestParam(name = "category", defaultValue = "") String category)
+            throws SQLException {
         Connection c = take();
         List<Object> products = new ArrayList<>();
         try (PreparedStatement st = c.prepareStatement(
@@ -171,10 +133,12 @@ public final class Shop {
         } finally {
             give(c);
         }
-        return new Reply(200, Map.of("products", products));
+        return reply(200, Map.of("products", products));
     }
 
-    private Reply getProduct(int id) throws SQLException, HttpError {
+    @GetMapping("/products/{id}")
+    public ResponseEntity<String> getProduct(@PathVariable("id") String productId) throws SQLException, HttpError {
+        int id = positive(productId);
         Connection c = take();
         try (PreparedStatement st = c.prepareStatement(
                 "SELECT id, sku, name, price_cents, stock FROM products WHERE id = ?")) {
@@ -183,7 +147,7 @@ public final class Shop {
                 if (!rs.next()) {
                     throw new HttpError(404, "not found");
                 }
-                return new Reply(200, product(rs));
+                return reply(200, product(rs));
             }
         } finally {
             give(c);
@@ -191,7 +155,8 @@ public final class Shop {
     }
 
     /** Takes the stock and records the order in one transaction, so two orders cannot sell the same unit. */
-    private Reply placeOrder(InputStream in) throws SQLException, HttpError, IOException {
+    @PostMapping("/orders")
+    public ResponseEntity<String> placeOrder(InputStream in) throws SQLException, HttpError, IOException {
         Map<String, Integer> body = new LinkedHashMap<>();
         Matcher m = JSON_INT.matcher(new String(in.readAllBytes(), StandardCharsets.UTF_8));
         while (m.find()) {
@@ -242,7 +207,7 @@ public final class Shop {
             o.put("product_id", productId);
             o.put("quantity", quantity);
             o.put("total_cents", total);
-            return new Reply(201, o);
+            return reply(201, o);
         } catch (SQLException | HttpError e) {
             c.rollback();
             throw e;
@@ -252,7 +217,9 @@ public final class Shop {
         }
     }
 
-    private Reply getOrder(int id) throws SQLException, HttpError {
+    @GetMapping("/orders/{id}")
+    public ResponseEntity<String> getOrder(@PathVariable("id") String orderId) throws SQLException, HttpError {
+        int id = positive(orderId);
         Connection c = take();
         try (PreparedStatement st = c.prepareStatement(
                 "SELECT o.id, o.product_id, p.name, o.quantity, o.total_cents FROM orders o "
@@ -268,14 +235,22 @@ public final class Shop {
                 o.put("name", rs.getString("name"));
                 o.put("quantity", rs.getInt("quantity"));
                 o.put("total_cents", rs.getInt("total_cents"));
-                return new Reply(200, o);
+                return reply(200, o);
             }
         } finally {
             give(c);
         }
     }
 
-    private Reply topProducts(int limit) throws SQLException {
+    @GetMapping("/reports/top-products")
+    public ResponseEntity<String> topProducts(@RequestParam(name = "limit", required = false) String requestedLimit)
+            throws SQLException {
+        int limit;
+        try {
+            limit = positive(requestedLimit);
+        } catch (HttpError e) {
+            limit = 3;
+        }
         Connection c = take();
         List<Object> top = new ArrayList<>();
         int total;
@@ -300,7 +275,7 @@ public final class Shop {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("orders", total);
         out.put("top", top);
-        return new Reply(200, out);
+        return reply(200, out);
     }
 
     private static int positive(Object value) throws HttpError {
@@ -315,16 +290,4 @@ public final class Shop {
         throw new HttpError(400, "bad request");
     }
 
-    private static Map<String, String> query(String raw) {
-        Map<String, String> q = new LinkedHashMap<>();
-        if (raw == null) {
-            return q;
-        }
-        for (String pair : raw.split("&")) {
-            String[] kv = pair.split("=", 2);
-            q.put(URLDecoder.decode(kv[0], StandardCharsets.UTF_8),
-                    kv.length > 1 ? URLDecoder.decode(kv[1], StandardCharsets.UTF_8) : "");
-        }
-        return q;
-    }
 }

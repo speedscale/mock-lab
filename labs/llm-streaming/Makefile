@@ -1,4 +1,5 @@
-.PHONY: test build server slow-server record replay replay-goals llm-metrics load clean
+.PHONY: test build server slow-server regressed-server record replay replay-goals llm-metrics load \
+	eval-record eval-replay eval-gate clean
 
 PROXYMOCK ?= proxymock
 RECORDING_DIR ?= proxymock/recording
@@ -7,6 +8,8 @@ TARGET_URL ?= http://localhost:8000
 FORMAT ?= openai
 REQUESTS ?= 8
 USAGE ?= true
+SCENARIO ?= timing
+EVAL_RECORDING_DIR ?= proxymock/eval-recording
 TTFT_P95_MS ?= 800
 ITL_P95_MS ?= 40
 LOAD_VUS ?= 4
@@ -28,9 +31,13 @@ server: build
 slow-server: build
 	FIRST_TOKEN_MS=900 TOKEN_GAP_MS=50 ./bin/model-server
 
+# A model that answers as fast as the default one and gets two answers wrong.
+regressed-server: build
+	MODE=regressed ./bin/model-server
+
 record: build
 	PROXYMOCK="$(PROXYMOCK)" RECORDING_DIR="$(RECORDING_DIR)" FORMAT="$(FORMAT)" \
-		REQUESTS="$(REQUESTS)" USAGE="$(USAGE)" ./scripts/record.sh
+		REQUESTS="$(REQUESTS)" USAGE="$(USAGE)" SCENARIO="$(SCENARIO)" ./scripts/record.sh
 
 # Each replay starts from an empty --out folder. proxymock scores the replay
 # verdict from every pair in that folder, so pairs left by a replay of another
@@ -61,6 +68,24 @@ load:
 	$(PROXYMOCK) replay --in "$(RECORDING_DIR)" --test-against "$(TARGET_URL)" \
 		--load-test --vus $(LOAD_VUS) --for $(LOAD_FOR) \
 		--fail-if 'llm.ttft-p95 > $(TTFT_P95_MS)'
+
+# The answer-quality targets use a second recording, made by a client that
+# sends tool definitions with every request.
+eval-record: build
+	PROXYMOCK="$(PROXYMOCK)" RECORDING_DIR="$(EVAL_RECORDING_DIR)" FORMAT="$(FORMAT)" \
+		REQUESTS="$(REQUESTS)" USAGE="$(USAGE)" SCENARIO=eval ./scripts/record.sh
+
+eval-replay:
+	rm -rf "$(RESULTS_DIR)/eval"
+	$(PROXYMOCK) replay --in "$(EVAL_RECORDING_DIR)" --test-against "$(TARGET_URL)" \
+		--out "$(RESULTS_DIR)/eval" \
+		--fail-if 'llm.tool-call-match-pct < 100' \
+		--fail-if 'llm.failure-pct > 0'
+
+# Starts its own two model servers, so it needs no other terminal.
+eval-gate: build
+	PROXYMOCK="$(PROXYMOCK)" EVAL_RECORDING_DIR="$(EVAL_RECORDING_DIR)" RESULTS_DIR="$(RESULTS_DIR)" \
+		./scripts/eval-gate.sh
 
 clean:
 	rm -rf bin "$(RESULTS_DIR)" proxymock.log

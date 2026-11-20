@@ -9,6 +9,7 @@ recording_dir=${RECORDING_DIR:-proxymock/recording}
 format=${FORMAT:-openai}
 requests=${REQUESTS:-8}
 usage=${USAGE:-true}
+scenario=${SCENARIO:-timing}
 app_port=${APP_PORT:-8000}
 log_file=$root_dir/proxymock.log
 recorder_pid=
@@ -45,7 +46,7 @@ for _ in $(seq 1 30); do
   sleep 0.5
 done
 
-./bin/chat-client -url http://127.0.0.1:4143 -format "$format" -n "$requests" -usage="$usage"
+./bin/chat-client -url http://127.0.0.1:4143 -format "$format" -n "$requests" -usage="$usage" -scenario "$scenario"
 
 cleanup
 recorder_pid=

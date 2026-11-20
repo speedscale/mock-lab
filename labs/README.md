@@ -19,7 +19,7 @@ Companion scenarios. Each directory has its own README and is independent of the
 | [chaos](chaos/README.md) | Verify a Node storefront against API and latency requirements using recorded inventory traffic |
 | [browser-journeys](browser-journeys/README.md) | Run Playwright tests with a frontend's API calls answered from a recording, or compared with it, and see which call broke a journey |
 | [playwright-gates](playwright-gates/README.md) | Use an agent and the browser-journey-tests skill to turn an ordinary Playwright suite into a regression gate and a web-vitals and API-load performance gate |
-| [llm-streaming](llm-streaming/README.md) | Record streamed LLM chat traffic, replay it to measure time to first token and inter-token latency, and fail the replay when a slower model server regresses them |
+| [llm-streaming](llm-streaming/README.md) | Record streamed LLM chat traffic, replay it to measure time to first token and inter-token latency, and fail the replay when a model server is slower or when its tool calls and answers change |
 | [grpc](grpc/README.md) | Read recorded gRPC and protobuf bodies as Protoscope and as named JSON from the service's `.proto`, with Pub/Sub, gRPC health and OTLP calls named by the built-in schemas and gRPC error details decoded |
 | [sqlserver](sqlserver/README.md) | Record a shop API in Go, Java, Node.js and Python on SQL Server, run it with SQL Server mocked, and replay its recorded SQL against the database as a regression and a load test |
 | [oracle](oracle/README.md) | Record a shop API in Go, Java, Node.js and Python on Oracle Database, run it with Oracle mocked, and replay its recorded SQL against the database as a regression and a load test |

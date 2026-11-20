@@ -76,9 +76,19 @@ echo "== 3. The regressed model's run against the other one"
 "$proxymock" replay score "$results_dir/eval-candidate" --baseline "$results_dir/eval-baseline" \
   --html "$results_dir/eval-comparison.html"
 
-# A candidate that rejects the requests also fails the gate, and that says
-# nothing about its answers.
-unanswered=$(jq '.summary.llm.noCompletion // 0' "$results_dir/eval-candidate/replay-verdict.json")
+# A failed gate means the answers got worse only when the regressed model
+# answered. A replay that left no readable verdict, scored nothing, or was
+# turned away by the model fails the gate too, and says nothing about answers.
+verdict=$results_dir/eval-candidate/replay-verdict.json
+if ! counts=$(jq -er '.summary.llm | "\(.scored) \(.noCompletion // 0)"' "$verdict" 2>/dev/null); then
+  echo "The regressed model's replay left no readable verdict at $verdict." >&2
+  exit 1
+fi
+read -r scored unanswered <<<"$counts"
+if [[ ! $scored =~ ^[1-9][0-9]*$ ]]; then
+  echo "The regressed model's replay scored no answers. See $verdict." >&2
+  exit 1
+fi
 if [[ $unanswered -ne 0 ]]; then
   echo "The regressed model returned no answer to $unanswered request(s). See model-server.log." >&2
   exit 1

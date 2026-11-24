@@ -1,0 +1,22 @@
+{
+  "id": "support-note-demo",
+  "transforms": [
+    {
+      "extractor": {
+        "type": "req_body"
+      },
+      "transforms": [
+        {
+          "type": "json_path",
+          "config": {
+            "path": "note",
+            "create": "false"
+          }
+        },
+        {
+          "type": "dlp_field"
+        }
+      ]
+    }
+  ]
+}

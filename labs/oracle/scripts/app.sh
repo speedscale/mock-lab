@@ -8,7 +8,7 @@ lang=${1:?usage: app.sh go|java|node|python}
 cd "$root_dir/apps/$lang"
 case $lang in
   go) exec ./bin/shop ;;
-  java) exec java -cp "target/classes:target/lib/*" lab.Shop ;;
+  java) exec java -jar target/shop-java-1.0.0.jar ;;
   node) exec node server.js ;;
   python) exec .venv/bin/python server.py ;;
   *) echo "unknown language $lang; use go, java, node or python" >&2; exit 2 ;;

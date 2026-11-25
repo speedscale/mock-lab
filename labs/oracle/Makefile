@@ -1,5 +1,5 @@
 .PHONY: build build-go build-java build-node build-python up down reset record mock replay-db replay-twice load web \
-	record-all mock-all replay-db-all test
+	record-all mock-all replay-db-all outage-java test
 
 PROXYMOCK ?= proxymock
 APP ?= go
@@ -37,6 +37,9 @@ record:
 
 mock:
 	./scripts/mock.sh $(APP)
+
+outage-java:
+	bash ./scripts/outage-java.sh
 
 replay-db:
 	./scripts/replay-db.sh $(APP)

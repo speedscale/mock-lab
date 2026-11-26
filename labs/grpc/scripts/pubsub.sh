@@ -67,6 +67,12 @@ finish_worker() {
 }
 
 case "${1:-}" in
+  broker)
+    start_broker
+    start_worker localhost:8085
+    ./bin/pubsub-worker seed
+    finish_worker
+    ;;
   record)
     if [[ -e "$recording" ]]; then
       echo "Recording already exists. Set PUBSUB_RECORDING to a fresh directory to capture again." >&2
@@ -91,7 +97,7 @@ case "${1:-}" in
     ;;
   mock)
     test -d "$recording"
-    "$proxymock" mock --in "$recording" --out "$run_dir/mocked" \
+    "$proxymock" mock --in "$recording" --out "$run_dir/mocked" --no-passthrough \
       --map 18085=localhost:8085 --pubsub-passes 2 --pubsub-gap-multiple 0.5 >"$run_dir/mock.log" 2>&1 &
     pids+=("$!")
     wait_for_port 18085 "$!" "$run_dir/mock.log"
@@ -108,7 +114,7 @@ case "${1:-}" in
     finish_worker
     ;;
   *)
-    echo "usage: $0 record|mock|republish" >&2
+    echo "usage: $0 broker|record|mock|republish" >&2
     exit 2
     ;;
 esac

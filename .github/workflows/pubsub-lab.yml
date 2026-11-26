@@ -24,6 +24,8 @@ jobs:
           cache-dependency-path: labs/grpc/go.sum
       - name: Build and vet
         run: make pubsub-build test
+      - name: Exercise the Go worker against the local broker
+        run: bash scripts/pubsub.sh broker
       - name: Record, mock, and republish
         env:
           SPEEDSCALE_API_KEY: ${{ secrets.SPEEDSCALE_API_KEY }}

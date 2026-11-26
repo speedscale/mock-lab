@@ -1,0 +1,47 @@
+name: Pub/Sub lab
+
+on:
+  pull_request:
+    paths:
+      - 'labs/grpc/**'
+      - '.github/workflows/pubsub-lab.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  pubsub:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: labs/grpc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: labs/grpc/go.mod
+          cache-dependency-path: labs/grpc/go.sum
+      - name: Build and vet
+        run: make pubsub-build test
+      - name: Record, mock, and republish
+        env:
+          SPEEDSCALE_API_KEY: ${{ secrets.SPEEDSCALE_API_KEY }}
+        run: |
+          if [[ -z "$SPEEDSCALE_API_KEY" ]]; then
+            echo "::notice::Skipping the proxymock walkthrough because SPEEDSCALE_API_KEY is unavailable"
+            exit 0
+          fi
+          curl -LfsS https://downloads.speedscale.com/proxymock/install-proxymock -o "$RUNNER_TEMP/install-proxymock"
+          sh "$RUNNER_TEMP/install-proxymock"
+          export PATH="$HOME/.speedscale:$PATH"
+          proxymock init --api-key "$SPEEDSCALE_API_KEY" --yes --quiet --no-rcfile-update
+          make pubsub-record pubsub-mock pubsub-republish
+      - name: Upload local lab logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pubsub-lab-logs
+          path: labs/grpc/.run/pubsub.*/*.log
+          if-no-files-found: ignore
+          include-hidden-files: true

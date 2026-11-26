@@ -1,0 +1,8 @@
+{
+  "generator": {
+    "pubsub": {
+      "republish": true,
+      "drainTimeout": "0s"
+    }
+  }
+}

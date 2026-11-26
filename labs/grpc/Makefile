@@ -1,4 +1,4 @@
-.PHONY: test build record mock replay check web gen clean
+.PHONY: test build record mock replay check web gen clean pubsub-build pubsub-record pubsub-mock pubsub-republish
 
 PROXYMOCK ?= proxymock
 RECORDING_DIR ?= proxymock/recording
@@ -10,6 +10,13 @@ test:
 build:
 	mkdir -p bin
 	go build -buildvcs=false -o bin/ ./cmd/...
+
+pubsub-build:
+	mkdir -p bin
+	go build -buildvcs=false -o bin/ ./cmd/pubsub-fake ./cmd/pubsub-worker
+
+pubsub-record pubsub-mock pubsub-republish: pubsub-%: pubsub-build
+	PROXYMOCK="$(PROXYMOCK)" bash scripts/pubsub.sh $*
 
 # Record the client's calls to the orders service, and the service's Pub/Sub
 # and OTLP calls, against local fakes. Replaces the checked-in recording.

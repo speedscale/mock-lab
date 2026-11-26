@@ -118,6 +118,22 @@ The service connects to `localhost:18085` and `localhost:14317` directly. gRPC c
 
 Order IDs and timestamps are derived from the order number, so a new recording holds the same bodies as the checked-in one.
 
+## Test a Pub/Sub subscriber
+
+This walkthrough reuses the in-memory Pub/Sub broker with a small Go worker that reads order events over `StreamingPull`. It needs Bash, Go 1.26+, `nc`, and a current proxymock with `--pubsub-passes`, `--pubsub-gap-multiple`, and `generator.pubsub.republish` support. Run it from `labs/grpc` with the default proxymock ports and ports 8085 and 18085 free.
+
+```bash
+make pubsub-record
+make pubsub-mock
+make pubsub-republish
+```
+
+- **Record** runs the worker through the reverse proxy on port 18085. The seed process publishes three order events directly to the broker on port 8085, about 400 ms apart. The worker acknowledges all three, and the capture goes to `proxymock/results/pubsub/recorded`.
+- **Mock** stops short of running a broker. The worker connects to the mock on port 18085, nacks its first delivery, and requires the same message ID with a fresh ack ID and delivery attempt 2. Two passes give the worker six distinct messages to acknowledge. The gap multiplier of 0.5 halves the recorded gaps between deliveries.
+- **Republish** starts an empty broker with the same topic and subscription. Replay turns the captured deliveries into three publishes. Replay must report zero failed requests, and the worker must acknowledge three messages from the new broker. The fake provides no Cloud Monitoring metrics.
+
+Each run saves logs and any observed mock or replay traffic under a new `.run/pubsub.*` directory. Use `PUBSUB_RECORDING=proxymock/results/pubsub/second make pubsub-record` to record again and pass the same variable to the other two targets to test that recording.
+
 ## Change the `.proto`
 
 ```shell

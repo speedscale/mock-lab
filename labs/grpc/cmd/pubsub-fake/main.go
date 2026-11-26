@@ -6,6 +6,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,12 +15,11 @@ import (
 )
 
 func main() {
-	addr := ":8085"
-	if port := os.Getenv("PORT"); port != "" {
-		addr = ":" + port
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8085"
 	}
-	// NewServerWithPort listens on loopback only; this listens on every
-	// interface, so a container or another host can reach it too
+	addr := net.JoinHostPort(os.Getenv("HOST"), port)
 	srv := pstest.NewServerWithAddress(addr)
 	log.Printf("pubsub fake listening on %s", srv.Addr)
 
